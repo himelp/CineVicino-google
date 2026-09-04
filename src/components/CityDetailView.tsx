@@ -82,30 +82,30 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-xs font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-medium transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Torna alla ricerca</span>
         </button>
-        <span className="text-neutral-600">/</span>
+        <span className="text-neutral-700">/</span>
         <span className="text-xs text-neutral-400 font-medium">
           {city.region}
         </span>
-        <span className="text-neutral-600">/</span>
+        <span className="text-neutral-700">/</span>
         <span className="text-xs text-neutral-400 font-medium">
           Provincia di {city.province} ({city.province_code})
         </span>
       </div>
 
       {/* City Hero Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-neutral-900/80 border border-neutral-800 backdrop-blur-md mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="p-6 sm:p-8 rounded-3xl bg-[#0a0a0a] border border-white/10 backdrop-blur-md mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 text-xs font-bold border border-amber-500/20">
+            <span className="px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold border border-[#D4AF37]/30">
               Comune d'Italia (ISTAT)
             </span>
             {city.is_provincial_capital && (
-              <span className="px-2.5 py-0.5 rounded-md bg-neutral-800 text-neutral-300 text-xs font-semibold">
+              <span className="px-3 py-0.5 rounded-full bg-white/10 text-neutral-300 text-xs font-semibold">
                 Capoluogo di Provincia
               </span>
             )}
@@ -114,24 +114,24 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-            Cinema a {city.name}
+          <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-tight">
+            Cinema a <span className="italic text-[#D4AF37]">{city.name}</span>
           </h1>
           <p className="text-sm sm:text-base text-neutral-400 mt-2">
             Programmazione, orari e biglietti ufficiali per le sale di {city.name} ({city.province_code}) e dintorni.
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-neutral-950/70 p-4 rounded-2xl border border-neutral-800 text-center">
+        <div className="flex items-center gap-4 bg-white/[0.03] p-4 rounded-2xl border border-white/10 text-center">
           <div>
-            <span className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
+            <span className="text-2xl sm:text-3xl font-black text-[#D4AF37] font-mono">
               {activeCinemas.length}
             </span>
             <span className="block text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
               Sale censite
             </span>
           </div>
-          <div className="w-px h-10 bg-neutral-800" />
+          <div className="w-px h-10 bg-white/10" />
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
               {filteredShowtimes.length}
@@ -148,17 +148,17 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
         <div className="space-y-8">
           
           {/* Quick Filters */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0a0a0a] border border-white/10">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-neutral-400">Filtra per formato:</span>
+              <span className="text-xs font-medium text-neutral-400">Filtra formato:</span>
               {['all', '2D', '3D', 'IMAX', 'Atmos'].map(fmt => (
                 <button
                   key={fmt}
                   onClick={() => setSelectedFormat(fmt)}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
                     selectedFormat === fmt
-                      ? 'bg-amber-500 text-neutral-950 font-bold'
-                      : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                      ? 'bg-[#D4AF37] text-black font-bold'
+                      : 'bg-white/5 text-neutral-300 hover:bg-white/10 border border-white/10'
                   }`}
                 >
                   {fmt === 'all' ? 'Tutti i formati' : fmt}
@@ -171,7 +171,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                 type="checkbox"
                 checked={onlyVose}
                 onChange={e => setOnlyVose(e.target.checked)}
-                className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-neutral-800 border-neutral-700"
+                className="w-4 h-4 rounded text-[#D4AF37] focus:ring-[#D4AF37] bg-white/5 border-white/20 accent-[#D4AF37]"
               />
               <span>Solo lingua originale (VOSE / VO)</span>
             </label>
@@ -179,8 +179,8 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
 
           {/* List of Cinemas in Comune */}
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Film className="w-5 h-5 text-amber-500" />
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-white flex items-center gap-2">
+              <Film className="w-5 h-5 text-[#D4AF37]" />
               <span>Sale cinematografiche attive a {city.name}</span>
             </h2>
 
@@ -192,17 +192,17 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                 return (
                   <div
                     key={cinema.id}
-                    className="p-6 rounded-3xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-all shadow-xl flex flex-col justify-between"
+                    className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all shadow-xl flex flex-col justify-between"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-bold text-white">
+                            <h3 className="text-lg font-serif font-bold text-white">
                               {cinema.name}
                             </h3>
                             {cinema.chain && (
-                              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">
                                 {cinema.chain}
                               </span>
                             )}
@@ -215,26 +215,26 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
 
                         <button
                           onClick={() => onToggleFavorite(cinema.id)}
-                          className={`p-2 rounded-xl border transition-colors ${
-                            isFav ? 'bg-amber-500 text-neutral-950 border-amber-400' : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-white'
+                          className={`p-2 rounded-full border transition-colors ${
+                            isFav ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-white/5 text-neutral-400 border-white/10 hover:text-white'
                           }`}
                           title="Salva cinema nei preferiti"
                         >
-                          <Bookmark className={`w-4 h-4 ${isFav ? 'fill-neutral-950' : ''}`} />
+                          <Bookmark className={`w-3.5 h-3.5 ${isFav ? 'fill-black' : ''}`} />
                         </button>
                       </div>
 
                       {/* Features */}
                       <div className="flex flex-wrap gap-1.5 mt-3">
                         {cinema.features.map(f => (
-                          <span key={f} className="text-[10px] px-2 py-0.5 rounded bg-neutral-800/80 text-neutral-400 font-mono">
+                          <span key={f} className="text-[10px] px-2.5 py-0.5 rounded-full bg-white/5 border border-white/5 text-neutral-400 font-mono">
                             {f}
                           </span>
                         ))}
                       </div>
 
                       {/* Today's Showtimes */}
-                      <div className="mt-6 pt-4 border-t border-neutral-800">
+                      <div className="mt-6 pt-4 border-t border-white/10">
                         <span className="text-xs font-semibold text-neutral-300 block mb-3">
                           Programmazione di oggi:
                         </span>
@@ -244,16 +244,16 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                             Nessun orario corrispondente ai filtri per oggi.
                           </p>
                         ) : (
-                          <div className="space-y-3">
+                          <div className="space-y-2.5">
                             {cinemaSt.map(st => {
                               const movie = moviesList.find(m => m.id === st.movie_id);
                               return (
-                                <div key={st.id} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-neutral-950/60 border border-neutral-800/70">
+                                <div key={st.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-black/40 border border-white/10">
                                   <div 
                                     onClick={() => movie && onSelectMovie(movie)}
                                     className="cursor-pointer group flex items-center gap-2.5 overflow-hidden"
                                   >
-                                    <span className="text-xs font-bold text-white group-hover:text-amber-400 truncate max-w-[180px]">
+                                    <span className="text-xs font-bold text-white group-hover:text-[#D4AF37] truncate max-w-[180px]">
                                       {st.movie_title || movie?.title_it}
                                     </span>
                                     <span className="text-[10px] text-neutral-500 font-mono">
@@ -265,7 +265,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                     href={st.ticket_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-3 py-1 rounded-lg bg-neutral-900 hover:bg-amber-500 text-amber-400 hover:text-neutral-950 border border-amber-500/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                                    className="px-3 py-1 rounded-lg bg-white/5 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
                                   >
                                     <span>{st.time}</span>
                                     <ExternalLink className="w-3 h-3" />
@@ -279,12 +279,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                     </div>
 
                     {/* Official website outbound link */}
-                    <div className="mt-6 pt-4 border-t border-neutral-800 flex items-center justify-between text-xs">
+                    <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
                       <a
                         href={cinema.website_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-neutral-400 hover:text-white flex items-center gap-1.5"
+                        className="text-[10px] uppercase tracking-widest text-[#D4AF37] hover:text-white border-b border-[#D4AF37]/30 hover:border-white pb-0.5 transition-colors flex items-center gap-1.5"
                       >
                         <span>{t.officialWebsite}</span>
                         <ExternalLink className="w-3 h-3" />
@@ -300,12 +300,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
         /* Case 2: Comune HAS NO Cinemas — calculate and show nearest */
         <div className="space-y-8">
           
-          <div className="p-8 rounded-3xl bg-neutral-900 border border-neutral-800 text-center max-w-2xl mx-auto shadow-xl">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
+          <div className="p-8 rounded-3xl bg-[#0a0a0a] border border-white/10 text-center max-w-2xl mx-auto shadow-xl">
+            <div className="w-14 h-14 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-7 h-7" />
             </div>
             
-            <h2 className="text-xl sm:text-2xl font-bold text-white">
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
               Nessun cinema attualmente a {city.name}
             </h2>
             <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
@@ -315,8 +315,8 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
 
           {/* Nearest Cinemas List */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-amber-500" />
+            <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
+              <Navigation className="w-5 h-5 text-[#D4AF37]" />
               <span>Cinema più vicini a {city.name} (ordinati per distanza stradale stimata)</span>
             </h3>
 
@@ -324,20 +324,20 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
               {data?.nearest_cinemas.map(nearest => (
                 <div 
                   key={nearest.id}
-                  className="p-6 rounded-3xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col justify-between"
+                  className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <span className="text-xs font-black text-amber-400 font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                        <span className="text-xs font-black text-[#D4AF37] font-mono px-2.5 py-0.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
                           {nearest.distance_km.toFixed(1)} km da {city.name}
                         </span>
-                        <h4 className="text-base font-bold text-white mt-2">
+                        <h4 className="text-base font-serif font-bold text-white mt-2.5">
                           {nearest.name}
                         </h4>
                       </div>
                       {nearest.chain && (
-                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
                           {nearest.chain}
                         </span>
                       )}
@@ -349,12 +349,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-neutral-800 flex items-center justify-between">
+                  <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
                     <a
                       href={nearest.website_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                      className="px-4 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-sm"
                     >
                       <span>Vedi programmazione</span>
                       <ExternalLink className="w-3.5 h-3.5" />

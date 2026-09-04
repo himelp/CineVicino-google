@@ -216,7 +216,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-amber-500 selection:text-neutral-950">
+    <div className="min-h-screen bg-[#050505] text-[#e0e0e0] flex flex-col font-sans selection:bg-[#D4AF37] selection:text-black">
       
       {/* 1. Universal Top Header */}
       <Header
@@ -271,24 +271,24 @@ export default function App() {
             />
 
             {/* Popular Italian Cities Quick Bar */}
-            <div className="border-b border-neutral-800/80 bg-neutral-900/40 py-3 px-4">
-              <div className="max-w-7xl mx-auto flex items-center gap-2 overflow-x-auto text-xs no-scrollbar">
-                <span className="text-neutral-400 font-medium whitespace-nowrap flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                  Città popolari:
+            <div className="border-b border-white/10 bg-[#0a0a0a] py-3.5 px-4">
+              <div className="max-w-7xl mx-auto flex items-center gap-2.5 overflow-x-auto text-xs no-scrollbar">
+                <span className="text-neutral-400 font-medium whitespace-nowrap flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  Città principali:
                 </span>
                 {popularCities.map(c => (
                   <button
                     key={c.slug}
                     onClick={() => handleSelectPopularCity(c.slug)}
-                    className="px-3 py-1 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors whitespace-nowrap font-medium"
+                    className="px-3.5 py-1 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 transition-colors whitespace-nowrap font-medium"
                   >
                     {c.name} <span className="text-[10px] text-neutral-400 font-mono">({c.prov})</span>
                   </button>
                 ))}
                 <button
                   onClick={() => setView('directory')}
-                  className="px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-colors whitespace-nowrap font-bold flex items-center gap-1 ml-auto"
+                  className="px-4 py-1 rounded-full bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/30 transition-colors whitespace-nowrap font-bold flex items-center gap-1 ml-auto text-xs"
                 >
                   <span>Tutti i 7.894 Comuni</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -299,16 +299,16 @@ export default function App() {
             {/* Geolocation Nearby Cinemas Section (when active) */}
             {nearbyCinemas.length > 0 && (
               <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-                <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/20">
-                  <div className="flex items-center justify-between gap-4 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Compass className="w-5 h-5 text-amber-400 animate-spin-slow" />
-                      <h2 className="text-lg font-bold text-white">
-                        Cinema più vicini alla tua posizione attuale
+                <div className="p-6 sm:p-8 rounded-3xl bg-[#0a0a0a] border border-white/10">
+                  <div className="flex items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-2.5">
+                      <Compass className="w-5 h-5 text-[#D4AF37] animate-spin-slow" />
+                      <h2 className="text-xl font-serif text-white font-bold">
+                        Cinema nelle <span className="italic text-[#D4AF37]">vicinanze</span>
                       </h2>
                     </div>
                     {activeCity && (
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 font-medium">
+                      <span className="text-xs px-3 py-1 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 font-bold uppercase tracking-wider">
                         Vicino a {activeCity.name}
                       </span>
                     )}
@@ -318,27 +318,27 @@ export default function App() {
                     {nearbyCinemas.slice(0, 4).map(c => (
                       <div
                         key={c.id}
-                        className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800 hover:border-neutral-700 transition-all flex flex-col justify-between"
+                        className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col justify-between group"
                       >
                         <div>
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-amber-400 font-mono">
+                            <span className="text-xs font-bold text-[#D4AF37] font-mono">
                               {c.distance_km.toFixed(1)} km
                             </span>
                             {c.chain && (
-                              <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300">
+                              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
                                 {c.chain}
                               </span>
                             )}
                           </div>
-                          <h4 className="font-bold text-white text-sm mt-2">{c.name}</h4>
+                          <h4 className="font-serif font-bold text-white text-base mt-2.5 group-hover:text-[#D4AF37] transition-colors">{c.name}</h4>
                           <p className="text-xs text-neutral-400 mt-1 line-clamp-1">{c.address}</p>
                         </div>
                         <a
                           href={c.website_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-4 pt-3 border-t border-neutral-800 text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center justify-between"
+                          className="mt-5 pt-3 border-t border-white/10 text-[10px] uppercase tracking-widest text-[#D4AF37] hover:text-white flex items-center justify-between transition-colors"
                         >
                           <span>Sito Ufficiale</span>
                           <ExternalLink className="w-3.5 h-3.5" />
@@ -352,14 +352,13 @@ export default function App() {
 
             {/* Movies Grid Section */}
             <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
-                    <Film className="w-6 h-6 text-amber-500" />
-                    <span>{t.featuredMovies}</span>
+                  <h2 className="text-3xl sm:text-4xl font-serif text-white tracking-tight flex items-center gap-2.5">
+                    <span>Nelle sale in <span className="italic text-[#D4AF37]">Italia</span></span>
                   </h2>
-                  <p className="text-xs sm:text-sm text-neutral-400 mt-1">
-                    Locandine, trame arricchite TMDb e orari orari verificati per l'acquisto diretto del biglietto.
+                  <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl">
+                    Locandine, trame arricchite TMDb e orari verificati per l'acquisto diretto del biglietto.
                   </p>
                 </div>
 
@@ -369,13 +368,13 @@ export default function App() {
                   value={movieSearchQuery}
                   onChange={e => setMovieSearchQuery(e.target.value)}
                   placeholder="Cerca film, regista o attore..."
-                  className="px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500 w-full sm:w-64"
+                  className="px-4 py-2 bg-white/5 border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] w-full sm:w-64 transition-colors"
                 />
               </div>
 
               {/* Movies Grid */}
               {filteredMovies.length === 0 ? (
-                <div className="py-16 text-center bg-neutral-900/40 rounded-3xl border border-neutral-800 p-8">
+                <div className="py-16 text-center bg-[#0a0a0a] rounded-3xl border border-white/10 p-8">
                   <p className="text-neutral-400 text-sm">
                     Nessun film trovato corrispondente ai criteri di ricerca.
                   </p>
@@ -429,7 +428,7 @@ export default function App() {
         {view === 'all-movies' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fadeIn">
             <div className="mb-8">
-              <h1 className="text-3xl font-extrabold text-white">Tutti i Film in Sala in Italia</h1>
+              <h1 className="text-3xl sm:text-4xl font-serif text-white">Tutti i Film in <span className="italic text-[#D4AF37]">Programmazione</span></h1>
               <p className="text-sm text-neutral-400 mt-1">
                 Consulta le schede dei film attualmente distribuiti nelle sale italiane, con orari e link diretti alle biglietterie ufficiali.
               </p>
@@ -451,8 +450,8 @@ export default function App() {
 
       </main>
 
-      {/* 3. Comprehensive Footer */}
-      <footer className="border-t border-neutral-800 bg-neutral-950 text-xs text-neutral-400 py-12 px-4 sm:px-6 lg:px-8">
+      {/* 3. Comprehensive Sophisticated Dark Footer */}
+      <footer className="border-t border-white/10 bg-[#0a0a0a] text-xs text-neutral-400 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto space-y-8">
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -460,28 +459,28 @@ export default function App() {
             {/* Brand column */}
             <div className="space-y-3 md:col-span-2">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
+                <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center font-bold">
                   <Film className="w-4 h-4" />
                 </div>
-                <span className="font-bold text-base text-white">CineVicino Italia</span>
+                <span className="font-serif italic text-lg text-white">CineVicino Italia</span>
               </div>
               <p className="text-neutral-400 text-xs leading-relaxed max-w-md">
                 CineVicino è la directory indipendente che copre tutti i 7.894 comuni d'Italia. Mostra orari aggiornati e reindirizza gli spettatori direttamente alle biglietterie autorizzate delle sale cinematografiche (UCI Cinemas, The Space Cinema, 18Tickets, Vivaticket, Liveticket).
               </p>
               <div className="flex items-center gap-3 pt-1 text-[11px] text-neutral-400">
-                <span className="flex items-center gap-1 text-emerald-400">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Nessuna commissione aggiunta
+                <span className="flex items-center gap-1 text-neutral-300">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Nessuna commissione aggiunta
                 </span>
                 <span>·</span>
-                <span className="flex items-center gap-1 text-amber-400">
-                  <Ticket className="w-3.5 h-3.5" /> Reindirizzamento ufficiale
+                <span className="flex items-center gap-1 text-neutral-300">
+                  <Ticket className="w-3.5 h-3.5 text-[#D4AF37]" /> Reindirizzamento ufficiale
                 </span>
               </div>
             </div>
 
             {/* Quick Links */}
             <div>
-              <h4 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
+              <h4 className="font-bold text-white uppercase tracking-[0.2em] text-[10px] mb-3">
                 Esplora
               </h4>
               <ul className="space-y-2">
@@ -510,7 +509,7 @@ export default function App() {
 
             {/* Compliance & Attributions */}
             <div>
-              <h4 className="font-bold text-white uppercase tracking-wider text-[11px] mb-3">
+              <h4 className="font-bold text-white uppercase tracking-[0.2em] text-[10px] mb-3">
                 Normativa & TMDb
               </h4>
               <ul className="space-y-2">
@@ -530,7 +529,7 @@ export default function App() {
                   </a>
                 </li>
                 <li>
-                  <button onClick={() => setShowAdmin(true)} className="hover:text-amber-400 transition-colors">
+                  <button onClick={() => setShowAdmin(true)} className="hover:text-[#D4AF37] transition-colors">
                     Pannello Amministratore
                   </button>
                 </li>
@@ -540,9 +539,9 @@ export default function App() {
           </div>
 
           {/* TMDb Attribution Banner & Disclaimer */}
-          <div className="pt-6 border-t border-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-neutral-400">
+          <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-neutral-500 uppercase tracking-widest">
             <div className="flex items-center gap-3">
-              <span className="font-medium text-neutral-300">
+              <span className="font-medium text-neutral-400">
                 {settings.footer_copy}
               </span>
             </div>

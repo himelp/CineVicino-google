@@ -57,20 +57,20 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
       <div 
-        className="relative w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-100 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 max-h-[90vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="p-6 border-b border-neutral-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
-              <Bookmark className="w-5 h-5 fill-amber-400" />
+        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center">
+              <Bookmark className="w-5 h-5 fill-[#D4AF37]" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-xl font-serif font-bold text-white">
                 {t.favorites} & Avvisi
               </h2>
               <p className="text-xs text-neutral-400">
@@ -81,19 +81,19 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition-colors"
+            className="p-2 rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable body */}
-        <div className="p-6 overflow-y-auto space-y-8 divide-y divide-neutral-800">
+        <div className="p-6 overflow-y-auto space-y-8 divide-y divide-white/10">
           
           {/* Favorite Cinemas */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] mb-3 flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5" />
               <span>Cinema Preferiti ({favoriteCinemas.length})</span>
             </h3>
 
@@ -106,7 +106,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                 {favoriteCinemas.map(c => (
                   <div
                     key={c.id}
-                    className="p-3 rounded-2xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between gap-3 group"
+                    className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
                   >
                     <div 
                       onClick={() => {
@@ -116,11 +116,11 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                       className="cursor-pointer flex-1"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-white group-hover:text-amber-400 transition-colors">
+                        <span className="font-serif font-bold text-sm text-white group-hover:text-[#D4AF37] transition-colors">
                           {c.name}
                         </span>
                         {c.chain && (
-                          <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-neutral-800 text-amber-400">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">
                             {c.chain}
                           </span>
                         )}
@@ -145,8 +145,8 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
           {/* Favorite Movies */}
           <div className="pt-6">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-3 flex items-center gap-2">
-              <Film className="w-4 h-4" />
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] mb-3 flex items-center gap-2">
+              <Film className="w-3.5 h-3.5" />
               <span>Film Salvati ({favoriteMovies.length})</span>
             </h3>
 
@@ -159,7 +159,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                 {favoriteMovies.map(m => (
                   <div
                     key={m.id}
-                    className="p-3 rounded-2xl bg-neutral-950/70 border border-neutral-800 flex items-center justify-between gap-3 group"
+                    className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
                   >
                     <div 
                       onClick={() => {
@@ -175,10 +175,10 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                         className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
                       />
                       <div className="truncate">
-                        <span className="font-bold text-sm text-white group-hover:text-amber-400 transition-colors block truncate">
+                        <span className="font-serif font-bold text-sm text-white group-hover:text-[#D4AF37] transition-colors block truncate">
                           {lang === 'en' ? m.title_en : m.title_it}
                         </span>
-                        <span className="text-xs text-neutral-400 block mt-0.5">
+                        <span className="text-xs text-neutral-400 block mt-0.5 font-mono">
                           {m.release_year} · {m.genres.slice(0, 2).join(', ')}
                         </span>
                       </div>
@@ -199,19 +199,19 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
           {/* Email Alert Subscription (Phase 5) */}
           <div className="pt-6">
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-              <div className="flex items-center gap-2 mb-1">
-                <Bell className="w-4 h-4 text-amber-400" />
-                <span className="font-bold text-sm text-amber-300">
+            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Bell className="w-4 h-4 text-[#D4AF37]" />
+                <span className="font-serif font-bold text-sm text-white">
                   {t.emailAlerts} {activeCity ? `per ${activeCity.name}` : 'nel tuo comune'}
                 </span>
               </div>
-              <p className="text-xs text-neutral-300 leading-relaxed mb-3">
+              <p className="text-xs text-neutral-400 leading-relaxed mb-4">
                 {t.alertSubtext}
               </p>
 
               {alertSubscribed ? (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-medium">
+                <div className="flex items-center gap-2 p-3 rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-medium">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   <span>{t.subSuccess}</span>
                 </div>
@@ -223,12 +223,12 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                     value={alertEmail}
                     onChange={e => setAlertEmail(e.target.value)}
                     placeholder="latua@email.it"
-                    className="flex-1 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                    className="flex-1 px-4 py-2 rounded-full bg-black border border-white/20 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
                   />
                   <button
                     type="submit"
                     disabled={alertLoading}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors disabled:opacity-50"
+                    className="px-5 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {alertLoading ? 'Invio...' : t.subscribe}
                   </button>

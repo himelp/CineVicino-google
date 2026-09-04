@@ -113,29 +113,29 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
       <div 
-        className="relative w-full max-w-4xl bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-100"
+        className="relative w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-neutral-950/70 hover:bg-neutral-950 text-neutral-300 hover:text-white border border-neutral-700/80 transition-all"
+          className="absolute top-4 right-4 z-20 p-2.5 rounded-full bg-black/60 hover:bg-white text-neutral-300 hover:text-black border border-white/10 transition-all cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Hero Backdrop */}
-        <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-neutral-950">
+        <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-black">
           <img
             src={movie.backdrop_url || movie.poster_url}
             alt={title}
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-40"
+            className="w-full h-full object-cover object-center opacity-30"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-neutral-900/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/60 to-transparent" />
 
           {/* Floating Movie Header Info */}
           <div className="absolute bottom-6 left-6 right-6 flex items-end gap-6">
@@ -143,34 +143,34 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               src={movie.poster_url}
               alt={title}
               referrerPolicy="no-referrer"
-              className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl border border-neutral-700 shadow-2xl hidden sm:block"
+              className="w-24 sm:w-32 aspect-[2/3] object-cover rounded-xl border border-white/10 shadow-2xl hidden sm:block"
             />
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 text-xs font-bold font-mono">
                   {movie.release_year}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-neutral-800 text-neutral-300 text-xs font-medium">
+                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-neutral-300 text-xs font-medium font-mono">
                   {movie.duration_minutes} min
                 </span>
                 {movie.rating > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-neutral-800 text-amber-400 text-xs font-bold flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" /> {movie.rating.toFixed(1)}
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-xs font-bold flex items-center gap-1 font-mono">
+                    <Star className="w-3.5 h-3.5 fill-[#D4AF37]" /> {movie.rating.toFixed(1)}
                   </span>
                 )}
                 {movie.age_rating && (
-                  <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-xs font-mono">
+                  <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-xs font-mono text-neutral-300">
                     {movie.age_rating}
                   </span>
                 )}
               </div>
 
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              <h2 className="text-2xl sm:text-4xl font-serif font-bold text-white tracking-tight">
                 {title}
               </h2>
 
               {movie.title_original && movie.title_original !== title && (
-                <p className="text-xs sm:text-sm text-neutral-400 italic">
+                <p className="text-xs sm:text-sm text-neutral-400 italic mt-0.5">
                   Titolo originale: {movie.title_original}
                 </p>
               )}
@@ -180,21 +180,21 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onToggleFavorite(movie.id)}
-                className={`p-2.5 rounded-xl border transition-colors ${
+                className={`p-2.5 rounded-full border transition-colors ${
                   isFavorite 
-                    ? 'bg-amber-500 text-neutral-950 border-amber-400' 
-                    : 'bg-neutral-900/80 text-neutral-300 border-neutral-700 hover:bg-neutral-800'
+                    ? 'bg-[#D4AF37] text-black border-[#D4AF37]' 
+                    : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
                 }`}
                 title={isFavorite ? 'Rimuovi dai preferiti' : 'Salva nei preferiti'}
               >
-                <Bookmark className={`w-5 h-5 ${isFavorite ? 'fill-neutral-950' : ''}`} />
+                <Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-black' : ''}`} />
               </button>
               <button
                 onClick={handleShare}
-                className="p-2.5 rounded-xl bg-neutral-900/80 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition-colors"
+                className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 border border-white/10 transition-colors"
                 title="Copia link"
               >
-                {copiedLink ? <Check className="w-5 h-5 text-emerald-400" /> : <Share2 className="w-5 h-5" />}
+                {copiedLink ? <Check className="w-4 h-4 text-[#D4AF37]" /> : <Share2 className="w-4 h-4" />}
               </button>
             </div>
           </div>
@@ -204,9 +204,9 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
         <div className="p-6 sm:p-8 space-y-8">
           
           {/* Metadata & Synopsis Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-neutral-800">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-white/10">
             <div className="md:col-span-2 space-y-4">
-              <h4 className="text-xs uppercase tracking-wider font-bold text-amber-500">
+              <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#D4AF37]">
                 {t.synopsis}
               </h4>
               <p className="text-neutral-300 text-sm sm:text-base leading-relaxed">
@@ -216,14 +216,14 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               {/* Genres */}
               <div className="flex flex-wrap gap-1.5 pt-2">
                 {movie.genres.map(g => (
-                  <span key={g} className="px-3 py-1 rounded-lg bg-neutral-800 text-neutral-300 text-xs font-medium">
+                  <span key={g} className="px-3 py-1 rounded-full bg-white/5 text-neutral-300 text-xs font-medium border border-white/10">
                     {g}
                   </span>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-4 bg-neutral-950/60 p-4 rounded-2xl border border-neutral-800/80 text-xs">
+            <div className="space-y-4 bg-white/[0.03] p-4 rounded-2xl border border-white/10 text-xs">
               <div>
                 <span className="text-neutral-400 block mb-0.5">{t.director}</span>
                 <span className="font-semibold text-white text-sm">{movie.director}</span>
@@ -233,9 +233,9 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 <span className="text-neutral-300">{movie.cast.join(', ')}</span>
               </div>
               {movie.tmdb_id && (
-                <div className="pt-2 border-t border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-neutral-400">
                   <span>ID TMDb: #{movie.tmdb_id}</span>
-                  <span className="text-amber-500/80 font-mono">Dati ufficiali</span>
+                  <span className="text-[#D4AF37] font-mono">Dati ufficiali</span>
                 </div>
               )}
             </div>
@@ -245,8 +245,8 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Ticket className="w-5 h-5 text-amber-500" />
+                <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
+                  <Ticket className="w-5 h-5 text-[#D4AF37]" />
                   <span>Programmazione e Biglietti Ufficiali</span>
                 </h3>
                 <p className="text-xs text-neutral-400">
@@ -255,14 +255,14 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               </div>
 
               {/* Date Selector Tabs */}
-              <div className="flex items-center gap-1.5 bg-neutral-950 p-1 rounded-xl border border-neutral-800 self-start">
+              <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-full border border-white/10 self-start">
                 {dateOptions.map(d => (
                   <button
                     key={d.value}
                     onClick={() => setSelectedDate(d.value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all ${
                       selectedDate === d.value
-                        ? 'bg-amber-500 text-neutral-950 font-bold shadow-sm'
+                        ? 'bg-[#D4AF37] text-black font-bold shadow-sm'
                         : 'text-neutral-400 hover:text-white'
                     }`}
                   >
@@ -275,14 +275,14 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
             {/* City Filter Pills for showtimes */}
             <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 text-xs no-scrollbar">
               <span className="text-neutral-400 whitespace-nowrap font-medium flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" /> Città:
+                <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> Città:
               </span>
               <button
                 onClick={() => setSelectedCityFilter('all')}
-                className={`px-3 py-1 rounded-full whitespace-nowrap border transition-all ${
+                className={`px-3.5 py-1 rounded-full whitespace-nowrap border transition-all ${
                   selectedCityFilter === 'all'
-                    ? 'bg-white text-neutral-950 border-white font-bold'
-                    : 'bg-neutral-800/80 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                    ? 'bg-white text-black border-white font-bold'
+                    : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
                 }`}
               >
                 Tutte le città ({cinemasList.length} cinema)
@@ -291,10 +291,10 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 <button
                   key={cSlug}
                   onClick={() => setSelectedCityFilter(cSlug)}
-                  className={`px-3 py-1 rounded-full whitespace-nowrap capitalize border transition-all ${
+                  className={`px-3.5 py-1 rounded-full whitespace-nowrap capitalize border transition-all ${
                     selectedCityFilter === cSlug
-                      ? 'bg-amber-500 text-neutral-950 border-amber-500 font-bold'
-                      : 'bg-neutral-800/80 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                      ? 'bg-[#D4AF37] text-black border-[#D4AF37] font-bold'
+                      : 'bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10'
                   }`}
                 >
                   {cSlug}
@@ -308,13 +308,13 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 Caricamento orari dai multiplex e sale d'autore...
               </div>
             ) : cinemasList.length === 0 ? (
-              <div className="py-12 text-center bg-neutral-950/40 rounded-2xl border border-neutral-800/60 p-6">
+              <div className="py-12 text-center bg-white/[0.03] rounded-2xl border border-white/10 p-6">
                 <p className="text-neutral-400 text-sm">
                   Nessun orario trovato per la combinazione selezionata in questa data.
                 </p>
                 <button
                   onClick={() => setSelectedCityFilter('all')}
-                  className="mt-3 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-white"
+                  className="mt-3 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
                 >
                   Mostra orari in tutta Italia
                 </button>
@@ -324,20 +324,20 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 {cinemasList.map((cinema, idx) => (
                   <div 
                     key={idx}
-                    className="p-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/90 hover:border-neutral-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-base">
+                        <span className="font-serif font-bold text-white text-base">
                           {cinema.cinema_name}
                         </span>
                         {cinema.chain && (
-                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-bold bg-neutral-800 text-amber-400 border border-neutral-700">
+                          <span className="text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full font-bold bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">
                             {cinema.chain}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-neutral-400 mt-0.5 flex items-center gap-1.5">
+                      <p className="text-xs text-neutral-400 mt-1 flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
                         <span>{cinema.address}</span>
                       </p>
@@ -352,19 +352,19 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           title={`Acquista su ${getTicketSourceLabel(s.ticket_source)} (Apre sito ufficiale)`}
-                          className="group/slot flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 hover:bg-amber-500 border border-neutral-700 hover:border-amber-400 transition-all shadow-sm active:scale-95"
+                          className="group/slot flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-[#D4AF37] border border-white/10 hover:border-[#D4AF37] transition-all shadow-sm active:scale-95"
                         >
                           <div className="text-left">
-                            <span className="font-mono font-bold text-sm text-white group-hover/slot:text-neutral-950 transition-colors">
+                            <span className="font-mono font-bold text-sm text-white group-hover/slot:text-black transition-colors">
                               {s.time}
                             </span>
-                            <div className="flex items-center gap-1 text-[10px] text-neutral-400 group-hover/slot:text-neutral-900">
+                            <div className="flex items-center gap-1 text-[10px] text-neutral-400 group-hover/slot:text-black/80 transition-colors">
                               <span className="font-semibold">{s.format}</span>
                               <span>·</span>
                               <span>{s.language}</span>
                             </div>
                           </div>
-                          <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover/slot:text-neutral-950 transition-colors ml-1" />
+                          <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover/slot:text-black transition-colors ml-1" />
                         </a>
                       ))}
                     </div>
@@ -375,8 +375,8 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
           </div>
 
           {/* Outbound Ticket Compliance Notice */}
-          <div className="p-4 rounded-xl bg-neutral-950/40 border border-neutral-800 text-xs text-neutral-400 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 text-xs text-neutral-400 flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-[#D4AF37] flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-white">Garanzia di Reindirizzamento Ufficiale:</span>
               <p className="mt-0.5">

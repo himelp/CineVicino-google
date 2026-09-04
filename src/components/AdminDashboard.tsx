@@ -250,45 +250,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   if (!isAuthenticated) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-        <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+        <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center text-neutral-200">
+          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4">
             <Shield className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold text-white">Accesso Pannello Admin</h2>
+          <h2 className="text-2xl font-serif font-bold text-white">Accesso Pannello Admin</h2>
           <p className="text-xs text-neutral-400 mt-1 mb-6">
             Area riservata alla gestione contenuti, scraper nazionale e parametri di CineVicino.
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative text-left">
-              <Key className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password admin..."
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-700 rounded-xl text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             {loginError && (
-              <p className="text-xs text-rose-400 bg-rose-950/40 p-2 rounded-lg border border-rose-800">
+              <p className="text-xs text-rose-400 bg-rose-950/40 p-2.5 rounded-xl border border-rose-800">
                 {loginError}
               </p>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-300 transition-colors"
+                className="flex-1 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-semibold text-neutral-300 border border-white/10 transition-colors cursor-pointer"
               >
                 Annulla
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-xs font-bold text-neutral-950 transition-colors shadow-sm"
+                className="flex-1 py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-xs font-bold uppercase tracking-wider text-black transition-colors shadow-sm cursor-pointer"
               >
                 Accedi
               </button>
@@ -302,20 +302,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
       <div 
-        className="relative w-full max-w-5xl bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-100 flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-5xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 flex flex-col max-h-[92vh]"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Admin Header */}
-        <div className="p-4 sm:p-6 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/70">
+        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between bg-black/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center">
               <Shield className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-white">CineVicino Admin</h2>
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <h2 className="text-lg font-serif font-bold text-white">CineVicino Admin</h2>
+                <span className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   Autenticato
                 </span>
               </div>
@@ -329,13 +329,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             <button
               onClick={() => setIsAuthenticated(false)}
               title="Disconnetti"
-              className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-rose-400 transition-colors"
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-rose-400 border border-white/10 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition-colors"
+              className="px-4 py-1.5 rounded-full bg-white/5 hover:bg-white text-neutral-300 hover:text-black border border-white/10 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
             >
               Chiudi
             </button>
@@ -343,7 +343,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-neutral-800 bg-neutral-950/40 px-4 gap-2 overflow-x-auto">
+        <div className="flex border-b border-white/10 bg-black/30 px-4 gap-2 overflow-x-auto">
           {[
             { id: 'status', label: '1. Stato API & Integrazioni', icon: Activity },
             { id: 'scrape', label: '2. Scraper Nazionale', icon: RefreshCw },
@@ -356,9 +356,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
                   isSel
-                    ? 'border-amber-500 text-amber-400 bg-amber-500/5'
+                    ? 'border-[#D4AF37] text-[#D4AF37] bg-[#D4AF37]/10'
                     : 'border-transparent text-neutral-400 hover:text-white'
                 }`}
               >

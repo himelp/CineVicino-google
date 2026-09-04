@@ -32,20 +32,20 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ lang, onOpenPrivacy 
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 animate-fadeIn">
-      <div className="p-4 sm:p-5 rounded-2xl bg-neutral-900/95 border border-neutral-700 shadow-2xl backdrop-blur-md text-neutral-200 text-xs space-y-3">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 flex-shrink-0">
-            <Shield className="w-5 h-5" />
+      <div className="p-5 rounded-3xl bg-[#0a0a0a]/95 border border-white/15 shadow-2xl backdrop-blur-md text-neutral-200 text-xs space-y-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-2 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[#D4AF37] flex-shrink-0">
+            <Shield className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-sm">
+            <h4 className="font-serif font-bold text-white text-sm">
               {t.cookieTitle}
             </h4>
             <p className="text-neutral-400 mt-1 leading-relaxed text-[11px]">
               {t.cookieDesc}{' '}
               <button
                 onClick={onOpenPrivacy}
-                className="text-amber-400 hover:underline inline font-medium"
+                className="text-[#D4AF37] hover:underline inline font-semibold cursor-pointer"
               >
                 {t.privacyPolicy}
               </button>
@@ -53,16 +53,16 @@ export const CookieBanner: React.FC<CookieBannerProps> = ({ lang, onOpenPrivacy 
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-1 border-t border-neutral-800">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
           <button
             onClick={handleDeclineNonEssential}
-            className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-medium text-[11px] transition-colors"
+            className="px-4 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 border border-white/10 font-medium text-[11px] transition-colors cursor-pointer"
           >
             {t.cookieDecline}
           </button>
           <button
             onClick={handleAcceptAll}
-            className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-[11px] transition-colors shadow-sm"
+            className="px-5 py-1.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold text-[11px] uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
           >
             {t.cookieAccept}
           </button>

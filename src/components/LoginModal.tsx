@@ -61,23 +61,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
       <div 
-        className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative"
+        className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative text-neutral-200"
         onClick={e => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
+          className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4">
           <User className="w-6 h-6" />
         </div>
 
-        <h2 className="text-xl font-bold text-white">Accedi a CineVicino</h2>
+        <h2 className="text-2xl font-serif font-bold text-white">Accedi a CineVicino</h2>
         <p className="text-xs text-neutral-400 mt-1 mb-6">
           Salva i tuoi cinema del cuore, sincronizza i tuoi film e ricevi avvisi personalizzati sulle uscite in sala.
         </p>
@@ -90,34 +90,34 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative text-left">
-              <Mail className="w-4 h-4 text-neutral-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="nome@esempio.it"
-                className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-700 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors shadow-sm disabled:opacity-50"
+              className="w-full py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {loading ? 'Accesso in corso...' : 'Continua con Email'}
             </button>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-neutral-800" /></div>
-              <div className="relative flex justify-center text-[10px] uppercase text-neutral-500 bg-neutral-900 px-2 font-mono">oppure</div>
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+              <div className="relative flex justify-center text-[10px] uppercase text-neutral-500 bg-[#0a0a0a] px-3 font-mono tracking-widest">oppure</div>
             </div>
 
             <button
               type="button"
               onClick={handleDemoLogin}
-              className="w-full py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-medium text-xs border border-neutral-700 transition-colors"
+              className="w-full py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-colors cursor-pointer"
             >
               Accesso Rapido Demo (Cinefilo Ospite)
             </button>
