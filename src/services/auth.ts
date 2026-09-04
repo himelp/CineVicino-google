@@ -8,7 +8,17 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { executeRawSql } from '../db/index';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cinevicino_production_jwt_secret_2026_super_hardened';
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim().length < 32) {
+    throw new Error(
+      'FATAL SECURITY ERROR: JWT_SECRET environment variable is missing or shorter than 32 characters. ' +
+      'A secure cryptographically random key is required (e.g. generate one using `openssl rand -hex 32`).'
+    );
+  }
+  return secret.trim();
+}
+
 const TOKEN_EXPIRY = '7d';
 
 export interface AuthUser {
@@ -38,14 +48,14 @@ export function generateSessionToken(user: AuthUser): string {
       email: user.email,
       is_admin: user.is_admin
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: TOKEN_EXPIRY }
   );
 }
 
 export function verifySessionToken(token: string): { id: string; email: string; is_admin: boolean } | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; email: string; is_admin: boolean };
+    return jwt.verify(token, getJwtSecret()) as { id: string; email: string; is_admin: boolean };
   } catch {
     return null;
   }

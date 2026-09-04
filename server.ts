@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
@@ -39,11 +40,12 @@ const app = express();
 const PORT = 3000;
 const ADMIN_SLUG = process.env.ADMIN_SLUG || 'gestione-riservata-cv';
 
-// 1. Startup validation
+// 1. Startup validation (fail-fast)
 try {
   validateEnvironment();
 } catch (err: any) {
   logger.error(`Fatal startup configuration error: ${err.message}`);
+  process.exit(1);
 }
 
 // 2. Global Security & Performance Middlewares

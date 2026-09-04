@@ -11,8 +11,8 @@ export function validateEnvironment() {
     warnings.push('DATABASE_URL is not configured. Falling back to embedded persistent PostgreSQL engine (PGlite at ./data/pgdata).');
   }
 
-  if (!process.env.JWT_SECRET) {
-    warnings.push('JWT_SECRET is not set. A default key is being used; set a strong random secret in production.');
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
+    errors.push('CRITICAL SECURITY: JWT_SECRET environment variable is missing or shorter than 32 characters. Generate a secure random key (e.g. `openssl rand -hex 32`) and add it to your environment.');
   }
 
   if (process.env.ADMIN_PASSWORD === 'admin' || process.env.ADMIN_PASSWORD === 'password') {
