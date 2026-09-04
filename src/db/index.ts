@@ -60,6 +60,9 @@ export async function getDb() {
 
 // Execute raw SQL query across both pool or PGlite
 export async function executeRawSql(query: string, params: any[] = []) {
+  if (!pool && !pgliteInstance) {
+    await getDb();
+  }
   if (pool) {
     return await pool.query(query, params);
   }

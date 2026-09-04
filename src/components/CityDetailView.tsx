@@ -76,13 +76,13 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fadeIn">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 animate-fadeIn">
       
       {/* Back to Home & Breadcrumb */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-6">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-medium transition-colors cursor-pointer active:scale-95"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Torna alla ricerca</span>
@@ -98,9 +98,9 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
       </div>
 
       {/* City Hero Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-[#0a0a0a] border border-white/10 backdrop-blur-md mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-[#0a0a0a] border border-white/10 backdrop-blur-md mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold border border-[#D4AF37]/30">
               Comune d'Italia (ISTAT)
             </span>
@@ -114,20 +114,20 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-serif font-bold text-white tracking-tight">
             Cinema a <span className="italic text-[#D4AF37]">{city.name}</span>
           </h1>
-          <p className="text-sm sm:text-base text-neutral-400 mt-2">
+          <p className="text-xs sm:text-base text-neutral-400 mt-2 leading-relaxed">
             Programmazione, orari e biglietti ufficiali per le sale di {city.name} ({city.province_code}) e dintorni.
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-white/[0.03] p-4 rounded-2xl border border-white/10 text-center">
+        <div className="flex items-center justify-around sm:justify-center gap-4 bg-white/[0.03] p-3.5 sm:p-4 rounded-2xl border border-white/10 text-center w-full md:w-auto">
           <div>
             <span className="text-2xl sm:text-3xl font-black text-[#D4AF37] font-mono">
               {activeCinemas.length}
             </span>
-            <span className="block text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
+            <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
               Sale censite
             </span>
           </div>
@@ -136,7 +136,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
               {filteredShowtimes.length}
             </span>
-            <span className="block text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
+            <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
               Spettacoli oggi
             </span>
           </div>
@@ -215,12 +215,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
 
                         <button
                           onClick={() => onToggleFavorite(cinema.id)}
-                          className={`p-2 rounded-full border transition-colors ${
+                          className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border transition-all active:scale-95 cursor-pointer ${
                             isFav ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-white/5 text-neutral-400 border-white/10 hover:text-white'
                           }`}
                           title="Salva cinema nei preferiti"
                         >
-                          <Bookmark className={`w-3.5 h-3.5 ${isFav ? 'fill-black' : ''}`} />
+                          <Bookmark className={`w-4 h-4 ${isFav ? 'fill-black' : ''}`} />
                         </button>
                       </div>
 
@@ -251,12 +251,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                 <div key={st.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-black/40 border border-white/10">
                                   <div 
                                     onClick={() => movie && onSelectMovie(movie)}
-                                    className="cursor-pointer group flex items-center gap-2.5 overflow-hidden"
+                                    className="cursor-pointer group flex items-center gap-2.5 overflow-hidden flex-1 min-w-0"
                                   >
-                                    <span className="text-xs font-bold text-white group-hover:text-[#D4AF37] truncate max-w-[180px]">
+                                    <span className="text-xs font-bold text-white group-hover:text-[#D4AF37] truncate">
                                       {st.movie_title || movie?.title_it}
                                     </span>
-                                    <span className="text-[10px] text-neutral-500 font-mono">
+                                    <span className="text-[10px] text-neutral-500 font-mono shrink-0">
                                       {st.format}
                                     </span>
                                   </div>
@@ -267,7 +267,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                     rel="noopener noreferrer"
                                     onClick={() => fetch(`/api/showtimes/${st.id}/click`, { method: 'POST' }).catch(() => {})}
                                     title={st.ticket_url ? "Acquista biglietto ufficiale" : "Consulta programmazione sul sito del cinema"}
-                                    className="px-3 py-1 rounded-lg bg-white/5 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                                    className="min-h-[40px] px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 shrink-0"
                                   >
                                     <span>{st.time}</span>
                                     <ExternalLink className="w-3 h-3" />

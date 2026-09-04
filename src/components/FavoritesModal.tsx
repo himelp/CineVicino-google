@@ -57,20 +57,20 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto min-h-[100dvh]">
       <div 
-        className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-2xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 max-h-[92dvh] flex flex-col pb-safe"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Header */}
-        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center shrink-0">
               <Bookmark className="w-5 h-5 fill-[#D4AF37]" />
             </div>
             <div>
-              <h2 className="text-xl font-serif font-bold text-white">
+              <h2 className="text-lg sm:text-xl font-serif font-bold text-white">
                 {t.favorites} & Avvisi
               </h2>
               <p className="text-xs text-neutral-400">
@@ -81,14 +81,15 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer"
+            aria-label="Chiudi"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer active:scale-95 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable body */}
-        <div className="p-6 overflow-y-auto space-y-8 divide-y divide-white/10">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 sm:space-y-8 divide-y divide-white/10">
           
           {/* Favorite Cinemas */}
           <div>
@@ -106,17 +107,17 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                 {favoriteCinemas.map(c => (
                   <div
                     key={c.id}
-                    className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
+                    className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
                   >
                     <div 
                       onClick={() => {
                         onSelectCinema(c);
                         onClose();
                       }}
-                      className="cursor-pointer flex-1"
+                      className="cursor-pointer flex-1 min-w-0"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="font-serif font-bold text-sm text-white group-hover:text-[#D4AF37] transition-colors">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-serif font-bold text-sm text-white group-hover:text-[#D4AF37] transition-colors truncate">
                           {c.name}
                         </span>
                         {c.chain && (
@@ -132,8 +133,9 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
                     <button
                       onClick={() => onRemoveFavoriteCinema(c.id)}
-                      className="p-2 text-neutral-500 hover:text-rose-400 transition-colors"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-rose-400 transition-colors shrink-0 active:scale-95 cursor-pointer"
                       title="Rimuovi dai preferiti"
+                      aria-label="Rimuovi cinema dai preferiti"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -159,26 +161,26 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                 {favoriteMovies.map(m => (
                   <div
                     key={m.id}
-                    className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
+                    className="p-3 sm:p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 flex items-center justify-between gap-3 group transition-all"
                   >
                     <div 
                       onClick={() => {
                         onSelectMovie(m);
                         onClose();
                       }}
-                      className="cursor-pointer flex items-center gap-3 flex-1 overflow-hidden"
+                      className="cursor-pointer flex items-center gap-3 flex-1 min-w-0"
                     >
                       <img
                         src={m.poster_url}
                         alt={m.title_it}
                         referrerPolicy="no-referrer"
-                        className="w-10 h-14 object-cover rounded-lg flex-shrink-0"
+                        className="w-10 h-14 object-cover rounded-lg flex-shrink-0 border border-white/10"
                       />
-                      <div className="truncate">
+                      <div className="min-w-0 flex-1">
                         <span className="font-serif font-bold text-sm text-white group-hover:text-[#D4AF37] transition-colors block truncate">
                           {lang === 'en' ? m.title_en : m.title_it}
                         </span>
-                        <span className="text-xs text-neutral-400 block mt-0.5 font-mono">
+                        <span className="text-xs text-neutral-400 block mt-0.5 font-mono truncate">
                           {m.release_year} · {m.genres.slice(0, 2).join(', ')}
                         </span>
                       </div>
@@ -186,8 +188,9 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
                     <button
                       onClick={() => onRemoveFavoriteMovie(m.id)}
-                      className="p-2 text-neutral-500 hover:text-rose-400 transition-colors"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-rose-400 transition-colors shrink-0 active:scale-95 cursor-pointer"
                       title="Rimuovi dai preferiti"
+                      aria-label="Rimuovi film dai preferiti"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -199,7 +202,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
           {/* Email Alert Subscription (Phase 5) */}
           <div className="pt-6">
-            <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10">
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/10">
               <div className="flex items-center gap-2 mb-1.5">
                 <Bell className="w-4 h-4 text-[#D4AF37]" />
                 <span className="font-serif font-bold text-sm text-white">
@@ -212,23 +215,23 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
               {alertSubscribed ? (
                 <div className="flex items-center gap-2 p-3 rounded-full bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs font-medium">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>{t.subSuccess}</span>
                 </div>
               ) : (
-                <form onSubmit={handleSubscribeAlert} className="flex gap-2">
+                <form onSubmit={handleSubscribeAlert} className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="email"
                     required
                     value={alertEmail}
                     onChange={e => setAlertEmail(e.target.value)}
                     placeholder="latua@email.it"
-                    className="flex-1 px-4 py-2 rounded-full bg-black border border-white/20 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                    className="flex-1 min-h-[44px] px-4 py-2 rounded-full bg-black border border-white/20 text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
                   />
                   <button
                     type="submit"
                     disabled={alertLoading}
-                    className="px-5 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                    className="min-h-[44px] px-5 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 cursor-pointer active:scale-95 shrink-0"
                   >
                     {alertLoading ? 'Invio...' : t.subscribe}
                   </button>

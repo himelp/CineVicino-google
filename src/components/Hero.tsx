@@ -51,40 +51,42 @@ export const Hero: React.FC<HeroProps> = ({
   ];
 
   return (
-    <div className="relative overflow-hidden border-b border-white/10 bg-[#050505] pt-12 pb-10 sm:pt-16 sm:pb-14">
+    <div className="relative overflow-hidden border-b border-white/10 bg-[#050505] pt-8 pb-8 sm:pt-16 sm:pb-14">
       {/* Subtle warm gold ambient backdrop */}
       <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[800px] h-[320px] bg-[#D4AF37]/5 blur-[160px] rounded-full pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         
         {/* Status pill */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/10 text-xs text-neutral-300 mb-6 shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-medium text-xs tracking-wide">
-            Copertura attiva su <strong className="text-white">{totalComuni.toLocaleString('it-IT')} Comuni</strong> italiani
-          </span>
-          <span className="text-neutral-600">|</span>
+        <div className="inline-flex flex-wrap items-center justify-center gap-2 px-3.5 py-1.5 rounded-2xl sm:rounded-full bg-white/[0.03] border border-white/10 text-xs text-neutral-300 mb-6 shadow-sm max-w-full">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="font-medium text-xs tracking-wide">
+              Copertura su <strong className="text-white">{totalComuni.toLocaleString('it-IT')} Comuni</strong>
+            </span>
+          </div>
+          <span className="hidden sm:inline text-neutral-600">|</span>
           <span className="text-[#D4AF37] flex items-center gap-1 font-mono text-[11px]">
             <Ticket className="w-3 h-3" /> Biglietterie Ufficiali
           </span>
         </div>
 
         {/* Dynamic Editorial Serif Title */}
-        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif text-white tracking-tight max-w-4xl mx-auto leading-[1.18]">
+        <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif text-white tracking-tight max-w-4xl mx-auto leading-[1.18]">
           {headline}
         </h1>
 
         {/* Dynamic Subtext */}
-        <p className="mt-4 text-sm sm:text-base text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+        <p className="mt-3 sm:mt-4 text-xs sm:text-base text-neutral-400 max-w-2xl mx-auto leading-relaxed">
           {subtext}
         </p>
 
         {/* Big Geolocation Trigger */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             onClick={onLocateMe}
             disabled={isLocating}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs sm:text-sm font-bold uppercase tracking-tighter shadow-xl transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 min-h-[48px] px-6 py-3 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs sm:text-sm font-bold uppercase tracking-tighter shadow-xl transition-all disabled:opacity-50 cursor-pointer active:scale-95"
           >
             <MapPin className={`w-4 h-4 ${isLocating ? 'animate-bounce' : ''}`} />
             <span>
@@ -94,7 +96,7 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* Chain Filter Row */}
-        <div className="mt-10">
+        <div className="mt-8 sm:mt-10">
           <div className="text-[11px] uppercase tracking-[0.2em] font-medium text-neutral-400 mb-3 flex items-center justify-center gap-1.5">
             <Film className="w-3.5 h-3.5 text-[#D4AF37]" />
             <span>Circuiti & Catene Multiplex</span>
@@ -107,7 +109,7 @@ export const Hero: React.FC<HeroProps> = ({
                 <button
                   key={chain.id}
                   onClick={() => onSelectChain(chain.id)}
-                  className={`px-4 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 border ${
+                  className={`min-h-[38px] px-3.5 sm:px-4 py-1.5 rounded-full text-xs transition-all flex items-center gap-1.5 border active:scale-95 cursor-pointer ${
                     isSelected
                       ? 'bg-[#D4AF37] text-black border-[#D4AF37] font-bold shadow-md'
                       : 'bg-white/5 hover:bg-white/10 text-neutral-300 border-white/10 hover:text-white'
@@ -115,7 +117,7 @@ export const Hero: React.FC<HeroProps> = ({
                 >
                   <span>{chain.label}</span>
                   {chain.badge && !isSelected && (
-                    <span className="text-[10px] text-neutral-400 font-mono px-1 py-0.2 rounded bg-white/5">
+                    <span className="text-[10px] text-neutral-400 font-mono px-1 py-0.2 rounded bg-white/5 hidden xs:inline">
                       {chain.badge}
                     </span>
                   )}
@@ -133,7 +135,7 @@ export const Hero: React.FC<HeroProps> = ({
               <button
                 key={fmt.id}
                 onClick={() => onSelectFormat(fmt.id)}
-                className={`px-3.5 py-1 rounded-full text-xs transition-all border ${
+                className={`min-h-[36px] px-3.5 py-1.5 rounded-full text-xs transition-all border active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-white text-black font-bold border-white'
                     : 'text-neutral-400 hover:text-white bg-white/[0.03] border-white/10 hover:border-white/20'

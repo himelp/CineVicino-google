@@ -8,15 +8,25 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { executeRawSql } from '../db/index';
 
+import crypto from 'crypto';
+
+let devJwtSecret: string | null = null;
+
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret || secret.trim().length < 32) {
+  if (secret && secret.trim().length >= 32) {
+    return secret.trim();
+  }
+  if (process.env.NODE_ENV === 'production') {
     throw new Error(
-      'FATAL SECURITY ERROR: JWT_SECRET environment variable is missing or shorter than 32 characters. ' +
+      'FATAL SECURITY ERROR: JWT_SECRET environment variable is missing or shorter than 32 characters in production. ' +
       'A secure cryptographically random key is required (e.g. generate one using `openssl rand -hex 32`).'
     );
   }
-  return secret.trim();
+  if (!devJwtSecret) {
+    devJwtSecret = crypto.randomBytes(32).toString('hex');
+  }
+  return devJwtSecret;
 }
 
 const TOKEN_EXPIRY = '7d';

@@ -116,14 +116,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto min-h-[100dvh]">
       <div 
-        className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center relative text-neutral-200"
+        className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl text-center relative text-neutral-200 my-auto pb-safe"
         onClick={e => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer"
+          aria-label="Chiudi"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer active:scale-95"
         >
           <X className="w-5 h-5" />
         </button>
@@ -132,7 +133,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
           <User className="w-6 h-6" />
         </div>
 
-        <h2 className="text-2xl font-serif font-bold text-white">
+        <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
           {tab === 'login' ? 'Accedi a CineVicino' : tab === 'register' ? 'Crea il tuo Profilo' : 'Recupero Password'}
         </h2>
         <p className="text-xs text-neutral-400 mt-1 mb-6">
@@ -144,7 +145,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
           <button
             type="button"
             onClick={() => { setTab('login'); setErrorMsg(''); setSuccessMsg(''); }}
-            className={`flex-1 py-1.5 rounded-full font-medium transition-colors ${
+            className={`flex-1 min-h-[38px] flex items-center justify-center rounded-full font-medium transition-colors cursor-pointer active:scale-95 ${
               tab === 'login' ? 'bg-[#D4AF37] text-black font-bold' : 'text-neutral-400 hover:text-white'
             }`}
           >
@@ -153,7 +154,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
           <button
             type="button"
             onClick={() => { setTab('register'); setErrorMsg(''); setSuccessMsg(''); }}
-            className={`flex-1 py-1.5 rounded-full font-medium transition-colors ${
+            className={`flex-1 min-h-[38px] flex items-center justify-center rounded-full font-medium transition-colors cursor-pointer active:scale-95 ${
               tab === 'register' ? 'bg-[#D4AF37] text-black font-bold' : 'text-neutral-400 hover:text-white'
             }`}
           >
@@ -178,26 +179,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
         {tab === 'login' && (
           <form onSubmit={handleLogin} className="space-y-3.5">
             <div className="relative text-left">
-              <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="nome@esempio.it"
-                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             <div className="relative text-left">
-              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Password (min. 6 caratteri)"
-                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
@@ -205,7 +206,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               <button
                 type="button"
                 onClick={() => { setTab('forgot'); setErrorMsg(''); setSuccessMsg(''); }}
-                className="text-[11px] text-neutral-400 hover:text-[#D4AF37] transition-colors"
+                className="text-xs text-neutral-400 hover:text-[#D4AF37] transition-colors py-1 cursor-pointer"
               >
                 Password dimenticata?
               </button>
@@ -214,7 +215,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
             >
               {loading ? 'Accesso in corso...' : 'Accedi'}
             </button>
@@ -228,18 +229,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               <button
                 type="button"
                 onClick={() => handleQuickFill('mario.rossi@cinefilo.it', 'CinefiloPass2026!')}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors"
+                className="min-h-[44px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors active:scale-95 cursor-pointer"
               >
                 <span className="block font-semibold text-white">Utente Demo</span>
-                <span className="text-[10px] text-neutral-500 font-mono">mario.rossi</span>
+                <span className="text-[10px] text-neutral-500 font-mono truncate block">mario.rossi</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleQuickFill('admin@cinevicino.it', 'CineVicinoAdmin2026!')}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors"
+                className="min-h-[44px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors active:scale-95 cursor-pointer"
               >
                 <span className="block font-semibold text-[#D4AF37]">Admin Test</span>
-                <span className="text-[10px] text-neutral-500 font-mono">admin@cinevicino</span>
+                <span className="text-[10px] text-neutral-500 font-mono truncate block">admin@cinevicino</span>
               </button>
             </div>
           </form>

@@ -67,18 +67,18 @@ export const MovieCard: React.FC<MovieCardProps> = ({
             onToggleFavorite(movie.id);
           }}
           title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
-          className={`absolute bottom-3 right-3 p-2 rounded-full backdrop-blur-md border transition-all ${
+          className={`absolute bottom-3 right-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-95 ${
             isFavorite
               ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
               : 'bg-black/60 text-white border-white/20 hover:bg-white/20'
           }`}
         >
-          <Bookmark className={`w-3.5 h-3.5 ${isFavorite ? 'fill-black' : ''}`} />
+          <Bookmark className={`w-4 h-4 ${isFavorite ? 'fill-black' : ''}`} />
         </button>
       </div>
 
       {/* Movie Details */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
+      <div className="p-3.5 sm:p-4 md:p-5 flex-1 flex flex-col justify-between">
         <div>
           {/* Genre and Duration */}
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -93,7 +93,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
           {/* Title in Editorial Serif */}
           <h3 
             onClick={() => onSelect(movie)}
-            className="font-serif text-lg font-bold text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1 cursor-pointer"
+            className="font-serif text-base sm:text-lg font-bold text-white group-hover:text-[#D4AF37] transition-colors line-clamp-1 cursor-pointer leading-snug"
           >
             {title}
           </h3>
@@ -116,21 +116,18 @@ export const MovieCard: React.FC<MovieCardProps> = ({
           </p>
         </div>
 
-        {/* View showtimes action with elegant underline */}
-        <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
-          <button
-            onClick={() => onSelect(movie)}
-            className="text-[10px] uppercase tracking-widest text-white border-b border-white/30 hover:border-white w-fit pb-0.5 transition-colors cursor-pointer"
-          >
+        {/* View showtimes action with full touch target */}
+        <button
+          onClick={() => onSelect(movie)}
+          className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between w-full min-h-[44px] py-1 text-left group/btn transition-colors cursor-pointer"
+        >
+          <span className="text-[11px] uppercase tracking-widest text-white/90 group-hover/btn:text-[#D4AF37] border-b border-transparent group-hover/btn:border-[#D4AF37] pb-0.5 transition-colors">
             Programmazione & Orari
-          </button>
-          <button
-            onClick={() => onSelect(movie)}
-            className="text-xs font-bold text-[#D4AF37] hover:text-white flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          </span>
+          <span className="text-xs font-bold text-[#D4AF37] flex items-center gap-1 group-hover/btn:translate-x-1 transition-transform">
+            <ChevronRight className="w-4 h-4" />
+          </span>
+        </button>
 
       </div>
     </div>

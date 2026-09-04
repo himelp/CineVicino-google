@@ -2,6 +2,7 @@
  * CineVicino — Nationwide Scraper & TMDb Enrichment Runner
  * Can be run standalone (e.g. via crontab daily at 12:00) or called from Admin UI.
  */
+import { initDb } from '../src/db/index';
 import { cinemaScraper } from '../src/services/scraper';
 
 async function main() {
@@ -16,6 +17,7 @@ async function main() {
   console.log('----------------------------------------------------');
 
   try {
+    await initDb();
     const result = await cinemaScraper.executeFullScrape(
       { useFirecrawl: false }, // Use plain free HTTP parser for routine runs
       (update) => {

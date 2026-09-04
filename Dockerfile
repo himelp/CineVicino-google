@@ -26,6 +26,7 @@ RUN npm ci --omit=dev
 
 # Copy build artifacts and data
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/src ./src
 COPY --from=builder /app/data ./data
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./

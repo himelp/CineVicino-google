@@ -12,7 +12,11 @@ export function validateEnvironment() {
   }
 
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim().length < 32) {
-    errors.push('CRITICAL SECURITY: JWT_SECRET environment variable is missing or shorter than 32 characters. Generate a secure random key (e.g. `openssl rand -hex 32`) and add it to your environment.');
+    if (process.env.NODE_ENV === 'production') {
+      errors.push('CRITICAL SECURITY: JWT_SECRET environment variable is missing or shorter than 32 characters. Generate a secure random key (e.g. `openssl rand -hex 32`) and add it to your environment.');
+    } else {
+      warnings.push('JWT_SECRET is missing or shorter than 32 characters in development mode. An automatic in-memory cryptographic secret will be used.');
+    }
   }
 
   if (process.env.ADMIN_PASSWORD === 'admin' || process.env.ADMIN_PASSWORD === 'password') {

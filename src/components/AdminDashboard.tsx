@@ -312,13 +312,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   if (!isAuthenticated) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-        <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center text-neutral-200">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto min-h-[100dvh]">
+        <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl text-center text-neutral-200 my-auto pb-safe">
           <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4">
             <Shield className="w-6 h-6" />
           </div>
-          <h2 className="text-2xl font-serif font-bold text-white">Accesso Pannello Admin</h2>
-          <p className="text-xs text-neutral-400 mt-1 mb-6">
+          <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">Accesso Pannello Admin</h2>
+          <p className="text-xs text-neutral-400 mt-1 mb-6 leading-relaxed">
             Area riservata protetta da token di sessione JWT e credenziali di amministratore.
           </p>
 
@@ -330,19 +330,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="Email amministratore (es. admin@cinevicino.it)"
-                className="w-full px-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full px-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             <div className="relative text-left">
-              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password admin..."
-                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
@@ -352,17 +352,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               </p>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-semibold text-neutral-300 border border-white/10 transition-colors cursor-pointer"
+                className="flex-1 min-h-[44px] py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-white border border-white/10 transition-colors cursor-pointer active:scale-95"
               >
                 Annulla
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-xs font-bold uppercase tracking-wider text-black transition-colors shadow-sm cursor-pointer"
+                className="flex-1 min-h-[44px] py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-xs font-bold uppercase tracking-wider text-black transition-colors shadow-sm cursor-pointer active:scale-95"
               >
                 Accedi
               </button>
@@ -374,42 +374,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn min-h-[100dvh]">
       <div 
-        className="relative w-full max-w-5xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 flex flex-col max-h-[92vh]"
+        className="relative w-full max-w-5xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 flex flex-col max-h-[92dvh] pb-safe"
         onClick={e => e.stopPropagation()}
       >
         
         {/* Admin Header */}
-        <div className="p-4 sm:p-6 border-b border-white/10 flex items-center justify-between bg-black/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center">
-              <Shield className="w-5 h-5" />
+        <div className="p-3.5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-black/50 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-serif font-bold text-white">CineVicino Admin</h2>
-                <span className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <h2 className="text-base sm:text-lg font-serif font-bold text-white truncate">CineVicino Admin</h2>
+                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
                   Autenticato
                 </span>
               </div>
-              <p className="text-xs text-neutral-400">
+              <p className="text-[11px] sm:text-xs text-neutral-400 truncate hidden xs:block">
                 Controllo Scraper, Stato API, Contenuti & Personalizzazione
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setIsAuthenticated(false)}
               title="Disconnetti"
-              className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-rose-400 border border-white/10 transition-colors cursor-pointer"
+              aria-label="Disconnetti"
+              className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-rose-400 border border-white/10 transition-colors cursor-pointer active:scale-95"
             >
               <LogOut className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-full bg-white/5 hover:bg-white text-neutral-300 hover:text-black border border-white/10 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
+              aria-label="Chiudi"
+              className="min-h-[40px] sm:min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full bg-white/5 hover:bg-white text-neutral-300 hover:text-black border border-white/10 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center justify-center"
             >
               Chiudi
             </button>
@@ -417,12 +419,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-white/10 bg-black/30 px-4 gap-2 overflow-x-auto">
+        <div className="flex border-b border-white/10 bg-black/30 px-2 sm:px-4 gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
           {[
-            { id: 'status', label: '1. Stato API & Integrazioni', icon: Activity },
-            { id: 'scrape', label: '2. Scraper Nazionale', icon: RefreshCw },
-            { id: 'content', label: '3. Gestione Contenuti', icon: Database },
-            { id: 'customization', label: '4. Personalizzazione Sito', icon: Edit3 }
+            { id: 'status', label: '1. Stato API', icon: Activity },
+            { id: 'scrape', label: '2. Scraper', icon: RefreshCw },
+            { id: 'content', label: '3. Contenuti', icon: Database },
+            { id: 'customization', label: '4. Personalizzazione', icon: Edit3 }
           ].map(tab => {
             const Icon = tab.icon;
             const isSel = activeTab === tab.id;
@@ -430,13 +432,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                className={`flex items-center gap-1.5 min-h-[44px] py-2.5 px-3 sm:px-4 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-95 ${
                   isSel
                     ? 'border-[#D4AF37] text-[#D4AF37] bg-[#D4AF37]/10'
                     : 'border-transparent text-neutral-400 hover:text-white'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -613,8 +615,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3">
                   Cronologia Esecuzioni Precedenti
                 </h4>
-                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[500px]">
                     <thead className="bg-neutral-900 text-neutral-400 uppercase tracking-wider font-mono">
                       <tr>
                         <th className="p-3">Data e Ora</th>
@@ -778,8 +780,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   <span>Gestione Orari Spettacoli Attivi (Disattiva orari errati con 1-click)</span>
                   <span className="font-mono text-amber-400">{contentData?.activeShowtimesCount} orari attivi</span>
                 </h4>
-                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-hidden max-h-80 overflow-y-auto">
-                  <table className="w-full text-left text-xs">
+                <div className="rounded-2xl bg-neutral-950 border border-neutral-800 overflow-x-auto max-h-80 overflow-y-auto">
+                  <table className="w-full text-left text-xs min-w-[500px]">
                     <thead className="bg-neutral-900 text-neutral-400 uppercase tracking-wider font-mono sticky top-0">
                       <tr>
                         <th className="p-3">Film</th>
