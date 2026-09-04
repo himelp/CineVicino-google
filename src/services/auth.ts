@@ -8,8 +8,6 @@ import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { executeRawSql } from '../db/index';
 
-import crypto from 'crypto';
-
 let devJwtSecret: string | null = null;
 
 export function getJwtSecret(): string {

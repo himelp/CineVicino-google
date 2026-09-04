@@ -22,6 +22,7 @@ export interface City {
 
 export interface Cinema {
   id: string;
+  slug?: string;
   city_id: string;
   name: string;
   chain: CinemaChain | null;

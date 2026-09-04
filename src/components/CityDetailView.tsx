@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle } from 'lucide-react';
+import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle, Share2, Check } from 'lucide-react';
 import { City, Cinema, Showtime, Movie } from '../types';
 import { Language, translations } from '../utils/i18n';
 
@@ -33,6 +33,51 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [selectedFormat, setSelectedFormat] = useState<string>('all');
   const [onlyVose, setOnlyVose] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCinemaId, setCopiedCinemaId] = useState<string | null>(null);
+
+  const handleShareCity = async () => {
+    const shareUrl = `${window.location.origin}/citta/${city.slug}`;
+    const shareTitle = `Cinema a ${city.name} (${city.province_code}) — CineVicino`;
+    const shareText = `Programmazione sale e orari film a ${city.name} su CineVicino`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard.writeText(shareUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleShareCinema = async (c: Cinema) => {
+    const slug = c.slug || c.id.replace(/^cin-/, '');
+    const shareUrl = `${window.location.origin}/cinema/${slug}`;
+    const shareTitle = `${c.name} (${city.name}) — CineVicino`;
+    const shareText = `Programmazione e orari film per ${c.name} su CineVicino`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl
+        });
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    await navigator.clipboard.writeText(shareUrl);
+    setCopiedCinemaId(c.id);
+    setTimeout(() => setCopiedCinemaId(null), 2000);
+  };
 
   useEffect(() => {
     async function loadCityData() {
@@ -120,6 +165,24 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <p className="text-xs sm:text-base text-neutral-400 mt-2 leading-relaxed">
             Programmazione, orari e biglietti ufficiali per le sale di {city.name} ({city.province_code}) e dintorni.
           </p>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={handleShareCity}
+              className="inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-medium transition-colors cursor-pointer active:scale-95"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-400 font-medium">Link copiato!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>Condividi pagina comune</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center justify-around sm:justify-center gap-4 bg-white/[0.03] p-3.5 sm:p-4 rounded-2xl border border-white/10 text-center w-full md:w-auto">
@@ -280,7 +343,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Official website outbound link */}
+                    {/* Official website outbound link & Cinema Share */}
                     <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs">
                       <a
                         href={cinema.website_url}
@@ -291,6 +354,23 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                         <span>{t.officialWebsite}</span>
                         <ExternalLink className="w-3 h-3" />
                       </a>
+                      <button
+                        onClick={() => handleShareCinema(cinema)}
+                        className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 px-2 rounded-md hover:bg-white/5"
+                        title="Condividi cinema"
+                      >
+                        {copiedCinemaId === cinema.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copiato!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-3 h-3 text-[#D4AF37]" />
+                            <span>Condividi</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 );

@@ -108,10 +108,13 @@ export async function initDb() {
       lat REAL NOT NULL,
       lng REAL NOT NULL,
       website_url TEXT NOT NULL,
-      features JSONB
+      features JSONB,
+      slug VARCHAR(256)
     );`,
+    `ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS slug VARCHAR(256);`,
     `CREATE INDEX IF NOT EXISTS idx_cinemas_city_id ON cinemas (city_id);`,
     `CREATE INDEX IF NOT EXISTS idx_cinemas_chain ON cinemas (chain);`,
+    `CREATE INDEX IF NOT EXISTS idx_cinemas_slug ON cinemas (slug);`,
 
     // 3. Movies table
     `CREATE TABLE IF NOT EXISTS movies (

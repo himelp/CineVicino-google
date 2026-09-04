@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -1217,6 +1218,181 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // ==========================================
+// DYNAMIC SEO & SOCIAL META INJECTION
+// ==========================================
+
+function escapeHtml(str: string = ''): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function getPageMeta(reqPath: string, host: string): Promise<{
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  jsonLd?: any;
+} | null> {
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const baseUrl = `${protocol}://${host}`;
+
+  // 1. Film route: /film/:slug
+  const filmMatch = reqPath.match(/^\/film\/([a-zA-Z0-9_-]+)\/?$/);
+  if (filmMatch) {
+    const slug = filmMatch[1];
+    try {
+      const movieRes = await executeRawSql(
+        'SELECT * FROM movies WHERE slug = $1 LIMIT 1',
+        [slug]
+      );
+      if (movieRes.rows && movieRes.rows.length > 0) {
+        const m = movieRes.rows[0];
+        const title = `${m.title_it} (${m.release_year}) — Cinema e Orari Spettacoli | CineVicino`;
+        const desc = m.synopsis_it 
+          ? `${m.title_it} (${m.release_year}, regia di ${m.director}). ${m.synopsis_it.slice(0, 150)}... Orari e biglietti ufficiali.`
+          : `Orari spettacoli nei cinema italiani e biglietti ufficiali per ${m.title_it} diretto da ${m.director}.`;
+        return {
+          title,
+          description: desc,
+          image: m.poster_url || m.backdrop_url,
+          url: `${baseUrl}/film/${m.slug}`,
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'Movie',
+            name: m.title_it,
+            director: { '@type': 'Person', name: m.director },
+            image: m.poster_url,
+            description: m.synopsis_it,
+            datePublished: String(m.release_year),
+            url: `${baseUrl}/film/${m.slug}`
+          }
+        };
+      }
+    } catch (e) {
+      logger.error({ e }, 'Error fetching movie meta');
+    }
+  }
+
+  // 2. Cinema route: /cinema/:slug
+  const cinemaMatch = reqPath.match(/^\/cinema\/([a-zA-Z0-9_-]+)\/?$/);
+  if (cinemaMatch) {
+    const slug = cinemaMatch[1];
+    try {
+      const cinRes = await executeRawSql(
+        `SELECT c.*, ci.name as city_name, ci.slug as city_slug, ci.province_code 
+         FROM cinemas c 
+         LEFT JOIN cities ci ON c.city_id = ci.id 
+         WHERE c.slug = $1 OR c.id = $1 OR c.id = ('cin-' || $1) 
+         LIMIT 1`,
+        [slug]
+      );
+      if (cinRes.rows && cinRes.rows.length > 0) {
+        const c = cinRes.rows[0];
+        const cityName = c.city_name ? `${c.city_name} (${c.province_code})` : 'Italia';
+        const title = `${c.name} (${cityName}) — Film in Programmazione & Orari | CineVicino`;
+        const desc = `Consulta la programmazione completa, gli orari degli spettacoli e acquista i biglietti ufficiali per il cinema ${c.name} in ${c.address}.`;
+        return {
+          title,
+          description: desc,
+          image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80',
+          url: `${baseUrl}/cinema/${slug}`,
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'MovieTheater',
+            name: c.name,
+            address: c.address,
+            url: `${baseUrl}/cinema/${slug}`
+          }
+        };
+      }
+    } catch (e) {
+      logger.error({ e }, 'Error fetching cinema meta');
+    }
+  }
+
+  // 3. City route: /citta/:slug or /city/:slug
+  const cityMatch = reqPath.match(/^\/(citta|city)\/([a-zA-Z0-9_-]+)\/?$/);
+  if (cityMatch) {
+    const slug = cityMatch[2];
+    try {
+      const cityRes = await executeRawSql(
+        'SELECT * FROM cities WHERE slug = $1 LIMIT 1',
+        [slug]
+      );
+      if (cityRes.rows && cityRes.rows.length > 0) {
+        const ci = cityRes.rows[0];
+        const title = `Cinema a ${ci.name} (${ci.province_code}) — Film in Programmazione & Sale | CineVicino`;
+        const desc = `Scopri tutti i cinema, multisala e sale d'essai a ${ci.name} (${ci.region}). Orari sempre aggiornati e link alle biglietterie ufficiali senza commissioni.`;
+        return {
+          title,
+          description: desc,
+          image: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=1200&q=80',
+          url: `${baseUrl}/citta/${ci.slug}`,
+          jsonLd: {
+            '@context': 'https://schema.org',
+            '@type': 'Place',
+            name: `Cinema a ${ci.name}`,
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: ci.name,
+              addressRegion: ci.region,
+              addressCountry: 'IT'
+            },
+            url: `${baseUrl}/citta/${ci.slug}`
+          }
+        };
+      }
+    } catch (e) {
+      logger.error({ e }, 'Error fetching city meta');
+    }
+  }
+
+  return null;
+}
+
+function injectMeta(html: string, meta: {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  jsonLd?: any;
+}): string {
+  let updated = html;
+
+  // Title tags
+  updated = updated.replace(/<title>.*?<\/title>/i, `<title>${escapeHtml(meta.title)}</title>`);
+  updated = updated.replace(/<meta property="og:title" content=".*?" \/>/i, `<meta property="og:title" content="${escapeHtml(meta.title)}" />`);
+
+  // Description tags
+  updated = updated.replace(/<meta name="description" content=".*?" \/>/i, `<meta name="description" content="${escapeHtml(meta.description)}" />`);
+  updated = updated.replace(/<meta property="og:description" content=".*?" \/>/i, `<meta property="og:description" content="${escapeHtml(meta.description)}" />`);
+
+  // Open Graph URL & Canonical
+  if (meta.url) {
+    const urlTag = `<meta property="og:url" content="${escapeHtml(meta.url)}" />\n    <link rel="canonical" href="${escapeHtml(meta.url)}" />`;
+    updated = updated.replace('</head>', `    ${urlTag}\n  </head>`);
+  }
+
+  // Open Graph Image
+  if (meta.image) {
+    const imgTag = `<meta property="og:image" content="${escapeHtml(meta.image)}" />\n    <meta name="twitter:image" content="${escapeHtml(meta.image)}" />`;
+    updated = updated.replace('</head>', `    ${imgTag}\n  </head>`);
+  }
+
+  // JSON-LD structured data
+  if (meta.jsonLd) {
+    const jsonLdTag = `<script type="application/ld+json">\n${JSON.stringify(meta.jsonLd, null, 2)}\n    </script>`;
+    updated = updated.replace('</head>', `    ${jsonLdTag}\n  </head>`);
+  }
+
+  return updated;
+}
+
+// ==========================================
 // BOOTSTRAP SERVER & VITE INTEGRATION
 // ==========================================
 
@@ -1231,12 +1407,41 @@ async function startServer() {
         server: { middlewareMode: true },
         appType: 'spa',
       });
+
+      // Intercept dynamic SEO routes in development
+      app.get(['/film/:slug', '/cinema/:slug', '/citta/:slug', '/city/:slug'], async (req, res, next) => {
+        try {
+          const rawHtml = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf-8');
+          const transformed = await vite.transformIndexHtml(req.originalUrl, rawHtml);
+          const meta = await getPageMeta(req.path, req.get('host') || 'localhost:3000');
+          const finalHtml = meta ? injectMeta(transformed, meta) : transformed;
+          res.type('html').send(finalHtml);
+        } catch (e) {
+          next(e);
+        }
+      });
+
       app.use(vite.middlewares);
     } else {
       const distPath = path.join(process.cwd(), 'dist');
       app.use(express.static(distPath));
-      app.get('*', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+
+      app.get('*', async (req, res) => {
+        try {
+          const indexHtmlPath = path.join(distPath, 'index.html');
+          if (fs.existsSync(indexHtmlPath)) {
+            const rawHtml = fs.readFileSync(indexHtmlPath, 'utf-8');
+            const meta = await getPageMeta(req.path, req.get('host') || 'cinemavicino.minhazbinsanto.com');
+            if (meta) {
+              const htmlWithMeta = injectMeta(rawHtml, meta);
+              return res.type('html').send(htmlWithMeta);
+            }
+            return res.type('html').send(rawHtml);
+          }
+          res.sendFile(indexHtmlPath);
+        } catch (err) {
+          res.sendFile(path.join(distPath, 'index.html'));
+        }
       });
     }
 

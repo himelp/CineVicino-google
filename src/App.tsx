@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { MovieCard } from './components/MovieCard';
@@ -15,6 +16,9 @@ import { Language, translations } from './utils/i18n';
 import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight } from 'lucide-react';
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [lang, setLang] = useState<Language>(() => {
     return (localStorage.getItem('cinevicino_lang') as Language) || 'it';
   });
@@ -230,19 +234,143 @@ export default function App() {
     { name: 'Cortina d\'Ampezzo', slug: 'cortina-dampezzo', prov: 'BL' }
   ];
 
+  // Router Navigation Handlers
+  const openMovie = (m: Movie) => {
+    setSelectedMovie(m);
+    navigate(`/film/${m.slug}`);
+  };
+
+  const closeMovie = () => {
+    setSelectedMovie(null);
+    if (activeCity && view === 'city') {
+      navigate(`/citta/${activeCity.slug}`);
+    } else if (view === 'directory') {
+      navigate('/comuni');
+    } else if (view === 'all-movies') {
+      navigate('/film');
+    } else {
+      navigate('/');
+    }
+  };
+
+  const selectCity = (c: City) => {
+    setActiveCity(c);
+    setView('city');
+    navigate(`/citta/${c.slug}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openHome = () => {
+    setView('home');
+    navigate('/');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openAllCities = () => {
+    setView('directory');
+    navigate('/comuni');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openAllMovies = () => {
+    setView('all-movies');
+    navigate('/film');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSelectPopularCity = async (slug: string) => {
     try {
       const res = await fetch(`/api/cities/${slug}`);
       if (res.ok) {
         const data = await res.json();
-        setActiveCity(data.city);
-        setView('city');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        selectCity(data.city);
       }
     } catch (e) {
       console.error(e);
     }
   };
+
+  // Synchronize URL pathname with internal view / state
+  useEffect(() => {
+    const path = location.pathname;
+
+    // 1. Film route: /film/:slug
+    if (path.startsWith('/film/')) {
+      const slug = path.replace('/film/', '').split('/')[0];
+      if (slug) {
+        const found = movies.find(m => m.slug === slug);
+        if (found) {
+          setSelectedMovie(found);
+        } else {
+          fetch(`/api/movies/${slug}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.movie) setSelectedMovie(data.movie);
+            })
+            .catch(err => console.error('Failed to load movie from URL', err));
+        }
+      }
+    } else if (selectedMovie) {
+      setSelectedMovie(null);
+    }
+
+    // 2. City route: /citta/:slug or /city/:slug
+    if (path.startsWith('/citta/') || path.startsWith('/city/')) {
+      const slug = path.replace(/^\/(citta|city)\//, '').split('/')[0];
+      if (slug) {
+        if (!activeCity || activeCity.slug !== slug) {
+          fetch(`/api/cities/${slug}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.city) {
+                setActiveCity(data.city);
+                setView('city');
+              }
+            })
+            .catch(err => console.error('Failed to load city from URL', err));
+        } else if (view !== 'city') {
+          setView('city');
+        }
+      }
+    }
+
+    // 3. Cinema route: /cinema/:slug
+    if (path.startsWith('/cinema/')) {
+      const slug = path.replace('/cinema/', '').split('/')[0];
+      if (slug) {
+        fetch(`/api/cinemas/${slug}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.cinema?.city_slug) {
+              fetch(`/api/cities/${data.cinema.city_slug}`)
+                .then(r => r.json())
+                .then(cData => {
+                  if (cData.city) {
+                    setActiveCity(cData.city);
+                    setView('city');
+                  }
+                });
+            }
+          })
+          .catch(err => console.error('Failed to load cinema from URL', err));
+      }
+    }
+
+    // 4. Directory route
+    if (path === '/comuni' || path === '/directory') {
+      if (view !== 'directory') setView('directory');
+    }
+
+    // 5. All movies route
+    if (path === '/film' || path === '/all-movies') {
+      if (view !== 'all-movies') setView('all-movies');
+    }
+
+    // 6. Home route
+    if (path === '/') {
+      if (view !== 'home') setView('home');
+    }
+  }, [location.pathname, movies]);
 
   return (
     <div className="min-h-screen bg-[#050505] text-[#e0e0e0] flex flex-col font-sans selection:bg-[#D4AF37] selection:text-black">
@@ -251,29 +379,16 @@ export default function App() {
       <Header
         lang={lang}
         onToggleLang={handleToggleLang}
-        onSelectCity={(c) => {
-          setActiveCity(c);
-          setView('city');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onSelectCity={selectCity}
         onLocateMe={handleLocateMe}
         isLocating={isLocating}
         activeCity={activeCity}
         favoritesCount={favoriteMovieIds.length + favoriteCinemaIds.length}
         onOpenFavorites={() => setShowFavorites(true)}
         onOpenAdmin={() => setShowAdmin(true)}
-        onOpenAllCities={() => {
-          setView('directory');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenAllMovies={() => {
-          setView('all-movies');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-        onOpenHome={() => {
-          setView('home');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
+        onOpenAllCities={openAllCities}
+        onOpenAllMovies={openAllMovies}
+        onOpenHome={openHome}
         user={user}
         onOpenLogin={() => setShowLogin(true)}
       />
@@ -415,7 +530,7 @@ export default function App() {
                       key={movie.id}
                       movie={movie}
                       lang={lang}
-                      onSelect={(m) => setSelectedMovie(m)}
+                      onSelect={openMovie}
                       isFavorite={favoriteMovieIds.includes(movie.id)}
                       onToggleFavorite={handleToggleFavoriteMovie}
                     />
@@ -432,9 +547,9 @@ export default function App() {
           <CityDetailView
             city={activeCity}
             lang={lang}
-            onBack={() => setView('home')}
-            onSelectMovie={(m) => setSelectedMovie(m)}
-            onSelectCity={(c) => setActiveCity(c)}
+            onBack={openHome}
+            onSelectMovie={openMovie}
+            onSelectCity={selectCity}
             onToggleFavorite={handleToggleFavoriteCinema}
             favoriteIds={favoriteCinemaIds}
           />
@@ -444,12 +559,8 @@ export default function App() {
         {view === 'directory' && (
           <ComuniDirectory
             lang={lang}
-            onBack={() => setView('home')}
-            onSelectCity={(c) => {
-              setActiveCity(c);
-              setView('city');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onBack={openHome}
+            onSelectCity={selectCity}
           />
         )}
 
@@ -468,7 +579,7 @@ export default function App() {
                   key={movie.id}
                   movie={movie}
                   lang={lang}
-                  onSelect={(m) => setSelectedMovie(m)}
+                  onSelect={openMovie}
                   isFavorite={favoriteMovieIds.includes(movie.id)}
                   onToggleFavorite={handleToggleFavoriteMovie}
                 />
@@ -514,12 +625,12 @@ export default function App() {
               </h4>
               <ul className="space-y-2">
                 <li>
-                  <button onClick={() => { setView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-white transition-colors">
+                  <button onClick={openHome} className="hover:text-white transition-colors">
                     Home & Film in Sala
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => { setView('directory'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-white transition-colors">
+                  <button onClick={openAllCities} className="hover:text-white transition-colors">
                     Tutti i 7.894 Comuni
                   </button>
                 </li>
@@ -590,9 +701,9 @@ export default function App() {
         <MovieDetailModal
           movie={selectedMovie}
           lang={lang}
-          onClose={() => setSelectedMovie(null)}
+          onClose={closeMovie}
           activeCity={activeCity}
-          onSelectCity={(c) => setActiveCity(c)}
+          onSelectCity={selectCity}
           isFavorite={favoriteMovieIds.includes(selectedMovie.id)}
           onToggleFavorite={handleToggleFavoriteMovie}
         />
@@ -607,16 +718,18 @@ export default function App() {
           onRemoveFavoriteMovie={handleToggleFavoriteMovie}
           onRemoveFavoriteCinema={handleToggleFavoriteCinema}
           onSelectMovie={(m) => {
-            setSelectedMovie(m);
+            openMovie(m);
             setShowFavorites(false);
           }}
           onSelectCinema={(c) => {
-            const city = activeCity; // find city
-            if (c.city_id) {
+            if (c.slug) {
+              navigate(`/cinema/${c.slug}`);
+              setShowFavorites(false);
+            } else if (c.city_id) {
               fetch(`/api/cities/${c.city_id}`).then(r => r.json()).then(d => {
                 if (d.city) {
-                  setActiveCity(d.city);
-                  setView('city');
+                  selectCity(d.city);
+                  setShowFavorites(false);
                 }
               });
             }
