@@ -84,14 +84,14 @@ export default function App() {
     localStorage.setItem('cinevicino_lang', nextLang);
   };
 
-  // Initial Data Fetch
+  // Initial Data Fetch & Session Restore
   useEffect(() => {
     async function loadInitialData() {
       try {
         const [movRes, cinRes, setRes, citRes] = await Promise.all([
           fetch('/api/movies'),
           fetch('/api/cinemas'),
-          fetch('/api/admin/settings'),
+          fetch('/api/settings'),
           fetch('/api/cities?limit=1')
         ]);
 
@@ -101,6 +101,35 @@ export default function App() {
         if (citRes.ok) {
           const citData = await citRes.json();
           if (citData.total) setCitiesCount(citData.total);
+        }
+
+        // Restore user session if token exists
+        const storedToken = localStorage.getItem('cinevicino_token');
+        if (storedToken) {
+          try {
+            const meRes = await fetch('/api/auth/me', {
+              headers: { 'Authorization': `Bearer ${storedToken}` }
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (meData.user) {
+                setUser(meData.user);
+                // Also fetch server favorites
+                const favRes = await fetch('/api/favorites', {
+                  headers: { 'Authorization': `Bearer ${storedToken}` }
+                });
+                if (favRes.ok) {
+                  const favData = await favRes.json();
+                  if (favData.movies?.length) setFavoriteMovieIds(favData.movies);
+                  if (favData.cinemas?.length) setFavoriteCinemaIds(favData.cinemas);
+                }
+              }
+            } else {
+              localStorage.removeItem('cinevicino_token');
+            }
+          } catch (e) {
+            console.error('Failed to verify token on startup', e);
+          }
         }
       } catch (err) {
         console.error('Failed to load initial CineVicino data', err);
@@ -528,11 +557,13 @@ export default function App() {
                     Robots.txt
                   </a>
                 </li>
-                <li>
-                  <button onClick={() => setShowAdmin(true)} className="hover:text-[#D4AF37] transition-colors">
-                    Pannello Amministratore
-                  </button>
-                </li>
+                {user?.is_admin && (
+                  <li>
+                    <button onClick={() => setShowAdmin(true)} className="hover:text-[#D4AF37] text-[#D4AF37] transition-colors">
+                      Pannello Amministratore
+                    </button>
+                  </li>
+                )}
               </ul>
             </div>
 

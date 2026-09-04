@@ -130,12 +130,15 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 Città
               </button>
-              <button 
-                onClick={onOpenAdmin}
-                className="hover:text-white transition-colors py-1 hover:border-b hover:border-white text-xs uppercase tracking-widest"
-              >
-                Admin
-              </button>
+              {user?.is_admin && (
+                <button 
+                  onClick={onOpenAdmin}
+                  className="hover:text-[#D4AF37] text-[#D4AF37] transition-colors py-1 text-xs uppercase tracking-widest flex items-center gap-1 font-semibold"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  Admin
+                </button>
+              )}
             </nav>
           </div>
 

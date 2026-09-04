@@ -262,9 +262,11 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                   </div>
 
                                   <a
-                                    href={st.ticket_url}
+                                    href={st.ticket_url || cinema.website_url || '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    onClick={() => fetch(`/api/showtimes/${st.id}/click`, { method: 'POST' }).catch(() => {})}
+                                    title={st.ticket_url ? "Acquista biglietto ufficiale" : "Consulta programmazione sul sito del cinema"}
                                     className="px-3 py-1 rounded-lg bg-white/5 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm"
                                   >
                                     <span>{st.time}</span>

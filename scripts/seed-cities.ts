@@ -1,21 +1,12 @@
 /**
- * CineVicino — Seed Italian Comuni from ISTAT List
- * Parses data/comuni-italia-istat.csv and geocodes coordinates.
+ * CineVicino — Seed All Italian Comuni from Official ISTAT Dataset into PostgreSQL
+ * Inserts all ~7,894 - 7,904 municipalities into the PostgreSQL cities table.
  */
 import fs from 'fs';
 import path from 'path';
+import { initDb, executeRawSql, closeDb } from '../src/db/index';
 
-interface IstatRow {
-  slug: string;
-  name: string;
-  region: string;
-  province: string;
-  province_code: string;
-  is_provincial_capital: boolean;
-  cadastral_code?: string;
-}
-
-// Major coordinates map for province capitals to provide rapid local anchoring
+// Known provincial capitals anchor coordinates
 const PROVINCE_COORDINATES: Record<string, [number, number]> = {
   RM: [41.9028, 12.4964],
   MI: [45.4642, 9.1900],
@@ -96,42 +87,167 @@ const PROVINCE_COORDINATES: Record<string, [number, number]> = {
   AO: [45.7373, 7.3195]
 };
 
-async function seedCities() {
-  console.log('🚀 CineVicino: Avvio importazione Comuni d\'Italia ISTAT 2026...');
-  const csvPath = path.join(process.cwd(), 'data', 'comuni-italia-istat.csv');
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
 
-  if (!fs.existsSync(csvPath)) {
-    console.error(`❌ File non trovato: ${csvPath}`);
+async function seedAllComuni() {
+  console.log('🚀 CineVicino: Inizializzazione database per importazione Comuni...');
+  await initDb();
+
+  // 1. Check existing count
+  const countCheck = await executeRawSql('SELECT COUNT(*) as cnt FROM cities');
+  const existingCount = parseInt(countCheck.rows[0].cnt || '0', 10);
+  console.log(`📊 Comuni attualmente presenti in PostgreSQL: ${existingCount}`);
+
+  // Load ISTAT JSON file
+  const jsonPath = path.join(process.cwd(), 'data', 'comuni-italia-istat-all.json');
+  let rawComuni: any[] = [];
+
+  if (fs.existsSync(jsonPath)) {
+    rawComuni = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    console.log(`📂 Caricati ${rawComuni.length} comuni da ${jsonPath}`);
+  } else {
+    // Fallback to CSV if json missing
+    const csvPath = path.join(process.cwd(), 'data', 'comuni-italia-istat.csv');
+    if (fs.existsSync(csvPath)) {
+      const csvData = fs.readFileSync(csvPath, 'utf8').split(/\r?\n/).filter(Boolean);
+      for (let i = 1; i < csvData.length; i++) {
+        const parts = csvData[i].split(',');
+        if (parts[1]) {
+          rawComuni.push({
+            nome: parts[1],
+            regione: { nome: parts[2] },
+            provincia: { nome: parts[3] },
+            sigla: parts[4],
+            is_provincial_capital: parts[5]?.toLowerCase() === 'true',
+            codiceCatastale: parts[6]
+          });
+        }
+      }
+      console.log(`📂 Caricati ${rawComuni.length} comuni da CSV`);
+    }
+  }
+
+  if (rawComuni.length === 0) {
+    console.error('❌ Nessun dato trovato per i comuni italiani!');
     process.exit(1);
   }
 
-  const raw = fs.readFileSync(csvPath, 'utf-8');
-  const lines = raw.split('\n').filter(l => l.trim().length > 0);
-  console.log(`📊 Trovate ${lines.length - 1} righe nel file ISTAT.`);
+  // Load any existing Nominatim cache
+  const cachePath = path.join(process.cwd(), 'data', 'nominatim-cache.json');
+  let nominatimCache: Record<string, { lat: number; lng: number }> = {};
+  if (fs.existsSync(cachePath)) {
+    try {
+      nominatimCache = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      console.log(`🗺️ Trovati ${Object.keys(nominatimCache).length} comuni pre-geocodificati in cache.`);
+    } catch {}
+  }
 
-  const seeded = [];
-  for (let i = 1; i < lines.length; i++) {
-    const [slug, name, region, province, province_code, is_capital, cadastral] = lines[i].split(',');
-    if (!slug || !name) continue;
+  // Batch insert into cities table
+  console.log('⏳ Inserimento dei comuni nel database PostgreSQL...');
+  let inserted = 0;
+  let updated = 0;
 
-    const baseCoords = PROVINCE_COORDINATES[province_code?.toUpperCase()] || [41.9028, 12.4964];
-    const jitter = (Math.sin(i * 997) * 0.05);
+  // Track unique slugs
+  const usedSlugs = new Set<string>();
 
-    seeded.push({
-      slug,
+  for (const c of rawComuni) {
+    const name = c.nome?.trim();
+    if (!name) continue;
+
+    const region = typeof c.regione === 'string' ? c.regione : (c.regione?.nome || 'Italia');
+    const province = typeof c.provincia === 'string' ? c.provincia : (c.provincia?.nome || '');
+    const province_code = (c.sigla || c.province_code || 'IT').toUpperCase();
+    const cadastral_code = c.codiceCatastale || c.cadastral_code || null;
+
+    let baseSlug = slugify(name);
+    if (usedSlugs.has(baseSlug)) {
+      baseSlug = `${baseSlug}-${province_code.toLowerCase()}`;
+    }
+    usedSlugs.add(baseSlug);
+
+    const isCapital = c.is_provincial_capital === true || PROVINCE_COORDINATES[province_code] !== undefined && name.toLowerCase() === province.toLowerCase();
+
+    // Check if coordinates exist in cache or province anchor
+    const cacheKey = `${name.toLowerCase()}|${province_code.toLowerCase()}`;
+    let lat: number;
+    let lng: number;
+    let geocodeStatus = 'pending';
+
+    if (nominatimCache[cacheKey]) {
+      lat = nominatimCache[cacheKey].lat;
+      lng = nominatimCache[cacheKey].lng;
+      geocodeStatus = 'complete';
+    } else if (isCapital && PROVINCE_COORDINATES[province_code]) {
+      [lat, lng] = PROVINCE_COORDINATES[province_code];
+      geocodeStatus = 'complete';
+    } else if (PROVINCE_COORDINATES[province_code]) {
+      // Deterministic slight spatial offset based on name hash for clean initial layout before geocoder runs
+      const hash = name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+      const latOffset = ((hash % 100) - 50) * 0.003;
+      const lngOffset = (((hash * 13) % 100) - 50) * 0.003;
+      lat = Number((PROVINCE_COORDINATES[province_code][0] + latOffset).toFixed(4));
+      lng = Number((PROVINCE_COORDINATES[province_code][1] + lngOffset).toFixed(4));
+      geocodeStatus = 'pending';
+    } else {
+      lat = 41.9028;
+      lng = 12.4964;
+      geocodeStatus = 'pending';
+    }
+
+    const cityId = `c-${baseSlug}`;
+
+    // UPSERT
+    const query = `
+      INSERT INTO cities (
+        id, slug, name, region, province, province_code,
+        is_provincial_capital, cadastral_code, lat, lng, geocode_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (slug) DO UPDATE SET
+        name = EXCLUDED.name,
+        region = EXCLUDED.region,
+        province = EXCLUDED.province,
+        province_code = EXCLUDED.province_code,
+        is_provincial_capital = EXCLUDED.is_provincial_capital,
+        cadastral_code = COALESCE(EXCLUDED.cadastral_code, cities.cadastral_code),
+        lat = CASE WHEN cities.geocode_status = 'complete' THEN cities.lat ELSE EXCLUDED.lat END,
+        lng = CASE WHEN cities.geocode_status = 'complete' THEN cities.lng ELSE EXCLUDED.lng END,
+        geocode_status = CASE WHEN cities.geocode_status = 'complete' THEN cities.geocode_status ELSE EXCLUDED.geocode_status END;
+    `;
+
+    await executeRawSql(query, [
+      cityId,
+      baseSlug,
       name,
       region,
       province,
       province_code,
-      is_provincial_capital: is_capital?.toLowerCase() === 'true',
-      cadastral_code: cadastral,
-      lat: Number((baseCoords[0] + jitter).toFixed(4)),
-      lng: Number((baseCoords[1] + jitter).toFixed(4))
-    });
+      isCapital,
+      cadastral_code,
+      lat,
+      lng,
+      geocodeStatus
+    ]);
+    inserted++;
+
+    if (inserted % 1000 === 0) {
+      console.log(`  ... processati ${inserted}/${rawComuni.length} Comuni`);
+    }
   }
 
-  console.log(`✅ ${seeded.length} Comuni importati e geolocalizzati con successo.`);
-  console.log(`Esempio: ${seeded[0].name} (${seeded[0].province_code}) -> Lat: ${seeded[0].lat}, Lng: ${seeded[0].lng}`);
+  const finalCheck = await executeRawSql('SELECT COUNT(*) as cnt, COUNT(*) FILTER (WHERE geocode_status = \'complete\') as geocoded FROM cities');
+  console.log(`\n🎉 COMPLETATO! Totale Comuni in database: ${finalCheck.rows[0].cnt} (Geocodificati completi: ${finalCheck.rows[0].geocoded})`);
+
+  await closeDb();
 }
 
-seedCities().catch(console.error);
+seedAllComuni().catch(err => {
+  console.error('❌ Errore durante seed dei comuni:', err);
+  process.exit(1);
+});

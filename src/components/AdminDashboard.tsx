@@ -12,10 +12,51 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
+  const [token, setToken] = useState<string>(() => localStorage.getItem('cinevicino_token') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState('admin@cinevicino.it');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'status' | 'scrape' | 'content' | 'customization'>('status');
+
+  // Authenticated fetch helper that automatically attaches JWT Bearer token
+  const authFetch = async (url: string, options: RequestInit = {}) => {
+    const currentToken = token || localStorage.getItem('cinevicino_token') || '';
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${currentToken}`,
+      ...options.headers,
+    };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 || res.status === 403) {
+      setIsAuthenticated(false);
+      setLoginError('Sessione scaduta o permessi admin insufficienti. Effettua nuovamente il login.');
+    }
+    return res;
+  };
+
+  // Check existing session on mount
+  useEffect(() => {
+    async function checkExistingAuth() {
+      const storedToken = localStorage.getItem('cinevicino_token');
+      if (!storedToken) return;
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${storedToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user?.is_admin) {
+            setIsAuthenticated(true);
+            setToken(storedToken);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to verify stored session', err);
+      }
+    }
+    checkExistingAuth();
+  }, []);
 
   // Status state
   const [statusData, setStatusData] = useState<any>(null);
@@ -54,26 +95,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [customSettings, setCustomSettings] = useState<SiteSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Handle Login
-  const handleLogin = (e: React.FormEvent) => {
+  // Handle Login via real POST /api/auth/login
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin' || password === 'admin123' || password.length >= 4) {
-      setIsAuthenticated(true);
-      setLoginError('');
+    setLoginError('');
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.token && data.user?.is_admin) {
+        setToken(data.token);
+        localStorage.setItem('cinevicino_token', data.token);
+        setIsAuthenticated(true);
+        setLoginError('');
+      } else if (res.ok && !data.user?.is_admin) {
+        setLoginError('Accesso negato: questo account non dispone dei privilegi di amministratore.');
+      } else {
+        setLoginError(data.error || 'Credenziali di accesso non valide.');
+      }
+    } catch (err: any) {
+      setLoginError(`Errore di connessione: ${err.message}`);
+    }
+  };
+
+  // Trigger loads when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
       loadStatus();
       loadScrapeLogs();
       loadContent();
       loadSettings();
-    } else {
-      setLoginError('Password non corretta. (Suggerimento: usa "admin" per la demo)');
     }
-  };
+  }, [isAuthenticated, token]);
 
   // Load Status
   const loadStatus = async () => {
     try {
       setLoadingStatus(true);
-      const res = await fetch('/api/admin/status');
+      const res = await authFetch('/api/admin/status');
       if (res.ok) {
         setStatusData(await res.json());
       }
@@ -87,7 +151,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Scrape Logs
   const loadScrapeLogs = async () => {
     try {
-      const res = await fetch('/api/admin/scrape/logs');
+      const res = await authFetch('/api/admin/scrape/logs');
       if (res.ok) {
         setLogs(await res.json());
       }
@@ -99,7 +163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Content
   const loadContent = async () => {
     try {
-      const res = await fetch('/api/admin/content');
+      const res = await authFetch('/api/admin/content/all');
       if (res.ok) {
         const data = await res.json();
         setContentData(data);
@@ -112,7 +176,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Settings
   const loadSettings = async () => {
     try {
-      const res = await fetch('/api/admin/settings');
+      const res = await authFetch('/api/admin/settings');
       if (res.ok) {
         setCustomSettings(await res.json());
       }
@@ -125,28 +189,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleTriggerScrape = async () => {
     setIsScraping(true);
     setScrapeConsole([
-      `[${new Date().toLocaleTimeString()}] Avvio scraping nazionale CineVicino...`,
-      `[${new Date().toLocaleTimeString()}] Modalità: ${useFirecrawl ? 'Hybrid HTTP + Firecrawl' : 'Standard Free HTTP (0 crediti consumati)'}`
+      `[${new Date().toLocaleTimeString()}] Avvio scraping nazionale CineVicino con Cheerio...`,
+      `[${new Date().toLocaleTimeString()}] Querying ComingSoon.it, MYmovies.it, CinemaTimes.com e TMDb...`
     ]);
 
     try {
-      const res = await fetch('/api/admin/scrape/run', {
+      const res = await authFetch('/api/admin/scrape/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ use_firecrawl: useFirecrawl })
+        body: JSON.stringify({ useFirecrawl })
       });
-      const result = await res.json();
-      if (result.success) {
+      const data = await res.json();
+      if (data.success && data.result) {
+        const r = data.result;
         setScrapeConsole(prev => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] Scansione aggregatori completata (MYmovies, ComingSoon, CinemaTimes).`,
-          `[${new Date().toLocaleTimeString()}] Sincronizzazione sale multiplex (UCI, The Space, Notorious, Arcadia, Anteo).`,
-          `[${new Date().toLocaleTimeString()}] Arricchimento metadati TMDb eseguito.`,
-          `[${new Date().toLocaleTimeString()}] Successo: ${result.log.showtimes_touched} orari aggiornati su ${result.log.cinemas_touched} cinema.`
+          `[${new Date().toLocaleTimeString()}] ${r.details}`,
+          `[${new Date().toLocaleTimeString()}] Successo: ${r.showtimes_touched} orari sincronizzati in PostgreSQL.`
         ]);
         loadScrapeLogs();
         loadContent();
         loadStatus();
+      } else {
+        setScrapeConsole(prev => [...prev, `[ERRORE] ${data.error || 'Errore durante lo scrape'}`]);
       }
     } catch (err: any) {
       setScrapeConsole(prev => [...prev, `[ERRORE] ${err.message}`]);
@@ -156,12 +220,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   };
 
   // Toggle Active Showtime
-  const handleToggleShowtime = async (id: string) => {
+  const handleToggleShowtime = async (id: string, currentActive: boolean) => {
     try {
-      const res = await fetch('/api/admin/content/toggle-active', {
+      const res = await authFetch('/api/admin/content/toggle-active', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'showtime', id })
+        body: JSON.stringify({ showtime_id: id, active: !currentActive })
       });
       if (res.ok) {
         loadContent();
@@ -177,9 +240,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!customSettings) return;
 
     try {
-      const res = await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await authFetch('/api/admin/settings', {
+        method: 'PUT',
         body: JSON.stringify(customSettings)
       });
       if (res.ok) {
@@ -197,14 +259,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!newCinemaName.trim() || !newCinemaAddress.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/content/cinema', {
+      const res = await authFetch('/api/admin/content/cinema', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: `cin-${Date.now()}`,
           name: newCinemaName.trim(),
           address: newCinemaAddress.trim(),
           chain: newCinemaChain,
-          city_id: 'city-rm-058091'
+          city_id: 'c-roma'
         })
       });
       if (res.ok) {
@@ -224,10 +286,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!newMovieTitle.trim()) return;
 
     try {
-      const res = await fetch('/api/admin/content/movie', {
+      const res = await authFetch('/api/admin/content/movie', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: `mov-${Date.now()}`,
           title_it: newMovieTitle.trim(),
           title_en: newMovieTitle.trim(),
           director: newMovieDirector.trim() || 'Regista sconosciuto',
@@ -257,23 +319,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </div>
           <h2 className="text-2xl font-serif font-bold text-white">Accesso Pannello Admin</h2>
           <p className="text-xs text-neutral-400 mt-1 mb-6">
-            Area riservata alla gestione contenuti, scraper nazionale e parametri di CineVicino.
+            Area riservata protetta da token di sessione JWT e credenziali di amministratore.
           </p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-3.5">
+            <div className="relative text-left">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Email amministratore (es. admin@cinevicino.it)"
+                className="w-full px-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+              />
+            </div>
+
             <div className="relative text-left">
               <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
+                required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Inserisci password admin..."
-                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             {loginError && (
-              <p className="text-xs text-rose-400 bg-rose-950/40 p-2.5 rounded-xl border border-rose-800">
+              <p className="text-xs text-rose-400 bg-rose-950/40 p-2.5 rounded-xl border border-rose-800 text-left">
                 {loginError}
               </p>
             )}
@@ -729,7 +803,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             <td className="p-3 font-mono text-[11px] text-neutral-400">{st.ticket_source}</td>
                             <td className="p-3">
                               <button
-                                onClick={() => handleToggleShowtime(st.id)}
+                                onClick={() => handleToggleShowtime(st.id, st.active)}
                                 className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors ${
                                   st.active
                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'

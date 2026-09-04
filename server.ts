@@ -1,577 +1,1265 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { dbStore } from './src/db/store';
+import helmet from 'helmet';
+import cors from 'cors';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { initDb, executeRawSql, closeDb } from './src/db/index';
 import { cinemaScraper } from './src/services/scraper';
-import { Favorite, AlertSubscription, Movie, Cinema } from './src/types';
+import { runBatchGeocoding } from './src/services/geocoder';
+import {
+  hashPassword,
+  verifyPassword,
+  generateSessionToken,
+  generateResetToken,
+  findUserByEmail,
+  findUserById,
+  authenticateToken,
+  requireAuth,
+  requireAdmin,
+  AuthenticatedRequest
+} from './src/services/auth';
+import { sendConfirmationEmail, logEmail } from './src/services/email';
+import { logger } from './src/utils/logger';
+import { validateEnvironment } from './src/utils/env';
+import {
+  loginSchema,
+  registerSchema,
+  resetRequestSchema,
+  resetPasswordSchema,
+  alertSubscriptionSchema,
+  favoriteSchema,
+  movieUpdateSchema,
+  cinemaUpdateSchema,
+  toggleActiveSchema
+} from './src/utils/validation';
 
 const app = express();
 const PORT = 3000;
+const ADMIN_SLUG = process.env.ADMIN_SLUG || 'gestione-riservata-cv';
 
-app.use(express.json());
+// 1. Startup validation
+try {
+  validateEnvironment();
+} catch (err: any) {
+  logger.error(`Fatal startup configuration error: ${err.message}`);
+}
+
+// 2. Global Security & Performance Middlewares
+app.use(helmet({
+  contentSecurityPolicy: false, // Allows Vite dev client & external CDNs (TMDb, OpenStreetMap, Unsplash)
+  crossOriginEmbedderPolicy: false
+}));
+
+const allowedOrigins = process.env.APP_URL
+  ? [process.env.APP_URL]
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.run.app') || origin.endsWith('.googleusercontent.com')) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
+  credentials: true
+}));
+
+app.use(compression());
+app.use(express.json({ limit: '1mb' }));
+app.use(authenticateToken); // Parses Authorization: Bearer <jwt>
+
+// 3. Rate Limiters
+const globalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too Many Requests', message: 'Troppe richieste da questo indirizzo IP. Riprova più tardi.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too Many Requests', message: 'Troppi tentativi di accesso. Riprova tra 15 minuti.' }
+});
+
+const scraperLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too Many Requests', message: 'Limite esecuzione scraper raggiunto. Massimo 3 esecuzioni ogni 10 minuti.' }
+});
+
+app.use('/api/', globalApiLimiter);
 
 // ==========================================
 // PUBLIC API ROUTES
 // ==========================================
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'CineVicino', timestamp: new Date().toISOString() });
+// Health check with real PostgreSQL ping, uptime, and memory usage
+app.get('/api/health', async (req: Request, res: Response) => {
+  try {
+    const t0 = Date.now();
+    const dbTest = await executeRawSql('SELECT 1 as ping');
+    const dbLatencyMs = Date.now() - t0;
+
+    const statsRes = await executeRawSql(`
+      SELECT
+        (SELECT COUNT(*) FROM cities) as total_cities,
+        (SELECT COUNT(*) FROM cinemas) as total_cinemas,
+        (SELECT COUNT(*) FROM movies) as total_movies,
+        (SELECT COUNT(*) FROM showtimes WHERE active = TRUE) as active_showtimes,
+        (SELECT run_at FROM scrape_logs ORDER BY run_at DESC LIMIT 1) as last_scraped_at
+    `);
+
+    const stats = statsRes.rows[0];
+
+    res.json({
+      status: 'healthy',
+      service: 'CineVicino API',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      memoryUsageMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      database: {
+        status: dbTest.rows[0]?.ping === 1 ? 'connected' : 'degraded',
+        latencyMs: dbLatencyMs,
+        stats: {
+          cities: parseInt(stats.total_cities || '0', 10),
+          cinemas: parseInt(stats.total_cinemas || '0', 10),
+          movies: parseInt(stats.total_movies || '0', 10),
+          active_showtimes: parseInt(stats.active_showtimes || '0', 10),
+          last_scraped_at: stats.last_scraped_at || null
+        }
+      }
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Healthcheck failed');
+    res.status(503).json({
+      status: 'unhealthy',
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-// Cities listing & search across all Italian comuni
-app.get('/api/cities', (req, res) => {
-  const query = (req.query.q as string || '').toLowerCase().trim();
-  const region = req.query.region as string;
-  const onlyWithCinemas = req.query.with_cinemas === 'true';
+// Cities listing & search across all ~7,904 Italian comuni in PostgreSQL
+app.get('/api/cities', async (req: Request, res: Response) => {
+  try {
+    const rawQuery = (req.query.q || req.query.query || req.query.search || '') as string;
+    const query = rawQuery.trim();
+    const region = req.query.region as string;
+    const onlyWithCinemas = req.query.with_cinemas === 'true';
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
 
-  let results = dbStore.cities;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pIdx = 1;
 
-  if (region) {
-    results = results.filter(c => c.region.toLowerCase() === region.toLowerCase());
-  }
+    if (query) {
+      // Search normalization (Section 10 item 3): strip accents (Forlì -> forli, Cantù -> cantu)
+      const normalized = query
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+      const slugQuery = normalized.replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 
-  if (onlyWithCinemas) {
-    results = results.filter(c => (c.cinema_count || 0) > 0);
-  }
-
-  if (query) {
-    results = results.filter(c => 
-      c.name.toLowerCase().includes(query) || 
-      c.province.toLowerCase().includes(query) ||
-      c.province_code.toLowerCase().includes(query) ||
-      c.region.toLowerCase().includes(query)
-    );
-  }
-
-  // Sort: cities with cinemas first, then provincial capitals, then alphabetical
-  results.sort((a, b) => {
-    if ((b.cinema_count || 0) !== (a.cinema_count || 0)) {
-      return (b.cinema_count || 0) - (a.cinema_count || 0);
+      conditions.push(
+        `(name ILIKE $${pIdx} OR slug ILIKE $${pIdx + 1} OR province ILIKE $${pIdx} OR province_code ILIKE $${pIdx} OR region ILIKE $${pIdx})`
+      );
+      params.push(`%${query}%`, `%${slugQuery}%`);
+      pIdx += 2;
     }
-    if (a.is_provincial_capital !== b.is_provincial_capital) {
-      return a.is_provincial_capital ? -1 : 1;
+
+    if (region) {
+      conditions.push(`LOWER(region) = LOWER($${pIdx})`);
+      params.push(region);
+      pIdx++;
     }
-    return a.name.localeCompare(b.name, 'it');
-  });
 
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 100;
-  const startIndex = (page - 1) * limit;
-  const paginated = results.slice(startIndex, startIndex + limit);
+    if (onlyWithCinemas) {
+      conditions.push(`id IN (SELECT DISTINCT city_id FROM cinemas)`);
+    }
 
-  res.json({
-    total: results.length,
-    page,
-    limit,
-    cities: paginated
-  });
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Count total matches
+    const countSql = `SELECT COUNT(*) as cnt FROM cities ${whereClause}`;
+    const countRes = await executeRawSql(countSql, params);
+    const total = parseInt(countRes.rows[0]?.cnt || '0', 10);
+
+    // Fetch paginated cities with cinema count via subquery
+    const fetchSql = `
+      SELECT
+        c.id, c.slug, c.name, c.region, c.province, c.province_code,
+        c.is_provincial_capital, c.cadastral_code, c.lat, c.lng, c.geocode_status,
+        (SELECT COUNT(*) FROM cinemas WHERE city_id = c.id) as cinema_count
+      FROM cities c
+      ${whereClause}
+      ORDER BY
+        (SELECT COUNT(*) FROM cinemas WHERE city_id = c.id) DESC,
+        c.is_provincial_capital DESC,
+        c.name ASC
+      LIMIT $${pIdx} OFFSET $${pIdx + 1}
+    `;
+
+    const citiesRes = await executeRawSql(fetchSql, [...params, limit, offset]);
+
+    res.set('Cache-Control', 'public, max-age=300'); // 5 minute HTTP cache
+    res.json({
+      total,
+      page,
+      limit,
+      cities: citiesRes.rows
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/cities');
+    res.status(500).json({ error: 'Errore durante la ricerca dei comuni' });
+  }
 });
 
 // Single city info with cinemas OR nearest cinemas if none
-app.get('/api/cities/:slug', (req, res) => {
-  const { slug } = req.params;
-  const city = dbStore.cities.find(c => c.slug === slug);
-  if (!city) {
-    return res.status(404).json({ error: 'Comune non trovato' });
-  }
-
-  const cityCinemas = dbStore.cinemas.filter(c => c.city_id === city.id);
-  const nearestCinemas = dbStore.findNearestCinemasForCity(city.slug).slice(0, 6);
-
-  res.json({
-    city,
-    cinemas: cityCinemas,
-    has_local_cinemas: cityCinemas.length > 0,
-    nearest_cinemas: nearestCinemas
-  });
-});
-
-// Real-time Geolocation endpoint: calculates Haversine distance to all Italian cinemas
-app.get('/api/nearby', (req, res) => {
-  const lat = parseFloat(req.query.lat as string);
-  const lng = parseFloat(req.query.lng as string);
-
-  if (isNaN(lat) || isNaN(lng)) {
-    return res.status(400).json({ error: 'Coordinate lat e lng richieste e valide' });
-  }
-
-  const nearbyCinemas = dbStore.findNearbyCinemas(lat, lng).slice(0, 10);
-
-  // Also find closest city
-  const closestCity = [...dbStore.cities]
-    .map(c => ({
-      ...c,
-      distance_km: dbStore.calculateDistance(lat, lng, c.lat, c.lng)
-    }))
-    .sort((a, b) => a.distance_km - b.distance_km)[0];
-
-  res.json({
-    user_location: { lat, lng },
-    closest_city: closestCity,
-    cinemas: nearbyCinemas
-  });
-});
-
-// Cinemas listing & filtering
-app.get('/api/cinemas', (req, res) => {
-  const citySlug = req.query.city as string;
-  const chain = req.query.chain as string;
-  const query = (req.query.q as string || '').toLowerCase().trim();
-
-  let results = dbStore.cinemas.map(cinema => {
-    const city = dbStore.cities.find(c => c.id === cinema.city_id);
-    return {
-      ...cinema,
-      city_name: city?.name || '',
-      city_slug: city?.slug || ''
-    };
-  });
-
-  if (citySlug) {
-    results = results.filter(c => c.city_slug === citySlug);
-  }
-
-  if (chain) {
-    results = results.filter(c => c.chain === chain);
-  }
-
-  if (query) {
-    results = results.filter(c => 
-      c.name.toLowerCase().includes(query) || 
-      c.address.toLowerCase().includes(query) ||
-      c.city_name.toLowerCase().includes(query)
-    );
-  }
-
-  res.json(results);
-});
-
-// Single cinema with today's showtimes
-app.get('/api/cinemas/:id', (req, res) => {
-  const cinema = dbStore.cinemas.find(c => c.id === req.params.id);
-  if (!cinema) {
-    return res.status(404).json({ error: 'Cinema non trovato' });
-  }
-
-  const city = dbStore.cities.find(c => c.id === cinema.city_id);
-  const showtimes = dbStore.showtimes
-    .filter(s => s.cinema_id === cinema.id && s.active)
-    .map(s => {
-      const movie = dbStore.movies.find(m => m.id === s.movie_id);
-      return {
-        ...s,
-        movie_title: movie?.title_it || '',
-        movie_poster: movie?.poster_url || ''
-      };
-    });
-
-  res.json({
-    ...cinema,
-    city_name: city?.name || '',
-    city_slug: city?.slug || '',
-    showtimes
-  });
-});
-
-// Movies listing
-app.get('/api/movies', (req, res) => {
-  const genre = req.query.genre as string;
-  const featured = req.query.featured === 'true';
-  const query = (req.query.q as string || '').toLowerCase().trim();
-
-  let results = [...dbStore.movies];
-
-  if (featured) {
-    results = results.filter(m => m.is_featured || dbStore.settings.featured_movie_ids.includes(m.id));
-  }
-
-  if (genre) {
-    results = results.filter(m => m.genres.some(g => g.toLowerCase() === genre.toLowerCase()));
-  }
-
-  if (query) {
-    results = results.filter(m => 
-      m.title_it.toLowerCase().includes(query) || 
-      m.title_en.toLowerCase().includes(query) ||
-      m.director.toLowerCase().includes(query) ||
-      m.cast.some(c => c.toLowerCase().includes(query))
-    );
-  }
-
-  res.json(results);
-});
-
-// Single movie with all upcoming showtimes across cinemas
-app.get('/api/movies/:slug', (req, res) => {
-  const movie = dbStore.movies.find(m => m.slug === req.params.slug);
-  if (!movie) {
-    return res.status(404).json({ error: 'Film non trovato' });
-  }
-
-  const showtimes = dbStore.showtimes
-    .filter(s => s.movie_id === movie.id && s.active)
-    .map(s => {
-      const cinema = dbStore.cinemas.find(c => c.id === s.cinema_id);
-      const city = cinema ? dbStore.cities.find(ci => ci.id === cinema.city_id) : null;
-      return {
-        ...s,
-        cinema_name: cinema?.name || '',
-        cinema_chain: cinema?.chain || null,
-        cinema_address: cinema?.address || '',
-        city_name: city?.name || '',
-        city_slug: city?.slug || ''
-      };
-    });
-
-  res.json({
-    movie,
-    showtimes
-  });
-});
-
-// Showtimes query
-app.get('/api/showtimes', (req, res) => {
-  const { movie_id, cinema_id, city_slug, date } = req.query;
-
-  let results = dbStore.showtimes.filter(s => s.active);
-
-  if (movie_id) {
-    results = results.filter(s => s.movie_id === movie_id);
-  }
-
-  if (cinema_id) {
-    results = results.filter(s => s.cinema_id === cinema_id);
-  }
-
-  if (date) {
-    results = results.filter(s => s.show_date === date);
-  }
-
-  const hydrated = results.map(s => {
-    const movie = dbStore.movies.find(m => m.id === s.movie_id);
-    const cinema = dbStore.cinemas.find(c => c.id === s.cinema_id);
-    const city = cinema ? dbStore.cities.find(ci => ci.id === cinema.city_id) : null;
-    return {
-      ...s,
-      movie_title: movie?.title_it || '',
-      movie_poster: movie?.poster_url || '',
-      cinema_name: cinema?.name || '',
-      cinema_chain: cinema?.chain || null,
-      cinema_address: cinema?.address || '',
-      city_name: city?.name || '',
-      city_slug: city?.slug || ''
-    };
-  });
-
-  if (city_slug) {
-    return res.json(hydrated.filter(s => s.city_slug === city_slug));
-  }
-
-  res.json(hydrated);
-});
-
-// ==========================================
-// OPTIONAL ACCOUNTS, FAVORITES & ALERTS
-// ==========================================
-
-// Current user profile
-app.get('/api/auth/me', (req, res) => {
-  // Return active user or null
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.includes('admin')) {
-    return res.json({ user: dbStore.users[0] });
-  }
-  res.json({ user: null });
-});
-
-// Demo login / register
-app.post('/api/auth/login', (req, res) => {
-  const { email, password, is_admin } = req.body;
-  
-  if (is_admin || password === (process.env.ADMIN_PASSWORD || 'admin')) {
-    return res.json({
-      success: true,
-      user: {
-        id: 'usr-admin',
-        email: email || 'admin@cinevicino.it',
-        name: 'Amministratore CineVicino',
-        is_admin: true,
-        created_at: new Date().toISOString()
-      },
-      token: 'admin-session-token'
-    });
-  }
-
-  // Regular user login / demo
-  const user = {
-    id: `usr-${Date.now()}`,
-    email: email || 'utente@cinevicino.it',
-    name: email ? email.split('@')[0] : 'Cinefilo',
-    is_admin: false,
-    created_at: new Date().toISOString()
-  };
-
-  res.json({
-    success: true,
-    user,
-    token: `user-session-${user.id}`
-  });
-});
-
-// Favorites management
-app.get('/api/favorites', (req, res) => {
-  res.json(dbStore.favorites);
-});
-
-app.post('/api/favorites', (req, res) => {
-  const { user_id, item_type, item_id } = req.body;
-  if (!item_type || !item_id) {
-    return res.status(400).json({ error: 'item_type e item_id richiesti' });
-  }
-  const existing = dbStore.favorites.find(f => f.item_id === item_id);
-  if (existing) {
-    dbStore.favorites = dbStore.favorites.filter(f => f.item_id !== item_id);
-    return res.json({ action: 'removed', item_id });
-  }
-  const fav: Favorite = {
-    id: `fav-${Date.now()}`,
-    user_id: user_id || 'guest-user',
-    item_type,
-    item_id,
-    created_at: new Date().toISOString()
-  };
-  dbStore.favorites.push(fav);
-  res.json({ action: 'added', favorite: fav });
-});
-
-// Alert subscriptions
-app.get('/api/alerts', (req, res) => {
-  res.json(dbStore.alertSubscriptions);
-});
-
-app.post('/api/alerts', (req, res) => {
-  const { email, city_id } = req.body;
-  if (!email || !city_id) {
-    return res.status(400).json({ error: 'Email e comune richiesti' });
-  }
-  const city = dbStore.cities.find(c => c.id === city_id);
-  const sub: AlertSubscription = {
-    id: `sub-${Date.now()}`,
-    email,
-    city_id,
-    city_name: city?.name || '',
-    active: true,
-    created_at: new Date().toISOString()
-  };
-  dbStore.alertSubscriptions.push(sub);
-  res.json({ success: true, subscription: sub });
-});
-
-// ==========================================
-// PROTECTED ADMIN & CUSTOMIZATION DASHBOARD
-// ==========================================
-
-// Content summary
-app.get('/api/admin/content', (req, res) => {
-  res.json({
-    citiesCount: dbStore.cities.length,
-    cinemasCount: dbStore.cinemas.length,
-    moviesCount: dbStore.movies.length,
-    showtimesCount: dbStore.showtimes.length,
-    activeShowtimesCount: dbStore.showtimes.filter(s => s.active).length,
-    cinemas: dbStore.cinemas,
-    movies: dbStore.movies,
-    showtimes: dbStore.showtimes.slice(0, 100),
-    settings: dbStore.settings
-  });
-});
-
-// Toggle active showtime
-app.post('/api/admin/content/toggle-active', (req, res) => {
-  const { type, id } = req.body;
-  if (type === 'showtime') {
-    const st = dbStore.showtimes.find(s => s.id === id);
-    if (st) {
-      st.active = !st.active;
-      return res.json({ success: true, active: st.active });
-    }
-  }
-  res.status(404).json({ error: 'Elemento non trovato' });
-});
-
-// Create/Edit movie
-app.post('/api/admin/content/movie', (req, res) => {
-  const data = req.body;
-  const existingIdx = dbStore.movies.findIndex(m => m.id === data.id);
-  if (existingIdx >= 0) {
-    dbStore.movies[existingIdx] = { ...dbStore.movies[existingIdx], ...data };
-    return res.json({ success: true, movie: dbStore.movies[existingIdx] });
-  }
-  const newMovie: Movie = {
-    id: `mov-${Date.now()}`,
-    slug: data.slug || data.title_it.toLowerCase().replace(/\s+/g, '-'),
-    title_it: data.title_it,
-    title_en: data.title_en || data.title_it,
-    title_original: data.title_original || data.title_it,
-    tmdb_id: data.tmdb_id || null,
-    poster_url: data.poster_url || 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800',
-    backdrop_url: data.backdrop_url || 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?q=80&w=1600',
-    genres: data.genres || ['Dramma'],
-    duration_minutes: data.duration_minutes || 120,
-    rating: data.rating || 7.5,
-    synopsis_it: data.synopsis_it || '',
-    synopsis_en: data.synopsis_en || '',
-    release_year: data.release_year || new Date().getFullYear(),
-    director: data.director || '',
-    cast: data.cast || [],
-    age_rating: data.age_rating || 'T',
-    is_featured: data.is_featured || false
-  };
-  dbStore.movies.unshift(newMovie);
-  res.json({ success: true, movie: newMovie });
-});
-
-// Create/Edit cinema
-app.post('/api/admin/content/cinema', (req, res) => {
-  const data = req.body;
-  const existingIdx = dbStore.cinemas.findIndex(c => c.id === data.id);
-  if (existingIdx >= 0) {
-    dbStore.cinemas[existingIdx] = { ...dbStore.cinemas[existingIdx], ...data };
-    return res.json({ success: true, cinema: dbStore.cinemas[existingIdx] });
-  }
-  const newCinema: Cinema = {
-    id: `cin-${Date.now()}`,
-    city_id: data.city_id || dbStore.cities[0].id,
-    name: data.name,
-    chain: data.chain || 'independent',
-    address: data.address,
-    lat: parseFloat(data.lat) || 41.9028,
-    lng: parseFloat(data.lng) || 12.4964,
-    website_url: data.website_url || 'https://cinevicino.it',
-    features: data.features || ['Dolby Digital']
-  };
-  dbStore.cinemas.push(newCinema);
-  res.json({ success: true, cinema: newCinema });
-});
-
-// Scraper history & trigger
-app.get('/api/admin/scrape/logs', (req, res) => {
-  res.json(dbStore.scrapeLogs);
-});
-
-app.post('/api/admin/scrape/run', async (req, res) => {
-  const { use_firecrawl } = req.body;
+app.get('/api/cities/:slug', async (req: Request, res: Response) => {
   try {
-    const log = await cinemaScraper.executeFullScrape({ useFirecrawl: use_firecrawl });
-    res.json({ success: true, log });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const { slug } = req.params;
+    const cityRes = await executeRawSql(
+      `SELECT c.*, (SELECT COUNT(*) FROM cinemas WHERE city_id = c.id) as cinema_count
+       FROM cities c WHERE c.slug = $1 LIMIT 1`,
+      [slug]
+    );
 
-// Status & test connections for TMDb, Firecrawl, Database, Email
-app.get('/api/admin/status', async (req, res) => {
-  const tmdbStatus = await cinemaScraper.testTmdbConnection();
-  const firecrawlStatus = await cinemaScraper.testFirecrawlConnection();
-
-  res.json({
-    database: {
-      configured: true,
-      type: 'In-Memory + ISTAT CSV Engine (PostgreSQL Compatible)',
-      status: 'healthy',
-      records: {
-        cities: dbStore.cities.length,
-        cinemas: dbStore.cinemas.length,
-        movies: dbStore.movies.length,
-        showtimes: dbStore.showtimes.length
-      }
-    },
-    tmdb: {
-      configured: Boolean(process.env.TMDB_API_KEY),
-      ...tmdbStatus
-    },
-    firecrawl: {
-      configured: Boolean(process.env.FIRECRAWL_API_KEY),
-      monthly_limit: dbStore.settings.firecrawl_monthly_limit,
-      credits_used: dbStore.settings.firecrawl_credits_used,
-      ...firecrawlStatus
-    },
-    email_alert_provider: {
-      configured: Boolean(process.env.EMAIL_ALERT_API_KEY),
-      status: process.env.EMAIL_ALERT_API_KEY ? 'active' : 'idle',
-      pending_subscribers: dbStore.alertSubscriptions.length
+    if (!cityRes.rows || cityRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Comune non trovato' });
     }
-  });
-});
 
-// Site Copy & Settings management
-app.get('/api/admin/settings', (req, res) => {
-  res.json(dbStore.settings);
-});
+    const city = cityRes.rows[0];
 
-app.post('/api/admin/settings', (req, res) => {
-  dbStore.settings = {
-    ...dbStore.settings,
-    ...req.body
-  };
-  res.json({ success: true, settings: dbStore.settings });
-});
+    // Local cinemas
+    const cinemasRes = await executeRawSql(
+      `SELECT c.*, ci.name as city_name, ci.slug as city_slug
+       FROM cinemas c
+       JOIN cities ci ON c.city_id = ci.id
+       WHERE c.city_id = $1`,
+      [city.id]
+    );
+    const cityCinemas = cinemasRes.rows;
 
-// ==========================================
-// SEO: SITEMAP.XML & ROBOTS.TXT
-// ==========================================
-app.get('/robots.txt', (req, res) => {
-  res.type('text/plain');
-  res.send(`User-agent: *\nAllow: /\n\nSitemap: ${process.env.APP_URL || 'https://cinevicino.it'}/sitemap.xml\n`);
-});
+    // Find nearest cinemas across Italy using SQL Haversine formula
+    const nearestRes = await executeRawSql(
+      `SELECT
+         c.*, ci.name as city_name, ci.slug as city_slug,
+         (6371 * acos(
+           cos(radians($1)) * cos(radians(c.lat)) *
+           cos(radians(c.lng) - radians($2)) +
+           sin(radians($1)) * sin(radians(c.lat))
+         )) AS distance_km
+       FROM cinemas c
+       JOIN cities ci ON c.city_id = ci.id
+       ORDER BY distance_km ASC
+       LIMIT 6`,
+      [city.lat, city.lng]
+    );
 
-app.get('/sitemap.xml', (req, res) => {
-  res.type('application/xml');
-  const baseUrl = process.env.APP_URL || 'https://cinevicino.it';
-  const today = new Date().toISOString().split('T')[0];
-
-  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
-  
-  // Home
-  xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
-
-  // Cities
-  dbStore.cities.slice(0, 100).forEach(c => {
-    xml += `  <url>\n    <loc>${baseUrl}/citta/${c.slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
-  });
-
-  // Movies
-  dbStore.movies.forEach(m => {
-    xml += `  <url>\n    <loc>${baseUrl}/film/${m.slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
-  });
-
-  xml += `</urlset>`;
-  res.send(xml);
-});
-
-// ==========================================
-// VITE MIDDLEWARE & SERVER STARTUP
-// ==========================================
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
+    res.json({
+      city,
+      cinemas: cityCinemas,
+      has_local_cinemas: cityCinemas.length > 0,
+      nearest_cinemas: nearestRes.rows.map(r => ({
+        ...r,
+        distance_km: Math.round(r.distance_km * 10) / 10
+      }))
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/cities/:slug');
+    res.status(500).json({ error: 'Errore nel caricamento del comune' });
+  }
+});
+
+// Real-time Geolocation endpoint: calculates Haversine distance to all Italian cinemas in PostgreSQL
+app.get('/api/nearby', async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return res.status(400).json({ error: 'Coordinate lat e lng richieste e valide' });
+    }
+
+    // Nearest cinemas using SQL Haversine
+    const cinemasRes = await executeRawSql(
+      `SELECT
+         c.*, ci.name as city_name, ci.slug as city_slug,
+         (6371 * acos(
+           cos(radians($1)) * cos(radians(c.lat)) *
+           cos(radians(c.lng) - radians($2)) +
+           sin(radians($1)) * sin(radians(c.lat))
+         )) AS distance_km
+       FROM cinemas c
+       JOIN cities ci ON c.city_id = ci.id
+       ORDER BY distance_km ASC
+       LIMIT 10`,
+      [lat, lng]
+    );
+
+    // Closest municipality
+    const closestCityRes = await executeRawSql(
+      `SELECT
+         c.*,
+         (6371 * acos(
+           cos(radians($1)) * cos(radians(c.lat)) *
+           cos(radians(c.lng) - radians($2)) +
+           sin(radians($1)) * sin(radians(c.lat))
+         )) AS distance_km
+       FROM cities c
+       ORDER BY distance_km ASC
+       LIMIT 1`,
+      [lat, lng]
+    );
+
+    const closestCity = closestCityRes.rows[0];
+    if (closestCity) {
+      closestCity.distance_km = Math.round(closestCity.distance_km * 10) / 10;
+    }
+
+    res.json({
+      user_location: { lat, lng },
+      closest_city: closestCity || null,
+      cinemas: cinemasRes.rows.map(r => ({
+        ...r,
+        distance_km: Math.round(r.distance_km * 10) / 10
+      }))
     });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/nearby');
+    res.status(500).json({ error: 'Errore durante la geolocalizzazione' });
+  }
+});
+
+// Cinemas listing & filtering with SQL joins
+app.get('/api/cinemas', async (req: Request, res: Response) => {
+  try {
+    const citySlug = req.query.city as string;
+    const chain = req.query.chain as string;
+    const query = (req.query.q as string || '').trim();
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pIdx = 1;
+
+    if (citySlug) {
+      conditions.push(`ci.slug = $${pIdx}`);
+      params.push(citySlug);
+      pIdx++;
+    }
+
+    if (chain && chain !== 'all') {
+      if (chain === 'independent') {
+        conditions.push(`(c.chain IS NULL OR c.chain = 'independent')`);
+      } else {
+        conditions.push(`c.chain = $${pIdx}`);
+        params.push(chain);
+        pIdx++;
+      }
+    }
+
+    if (query) {
+      conditions.push(`(c.name ILIKE $${pIdx} OR c.address ILIKE $${pIdx} OR ci.name ILIKE $${pIdx})`);
+      params.push(`%${query}%`);
+      pIdx++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT
+        c.*, ci.name as city_name, ci.slug as city_slug
+      FROM cinemas c
+      JOIN cities ci ON c.city_id = ci.id
+      ${whereClause}
+      ORDER BY c.name ASC
+    `;
+
+    const result = await executeRawSql(sql, params);
+    res.set('Cache-Control', 'public, max-age=180');
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/cinemas');
+    res.status(500).json({ error: 'Errore nel caricamento dei cinema' });
+  }
+});
+
+// Single cinema with active showtimes
+app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const cinemaRes = await executeRawSql(
+      `SELECT c.*, ci.name as city_name, ci.slug as city_slug
+       FROM cinemas c
+       JOIN cities ci ON c.city_id = ci.id
+       WHERE c.id = $1 LIMIT 1`,
+      [id]
+    );
+
+    if (!cinemaRes.rows || cinemaRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Cinema non trovato' });
+    }
+
+    const cinema = cinemaRes.rows[0];
+
+    const showtimesRes = await executeRawSql(
+      `SELECT
+         s.*, m.title_it as movie_title, m.poster_url as movie_poster
+       FROM showtimes s
+       JOIN movies m ON s.movie_id = m.id
+       WHERE s.cinema_id = $1 AND s.active = TRUE
+       ORDER BY s.show_date ASC, s.time ASC`,
+      [id]
+    );
+
+    res.json({
+      cinema,
+      showtimes: showtimesRes.rows
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/cinemas/:id');
+    res.status(500).json({ error: 'Errore nel caricamento del cinema' });
+  }
+});
+
+// Movies listing & search
+app.get('/api/movies', async (req: Request, res: Response) => {
+  try {
+    const query = (req.query.q as string || '').trim();
+    const genre = req.query.genre as string;
+    const featuredOnly = req.query.featured === 'true';
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let pIdx = 1;
+
+    if (query) {
+      conditions.push(`(title_it ILIKE $${pIdx} OR title_original ILIKE $${pIdx} OR director ILIKE $${pIdx})`);
+      params.push(`%${query}%`);
+      pIdx++;
+    }
+
+    if (genre && genre !== 'all') {
+      conditions.push(`genres @> $${pIdx}::jsonb`);
+      params.push(JSON.stringify([genre]));
+      pIdx++;
+    }
+
+    if (featuredOnly) {
+      conditions.push(`is_featured = TRUE`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT * FROM movies
+      ${whereClause}
+      ORDER BY is_featured DESC, rating DESC, title_it ASC
+    `;
+
+    const result = await executeRawSql(sql, params);
+    res.set('Cache-Control', 'public, max-age=180');
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/movies');
+    res.status(500).json({ error: 'Errore nel caricamento dei film' });
+  }
+});
+
+// Single movie detail by slug with all active showtimes joined with cinema & city
+app.get('/api/movies/:slug', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params;
+    const movieRes = await executeRawSql(
+      `SELECT * FROM movies WHERE slug = $1 LIMIT 1`,
+      [slug]
+    );
+
+    if (!movieRes.rows || movieRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Film non trovato' });
+    }
+
+    const movie = movieRes.rows[0];
+
+    const showtimesRes = await executeRawSql(
+      `SELECT
+         s.*,
+         c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
+         ci.name as city_name, ci.slug as city_slug
+       FROM showtimes s
+       JOIN cinemas c ON s.cinema_id = c.id
+       JOIN cities ci ON c.city_id = ci.id
+       WHERE s.movie_id = $1 AND s.active = TRUE
+       ORDER BY s.show_date ASC, s.time ASC`,
+      [movie.id]
+    );
+
+    res.json({
+      movie,
+      showtimes: showtimesRes.rows
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/movies/:slug');
+    res.status(500).json({ error: 'Errore nel caricamento del film' });
+  }
+});
+
+// Showtimes query with multi-filtering
+app.get('/api/showtimes', async (req: Request, res: Response) => {
+  try {
+    const movieId = req.query.movie_id as string;
+    const cinemaId = req.query.cinema_id as string;
+    const citySlug = req.query.city as string;
+    const date = req.query.date as string;
+    const format = req.query.format as string;
+    const language = req.query.language as string;
+
+    const conditions: string[] = ['s.active = TRUE'];
+    const params: any[] = [];
+    let pIdx = 1;
+
+    if (movieId) {
+      conditions.push(`s.movie_id = $${pIdx}`);
+      params.push(movieId);
+      pIdx++;
+    }
+
+    if (cinemaId) {
+      conditions.push(`s.cinema_id = $${pIdx}`);
+      params.push(cinemaId);
+      pIdx++;
+    }
+
+    if (citySlug) {
+      conditions.push(`ci.slug = $${pIdx}`);
+      params.push(citySlug);
+      pIdx++;
+    }
+
+    if (date) {
+      conditions.push(`s.show_date = $${pIdx}`);
+      params.push(date);
+      pIdx++;
+    }
+
+    if (format && format !== 'all') {
+      conditions.push(`s.format = $${pIdx}`);
+      params.push(format);
+      pIdx++;
+    }
+
+    if (language && language !== 'all') {
+      conditions.push(`s.language = $${pIdx}`);
+      params.push(language);
+      pIdx++;
+    }
+
+    const sql = `
+      SELECT
+        s.*,
+        m.title_it as movie_title, m.poster_url as movie_poster,
+        c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
+        ci.name as city_name, ci.slug as city_slug
+      FROM showtimes s
+      JOIN movies m ON s.movie_id = m.id
+      JOIN cinemas c ON s.cinema_id = c.id
+      JOIN cities ci ON c.city_id = ci.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY s.show_date ASC, s.time ASC
+      LIMIT 300
+    `;
+
+    const result = await executeRawSql(sql, params);
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/showtimes');
+    res.status(500).json({ error: 'Errore nel caricamento degli orari' });
+  }
+});
+
+// Section 8: Ticket Click-Through Tracking
+app.post('/api/showtimes/:id/click', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const result = await executeRawSql(
+      `UPDATE showtimes
+       SET clicks = clicks + 1
+       WHERE id = $1
+       RETURNING id, ticket_url, clicks`,
+      [id]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({ error: 'Orario non trovato' });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      success: true,
+      showtime_id: row.id,
+      ticket_url: row.ticket_url,
+      clicks: row.clicks
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/showtimes/:id/click');
+    res.status(500).json({ error: 'Errore nella registrazione del click' });
+  }
+});
+
+// Public Site Settings
+app.get('/api/settings', async (req: Request, res: Response) => {
+  try {
+    const resSettings = await executeRawSql('SELECT key, value FROM site_settings');
+    const settingsObj: Record<string, any> = {};
+    for (const r of resSettings.rows) {
+      try {
+        settingsObj[r.key] = JSON.parse(r.value);
+      } catch {
+        settingsObj[r.key] = r.value;
+      }
+    }
+    res.json(settingsObj);
+  } catch (err: any) {
+    logger.error({ err }, 'Error fetching settings');
+    res.status(500).json({ error: 'Errore nel caricamento delle impostazioni' });
+  }
+});
+
+// ==========================================
+// AUTHENTICATION & USER MANAGEMENT
+// ==========================================
+
+// Register new user
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`CineVicino server listening on http://0.0.0.0:${PORT}`);
+  const { email, password, name } = parsed.data;
+
+  try {
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      return res.status(409).json({ error: 'Questo indirizzo email è già registrato' });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const userId = `usr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    await executeRawSql(
+      `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
+       VALUES ($1, $2, $3, $4, FALSE, NOW())`,
+      [userId, email.toLowerCase(), name, passwordHash]
+    );
+
+    const user = { id: userId, email: email.toLowerCase(), name, is_admin: false, created_at: new Date().toISOString() };
+    const token = generateSessionToken(user);
+
+    res.status(201).json({ success: true, token, user });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/auth/register');
+    res.status(500).json({ error: 'Errore durante la registrazione' });
+  }
+});
+
+// Login (Strict rate limiting applied)
+app.post('/api/auth/login', authLimiter, async (req: Request, res: Response) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { email, password } = parsed.data;
+
+  try {
+    const user = await findUserByEmail(email);
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ error: 'Credenziali non valide' });
+    }
+
+    const isMatch = await verifyPassword(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Credenziali non valide' });
+    }
+
+    const authUser = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      is_admin: user.is_admin,
+      created_at: user.created_at
+    };
+
+    const token = generateSessionToken(authUser);
+    res.json({ success: true, token, user: authUser });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/auth/login');
+    res.status(500).json({ error: 'Errore durante il login' });
+  }
+});
+
+// Current authenticated user (Requires valid session token)
+app.get('/api/auth/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ user: req.user });
+});
+
+// Request Password Reset
+app.post('/api/auth/reset-request', async (req: Request, res: Response) => {
+  const parsed = resetRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { email } = parsed.data;
+
+  try {
+    const user = await findUserByEmail(email);
+    if (user) {
+      const { token, expiresAt } = generateResetToken();
+      await executeRawSql(
+        `UPDATE users SET reset_token = $1, reset_token_expires_at = $2 WHERE id = $3`,
+        [token, expiresAt.toISOString(), user.id]
+      );
+      // Log for audit
+      await logEmail(email, 'password_reset', 'Recupero Password CineVicino', 'pending', `Token valido 1 ora`);
+    }
+
+    // Always return 200 to prevent email enumeration
+    res.json({ success: true, message: 'Se l\'email è registrata, riceverai a breve un link di recupero.' });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/auth/reset-request');
+    res.status(500).json({ error: 'Errore durante la richiesta di recupero' });
+  }
+});
+
+// Complete Password Reset
+app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { token, newPassword } = parsed.data;
+
+  try {
+    const userRes = await executeRawSql(
+      `SELECT id, reset_token_expires_at FROM users WHERE reset_token = $1`,
+      [token]
+    );
+
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(400).json({ error: 'Token di recupero non valido o scaduto' });
+    }
+
+    const user = userRes.rows[0];
+    if (new Date(user.reset_token_expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Token di recupero scaduto. Richiedine uno nuovo.' });
+    }
+
+    const newHash = await hashPassword(newPassword);
+    await executeRawSql(
+      `UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires_at = NULL WHERE id = $2`,
+      [newHash, user.id]
+    );
+
+    res.json({ success: true, message: 'Password aggiornata con successo. Ora puoi effettuare il login.' });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/auth/reset-password');
+    res.status(500).json({ error: 'Errore durante l\'aggiornamento della password' });
+  }
+});
+
+// User Favorites (Persistent in PostgreSQL)
+app.get('/api/favorites', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await executeRawSql(
+      `SELECT * FROM favorites WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user!.id]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in GET /api/favorites');
+    res.status(500).json({ error: 'Errore nel caricamento dei preferiti' });
+  }
+});
+
+app.post('/api/favorites', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = favoriteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { item_type, item_id } = parsed.data;
+
+  try {
+    const favId = `fav-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    await executeRawSql(
+      `INSERT INTO favorites (id, user_id, item_type, item_id, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [favId, req.user!.id, item_type, item_id]
+    );
+    res.status(201).json({ success: true, id: favId });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in POST /api/favorites');
+    res.status(500).json({ error: 'Errore nel salvataggio del preferito' });
+  }
+});
+
+app.delete('/api/favorites/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await executeRawSql(
+      `DELETE FROM favorites WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.user!.id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in DELETE /api/favorites');
+    res.status(500).json({ error: 'Errore nella cancellazione del preferito' });
+  }
+});
+
+// ==========================================
+// SECTION 9: NEWSLETTER / ALERTS
+// ==========================================
+
+// Subscribe with Double Opt-in
+app.post('/api/alerts', async (req: Request, res: Response) => {
+  const parsed = alertSubscriptionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { email, city_id } = parsed.data;
+
+  try {
+    const cityRes = await executeRawSql('SELECT name FROM cities WHERE id = $1', [city_id]);
+    const cityName = cityRes.rows[0]?.name || 'la tua città';
+
+    const subId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const confirmToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+    const unsubscribeToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+
+    await executeRawSql(
+      `INSERT INTO alert_subscriptions (
+         id, email, city_id, active, confirmed, confirmation_token, unsubscribe_token, created_at
+       ) VALUES ($1, $2, $3, TRUE, FALSE, $4, $5, NOW())`,
+      [subId, email.toLowerCase(), city_id, confirmToken, unsubscribeToken]
+    );
+
+    // Send Double Opt-in confirmation email
+    await sendConfirmationEmail(email, cityName, confirmToken, unsubscribeToken);
+
+    res.status(201).json({
+      success: true,
+      message: `Abbiamo inviato un'email di conferma a ${email}. Clicca sul link per attivare gli avvisi.`
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/alerts');
+    res.status(500).json({ error: 'Errore durante l\'iscrizione agli avvisi' });
+  }
+});
+
+// Confirm Double Opt-in
+app.get('/api/alerts/confirm', async (req: Request, res: Response) => {
+  const token = req.query.token as string;
+  if (!token) {
+    return res.status(400).send('Token di conferma mancante.');
+  }
+
+  try {
+    const result = await executeRawSql(
+      `UPDATE alert_subscriptions
+       SET confirmed = TRUE
+       WHERE confirmation_token = $1
+       RETURNING id, email`,
+      [token]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).send('Token di conferma non valido o già utilizzato.');
+    }
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <body style="background: #0a0a0a; color: #fff; font-family: sans-serif; text-align: center; padding: 60px 20px;">
+          <h1 style="color: #38bdf8;">Iscrizione confermata con successo!</h1>
+          <p style="color: #94a3b8; font-size: 16px;">Riceverai gli avvisi sulle nuove uscite cinematografiche nella tua zona.</p>
+          <a href="/" style="display: inline-block; margin-top: 20px; background: #D4AF37; color: #000; padding: 10px 24px; border-radius: 9999px; text-decoration: none; font-weight: bold;">Torna a CineVicino</a>
+        </body>
+      </html>
+    `);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/alerts/confirm');
+    res.status(500).send('Errore durante la conferma dell\'iscrizione.');
+  }
+});
+
+// 1-Click Unsubscribe
+app.get('/api/alerts/unsubscribe', async (req: Request, res: Response) => {
+  const token = req.query.token as string;
+  if (!token) {
+    return res.status(400).send('Token di disiscrizione mancante.');
+  }
+
+  try {
+    await executeRawSql(
+      `UPDATE alert_subscriptions SET active = FALSE WHERE unsubscribe_token = $1`,
+      [token]
+    );
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+        <body style="background: #0a0a0a; color: #fff; font-family: sans-serif; text-align: center; padding: 60px 20px;">
+          <h1 style="color: #ef4444;">Disiscrizione completata</h1>
+          <p style="color: #94a3b8; font-size: 16px;">Non riceverai più notifiche email per questo comune.</p>
+          <a href="/" style="display: inline-block; margin-top: 20px; background: #262626; color: #fff; padding: 10px 24px; border-radius: 9999px; text-decoration: none;">Torna alla Home</a>
+        </body>
+      </html>
+    `);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/alerts/unsubscribe');
+    res.status(500).send('Errore durante la disiscrizione.');
+  }
+});
+
+// ==========================================
+// SECTIONS 2 & 3: RESTRICTED ADMIN API
+// ==========================================
+
+// Admin Status Overview
+app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const stats = await executeRawSql(`
+      SELECT
+        (SELECT COUNT(*) FROM cities) as total_cities,
+        (SELECT COUNT(*) FROM cities WHERE geocode_status = 'complete') as geocoded_cities,
+        (SELECT COUNT(*) FROM cinemas) as total_cinemas,
+        (SELECT COUNT(*) FROM movies) as total_movies,
+        (SELECT COUNT(*) FROM showtimes WHERE active = TRUE) as active_showtimes,
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM alert_subscriptions WHERE active = TRUE) as alert_subscribers,
+        (SELECT run_at FROM scrape_logs ORDER BY run_at DESC LIMIT 1) as last_scrape_time
+    `);
+
+    res.json(stats.rows[0]);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/status');
+    res.status(500).json({ error: 'Errore nel recupero dello stato di sistema' });
+  }
+});
+
+// Admin Scraper: Run Real Cheerio Scrape (Strict rate limiting applied)
+app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    logger.info({ user: req.user!.email }, 'Admin triggered real Cheerio cinema scrape');
+    const result = await cinemaScraper.executeFullScrape({
+      useFirecrawl: req.body?.useFirecrawl === true
+    });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, 'Error executing admin scrape');
+    res.status(500).json({ error: 'Errore durante l\'esecuzione dello scraping' });
+  }
+});
+
+// Admin Scraper Logs
+app.get('/api/admin/scrape/logs', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await executeRawSql('SELECT * FROM scrape_logs ORDER BY run_at DESC LIMIT 50');
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/scrape/logs');
+    res.status(500).json({ error: 'Errore nel recupero dei log' });
+  }
+});
+
+// Admin Email Logs
+app.get('/api/admin/email/logs', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await executeRawSql('SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 50');
+    res.json(result.rows);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/email/logs');
+    res.status(500).json({ error: 'Errore nel recupero dei log email' });
+  }
+});
+
+// Admin Geocoding Runner
+app.post('/api/admin/geocode/run', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = Math.min(20, Math.max(1, parseInt(req.body?.limit as string) || 5));
+    const result = await runBatchGeocoding({ limit });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/geocode/run');
+    res.status(500).json({ error: 'Errore durante la geocodifica' });
+  }
+});
+
+// Admin Settings: Read & Write
+app.get('/api/admin/settings', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const result = await executeRawSql('SELECT key, value FROM site_settings');
+    const settings: Record<string, any> = {};
+    for (const r of result.rows) {
+      try {
+        settings[r.key] = JSON.parse(r.value);
+      } catch {
+        settings[r.key] = r.value;
+      }
+    }
+    res.json(settings);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/settings');
+    res.status(500).json({ error: 'Errore nel recupero delle impostazioni' });
+  }
+});
+
+app.put('/api/admin/settings', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const updates = req.body;
+    for (const [key, value] of Object.entries(updates)) {
+      const valStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      await executeRawSql(
+        `INSERT INTO site_settings (key, value)
+         VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, valStr]
+      );
+    }
+    res.json({ success: true, message: 'Impostazioni aggiornate con successo' });
+  } catch (err: any) {
+    logger.error({ err }, 'Error updating settings');
+    res.status(500).json({ error: 'Errore durante il salvataggio delle impostazioni' });
+  }
+});
+
+// Admin Content Management
+app.post('/api/admin/content/movie', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = movieUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { id, title_it, title_en, synopsis_it, rating, poster_url, backdrop_url, is_featured } = parsed.data;
+
+  try {
+    await executeRawSql(
+      `UPDATE movies SET
+         title_it = COALESCE($1, title_it),
+         title_en = COALESCE($2, title_en),
+         synopsis_it = COALESCE($3, synopsis_it),
+         rating = COALESCE($4, rating),
+         poster_url = COALESCE($5, poster_url),
+         backdrop_url = COALESCE($6, backdrop_url),
+         is_featured = COALESCE($7, is_featured)
+       WHERE id = $8`,
+      [title_it, title_en, synopsis_it, rating, poster_url, backdrop_url, is_featured, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err }, 'Error updating movie');
+    res.status(500).json({ error: 'Errore durante l\'aggiornamento del film' });
+  }
+});
+
+app.post('/api/admin/content/cinema', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = cinemaUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { id, name, address, website_url, features } = parsed.data;
+
+  try {
+    await executeRawSql(
+      `UPDATE cinemas SET
+         name = COALESCE($1, name),
+         address = COALESCE($2, address),
+         website_url = COALESCE($3, website_url),
+         features = COALESCE($4, features)
+       WHERE id = $5`,
+      [name, address, website_url, features ? JSON.stringify(features) : null, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ err }, 'Error updating cinema');
+    res.status(500).json({ error: 'Errore durante l\'aggiornamento del cinema' });
+  }
+});
+
+app.post('/api/admin/content/toggle-active', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = toggleActiveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues[0].message });
+  }
+
+  const { showtime_id, active } = parsed.data;
+
+  try {
+    await executeRawSql(
+      `UPDATE showtimes SET active = $1 WHERE id = $2`,
+      [active, showtime_id]
+    );
+    res.json({ success: true, active });
+  } catch (err: any) {
+    logger.error({ err }, 'Error toggling showtime active status');
+    res.status(500).json({ error: 'Errore durante l\'aggiornamento dell\'orario' });
+  }
+});
+
+// Admin Content Data Endpoint
+app.get('/api/admin/content/all', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const [citiesCountRes, cinemasRes, moviesRes, showtimesRes] = await Promise.all([
+      executeRawSql('SELECT COUNT(*) as count FROM cities'),
+      executeRawSql('SELECT c.*, ci.name as city_name, ci.slug as city_slug FROM cinemas c JOIN cities ci ON c.city_id = ci.id ORDER BY c.name ASC'),
+      executeRawSql('SELECT * FROM movies ORDER BY title_it ASC'),
+      executeRawSql('SELECT s.*, m.title_it as movie_title, c.name as cinema_name FROM showtimes s JOIN movies m ON s.movie_id = m.id JOIN cinemas c ON s.cinema_id = c.id ORDER BY s.show_date DESC LIMIT 300')
+    ]);
+
+    res.json({
+      citiesCount: parseInt(citiesCountRes.rows[0]?.count || '0', 10),
+      cinemasCount: cinemasRes.rows.length,
+      moviesCount: moviesRes.rows.length,
+      showtimesCount: showtimesRes.rows.length,
+      activeShowtimesCount: showtimesRes.rows.filter((s: any) => s.active).length,
+      cinemas: cinemasRes.rows,
+      movies: moviesRes.rows,
+      showtimes: showtimesRes.rows
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/content/all');
+    res.status(500).json({ error: 'Errore nel recupero dei contenuti' });
+  }
+});
+
+// Robots.txt Handler (Section 4 item 2)
+app.get('/robots.txt', (req: Request, res: Response) => {
+  res.type('text/plain');
+  res.send(`User-agent: *
+Allow: /
+Disallow: /gestione-riservata-cv/
+Disallow: /admin/
+Disallow: /api/admin/
+Disallow: /api/auth/
+
+Sitemap: https://cinevicino.it/sitemap.xml
+`);
+});
+
+// Dynamic Sitemap.xml Handler
+app.get('/sitemap.xml', async (req: Request, res: Response) => {
+  try {
+    const [citiesRes, moviesRes] = await Promise.all([
+      executeRawSql('SELECT slug FROM cities WHERE is_provincial_capital = TRUE LIMIT 120'),
+      executeRawSql('SELECT slug FROM movies LIMIT 200')
+    ]);
+
+    const baseUrl = 'https://cinevicino.it';
+    const urls = [
+      `${baseUrl}/`,
+      `${baseUrl}/film`,
+      `${baseUrl}/comuni`
+    ];
+
+    for (const c of citiesRes.rows) {
+      urls.push(`${baseUrl}/cinema/${c.slug}`);
+    }
+
+    for (const m of moviesRes.rows) {
+      urls.push(`${baseUrl}/film/${m.slug}`);
+    }
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => `  <url>
+    <loc>${u}</loc>
+    <changefreq>daily</changefreq>
+    <priority>${u === baseUrl + '/' ? '1.0' : '0.8'}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+    res.type('application/xml');
+    res.send(xml);
+  } catch (err: any) {
+    logger.error({ err }, 'Error generating sitemap.xml');
+    res.status(500).send('Error generating sitemap');
+  }
+});
+
+// 4. Global Error Handler (Section 5 item 5)
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  logger.error({ err, path: req.path, method: req.method }, 'Unhandled application error');
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: 'Si è verificato un errore interno al server.',
+    code: 500
   });
+});
+
+// ==========================================
+// BOOTSTRAP SERVER & VITE INTEGRATION
+// ==========================================
+
+async function startServer() {
+  try {
+    // Initialize PostgreSQL schema, tables, indexes, and defaults
+    await initDb();
+
+    // In development, hook up Vite middleware; in production, serve dist static files
+    if (process.env.NODE_ENV !== 'production') {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      logger.info(`🚀 CineVicino Production Server listening on http://0.0.0.0:${PORT}`);
+      logger.info(`🛡️ Admin area configured at: /${ADMIN_SLUG}`);
+    });
+
+    // Graceful shutdown handling (Section 10 item 3)
+    const handleShutdown = async (signal: string) => {
+      logger.info(`Received ${signal}. Shutting down CineVicino server gracefully...`);
+      server.close(async () => {
+        await closeDb();
+        logger.info('Closed database connections and HTTP server. Exiting.');
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+    process.on('SIGINT', () => handleShutdown('SIGINT'));
+
+  } catch (err: any) {
+    logger.error({ err }, 'Fatal error during server startup');
+    process.exit(1);
+  }
 }
 
 startServer();

@@ -348,10 +348,11 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                       {cinema.slots.map(s => (
                         <a
                           key={s.id}
-                          href={s.ticket_url}
+                          href={s.ticket_url || '#'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={`Acquista su ${getTicketSourceLabel(s.ticket_source)} (Apre sito ufficiale)`}
+                          onClick={() => fetch(`/api/showtimes/${s.id}/click`, { method: 'POST' }).catch(() => {})}
+                          title={s.ticket_url ? `Acquista su ${getTicketSourceLabel(s.ticket_source)} (Apre sito ufficiale)` : 'Acquista in cassa o consulta il sito del cinema'}
                           className="group/slot flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-[#D4AF37] border border-white/10 hover:border-[#D4AF37] transition-all shadow-sm active:scale-95"
                         >
                           <div className="text-left">

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /gestione-riservata-cv/
+Disallow: /admin/
+Disallow: /api/admin/
+Disallow: /api/auth/
+
+Sitemap: https://cinevicino.it/sitemap.xml
