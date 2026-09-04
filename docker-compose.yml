@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinevicino-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - APP_URL=${APP_URL:-http://localhost}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-cineuser}:${POSTGRES_PASSWORD:-cinepass}@postgres:5432/${POSTGRES_DB:-cinevicino}
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
+      - EMAIL_ALERT_API_KEY=${EMAIL_ALERT_API_KEY}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cinevicino-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cinevicino-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cineuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinepass}
+      POSTGRES_DB: ${POSTGRES_DB:-cinevicino}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cineuser} -d ${POSTGRES_DB:-cinevicino}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cinevicino-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: cinevicino-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - app
+    networks:
+      - cinevicino-network
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  cinevicino-network:
+    driver: bridge

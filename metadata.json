@@ -1,0 +1,6 @@
+{
+  "name": "CineVicino",
+  "description": "Directory nazionale dei cinema e programmazione film in tutta Italia con geolocalizzazione, orari spettacoli e link ufficiali di biglietteria.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

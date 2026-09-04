@@ -1,0 +1,512 @@
+slug,name,region,province,province_code,is_provincial_capital,cadastral_code
+roma,Roma,Lazio,Roma,RM,True,H501
+milano,Milano,Lombardia,Milano,MI,True,F205
+napoli,Napoli,Campania,Napoli,NA,True,F839
+torino,Torino,Piemonte,Torino,TO,True,L219
+palermo,Palermo,Sicilia,Palermo,PA,True,G273
+genova,Genova,Liguria,Genova,GE,True,D969
+bologna,Bologna,Emilia-Romagna,Bologna,BO,True,A944
+firenze,Firenze,Toscana,Firenze,FI,True,D612
+bari,Bari,Puglia,Bari,BA,True,A662
+catania,Catania,Sicilia,Catania,CT,True,C351
+venezia,Venezia,Veneto,Venezia,VE,True,L736
+verona,Verona,Veneto,Verona,VR,True,L781
+messina,Messina,Sicilia,Messina,ME,True,F158
+padova,Padova,Veneto,Padova,PD,True,G224
+trieste,Trieste,Friuli-Venezia Giulia,Trieste,TS,True,L424
+brescia,Brescia,Lombardia,Brescia,BS,True,B157
+taranto,Taranto,Puglia,Taranto,TA,True,L049
+parma,Parma,Emilia-Romagna,Parma,PR,True,G337
+prato,Prato,Toscana,Prato,PO,True,G999
+modena,Modena,Emilia-Romagna,Modena,MO,True,F257
+reggio-di-calabria,Reggio di Calabria,Calabria,Reggio Calabria,RC,True,H224
+reggio-nell-emilia,Reggio nell'Emilia,Emilia-Romagna,Reggio nell'Emilia,RE,True,H223
+perugia,Perugia,Umbria,Perugia,PG,True,G478
+ravenna,Ravenna,Emilia-Romagna,Ravenna,RA,True,H199
+livorno,Livorno,Toscana,Livorno,LI,True,E625
+cagliari,Cagliari,Sardegna,Cagliari,CA,True,B354
+foggia,Foggia,Puglia,Foggia,FG,True,D643
+rimini,Rimini,Emilia-Romagna,Rimini,RN,True,H294
+salerno,Salerno,Campania,Salerno,SA,True,H703
+ferrara,Ferrara,Emilia-Romagna,Ferrara,FE,True,D548
+sassari,Sassari,Sardegna,Sassari,SS,True,I452
+latina,Latina,Lazio,Latina,LT,True,E472
+giugliano-in-campania,Giugliano in Campania,Campania,Napoli,NA,False,E054
+monza,Monza,Lombardia,Monza e della Brianza,MB,True,F704
+siracusa,Siracusa,Sicilia,Siracusa,SR,True,I754
+pescara,Pescara,Abruzzo,Pescara,PE,True,G482
+bergamo,Bergamo,Lombardia,Bergamo,BG,True,A794
+forli,Forlì,Emilia-Romagna,Forlì-Cesena,FC,True,D704
+trento,Trento,Trentino-Alto Adige/Südtirol,Trento,TN,True,L378
+vicenza,Vicenza,Veneto,Vicenza,VI,True,L840
+terni,Terni,Umbria,Terni,TR,True,L117
+bolzano,Bolzano,Trentino-Alto Adige/Südtirol,Bolzano/Bozen,BZ,True,A952
+novara,Novara,Piemonte,Novara,NO,True,F952
+piacenza,Piacenza,Emilia-Romagna,Piacenza,PC,True,G535
+ancona,Ancona,Marche,Ancona,AN,True,A271
+andria,Andria,Puglia,Barletta-Andria-Trani,BT,True,A285
+arezzo,Arezzo,Toscana,Arezzo,AR,True,A390
+udine,Udine,Friuli-Venezia Giulia,Udine,UD,True,L483
+cesena,Cesena,Emilia-Romagna,Forlì-Cesena,FC,True,C573
+lecce,Lecce,Puglia,Lecce,LE,True,E506
+pesaro,Pesaro,Marche,Pesaro e Urbino,PU,True,G479
+barletta,Barletta,Puglia,Barletta-Andria-Trani,BT,True,A669
+alessandria,Alessandria,Piemonte,Alessandria,AL,True,A182
+la-spezia,La Spezia,Liguria,La Spezia,SP,True,E463
+pisa,Pisa,Toscana,Pisa,PI,True,G702
+pistoia,Pistoia,Toscana,Pistoia,PT,True,G713
+lucca,Lucca,Toscana,Lucca,LU,True,E715
+guidonia-montecelio,Guidonia Montecelio,Lazio,Roma,RM,False,E263
+catanzaro,Catanzaro,Calabria,Catanzaro,CZ,True,C352
+treviso,Treviso,Veneto,Treviso,TV,True,L407
+brindisi,Brindisi,Puglia,Brindisi,BR,True,B180
+busto-arsizio,Busto Arsizio,Lombardia,Varese,VA,False,B300
+como,Como,Lombardia,Como,CO,True,C933
+grosseto,Grosseto,Toscana,Grosseto,GR,True,E202
+sesto-san-giovanni,Sesto San Giovanni,Lombardia,Milano,MI,False,I690
+pozzuoli,Pozzuoli,Campania,Napoli,NA,False,G964
+varese,Varese,Lombardia,Varese,VA,True,L682
+fiumicino,Fiumicino,Lazio,Roma,RM,False,M297
+corigliano-rossano,Corigliano-Rossano,Calabria,Cosenza,CS,False,M403
+casoria,Casoria,Campania,Napoli,NA,False,B990
+asti,Asti,Piemonte,Asti,AT,True,A479
+cinisello-balsamo,Cinisello Balsamo,Lombardia,Milano,MI,False,C707
+caserta,Caserta,Campania,Caserta,CE,True,B963
+gela,Gela,Sicilia,Caltanissetta,CL,False,D960
+ragusa,Ragusa,Sicilia,Ragusa,RG,True,H163
+pavia,Pavia,Lombardia,Pavia,PV,True,G388
+cremona,Cremona,Lombardia,Cremona,CR,True,D150
+carpi,Carpi,Emilia-Romagna,Modena,MO,False,B819
+altamura,Altamura,Puglia,Bari,BA,False,A225
+imola,Imola,Emilia-Romagna,Bologna,BO,False,E289
+l-aquila,L'Aquila,Abruzzo,L'Aquila,AQ,True,A345
+massa,Massa,Toscana,Massa-Carrara,MS,True,F023
+trapani,Trapani,Sicilia,Trapani,TP,True,L331
+viterbo,Viterbo,Lazio,Viterbo,VT,True,M082
+cosenza,Cosenza,Calabria,Cosenza,CS,True,D086
+potenza,Potenza,Basilicata,Potenza,PZ,True,G942
+castellammare-di-stabia,Castellammare di Stabia,Campania,Napoli,NA,False,C129
+crotone,Crotone,Calabria,Crotone,KR,True,D122
+pomezia,Pomezia,Lazio,Roma,RM,False,G811
+afragola,Afragola,Campania,Napoli,NA,False,A064
+vittoria,Vittoria,Sicilia,Ragusa,RG,False,M088
+vigevano,Vigevano,Lombardia,Pavia,PV,False,L872
+carrara,Carrara,Toscana,Massa-Carrara,MS,True,B832
+olbia,Olbia,Sardegna,Gallura Nord-Est Sardegna,OT,True,G015
+viareggio,Viareggio,Toscana,Lucca,LU,False,L833
+fano,Fano,Marche,Pesaro e Urbino,PU,False,D488
+savona,Savona,Liguria,Savona,SV,True,I480
+matera,Matera,Basilicata,Matera,MT,True,F052
+legnano,Legnano,Lombardia,Milano,MI,False,E514
+acerra,Acerra,Campania,Napoli,NA,False,A024
+marano-di-napoli,Marano di Napoli,Campania,Napoli,NA,False,E906
+benevento,Benevento,Campania,Benevento,BN,True,A783
+molfetta,Molfetta,Puglia,Bari,BA,False,F284
+agrigento,Agrigento,Sicilia,Agrigento,AG,True,A089
+cerignola,Cerignola,Puglia,Foggia,FG,False,C514
+moncalieri,Moncalieri,Piemonte,Torino,TO,False,F335
+foligno,Foligno,Umbria,Perugia,PG,False,D653
+faenza,Faenza,Emilia-Romagna,Ravenna,RA,False,D458
+tivoli,Tivoli,Lazio,Roma,RM,False,L182
+manfredonia,Manfredonia,Puglia,Foggia,FG,False,E885
+sanremo,Sanremo,Liguria,Imperia,IM,False,I138
+avellino,Avellino,Campania,Avellino,AV,True,A509
+bagheria,Bagheria,Sicilia,Palermo,PA,False,A546
+bitonto,Bitonto,Puglia,Bari,BA,False,A893
+portici,Portici,Campania,Napoli,NA,False,G902
+anacapri,Anacapri,Campania,Napoli,NA,False,A268
+capri,Capri,Campania,Napoli,NA,False,B696
+sorrento,Sorrento,Campania,Napoli,NA,False,I862
+melzo,Melzo,Lombardia,Milano,MI,False,F119
+limena,Limena,Veneto,Padova,PD,False,E592
+campi-bisenzio,Campi Bisenzio,Toscana,Firenze,FI,False,B507
+casalecchio-di-reno,Casalecchio di Reno,Emilia-Romagna,Bologna,BO,False,B880
+assago,Assago,Lombardia,Milano,MI,False,A473
+parco-leonardo,Fiumicino,Lazio,Roma,RM,False,M297
+porta-di-roma,Roma,Lazio,Roma,RM,True,H501
+tor-vergate,Roma,Lazio,Roma,RM,True,H501
+bellinzago-lombardo,Bellinzago Lombardo,Lombardia,Milano,MI,False,A751
+melzo,Melzo,Lombardia,Milano,MI,False,F119
+rozzano,Rozzano,Lombardia,Milano,MI,False,H623
+pioltello,Pioltello,Lombardia,Milano,MI,False,G686
+vimercate,Vimercate,Lombardia,Monza e della Brianza,MB,False,M052
+sesto-san-giovanni,Sesto San Giovanni,Lombardia,Milano,MI,False,I690
+erbusco,Erbusco,Lombardia,Brescia,BS,False,D421
+curtatone,Curtatone,Lombardia,Mantova,MN,False,D227
+marcon,Marcon,Veneto,Venezia,VE,False,E936
+san-giovanni-lupatoto,San Giovanni Lupatoto,Veneto,Verona,VR,False,H924
+torri-di-quartesolo,Torri di Quartesolo,Veneto,Vicenza,VI,False,L297
+silea,Silea,Veneto,Treviso,TV,False,F116
+villesse,Villesse,Friuli-Venezia Giulia,Gorizia,GO,False,M043
+montano-lucino,Montano Lucino,Lombardia,Como,CO,False,F427
+curno,Curno,Lombardia,Bergamo,BG,False,D221
+calolziocorte,Calolziocorte,Lombardia,Lecco,LC,False,B423
+moncalieri,Moncalieri,Piemonte,Torino,TO,False,F335
+beinasco,Beinasco,Piemonte,Torino,TO,False,A734
+grugliasco,Grugliasco,Piemonte,Torino,TO,False,E216
+san-rocco-al-porto,San Rocco al Porto,Lombardia,Lodi,LO,False,I140
+parma,Parma,Emilia-Romagna,Parma,PR,True,G337
+reggio-nell-emilia,Reggio nell'Emilia,Emilia-Romagna,Reggio nell'Emilia,RE,True,H223
+savignano-sul-rubicone,Savignano sul Rubicone,Emilia-Romagna,Forlì-Cesena,FC,False,I472
+ferrara,Ferrara,Emilia-Romagna,Ferrara,FE,True,D548
+campi-bisenzio,Campi Bisenzio,Toscana,Firenze,FI,False,B507
+firenze,Firenze,Toscana,Firenze,FI,True,D612
+arezzo,Arezzo,Toscana,Arezzo,AR,True,A390
+perugia,Perugia,Umbria,Perugia,PG,True,G478
+corciano,Corciano,Umbria,Perugia,PG,False,C990
+jesolo,Jesolo,Veneto,Venezia,VE,False,C388
+san-benedetto-del-tronto,San Benedetto del Tronto,Marche,Ascoli Piceno,AP,False,H769
+pesaro,Pesaro,Marche,Pesaro e Urbino,PU,True,G479
+roma,Roma,Lazio,Roma,RM,True,H501
+guidonia-montecelio,Guidonia Montecelio,Lazio,Roma,RM,False,E263
+colleferro,Colleferro,Lazio,Roma,RM,False,C858
+fiumicino,Fiumicino,Lazio,Roma,RM,False,M297
+latina,Latina,Lazio,Latina,LT,True,E472
+napoli,Napoli,Campania,Napoli,NA,True,F839
+afragola,Afragola,Campania,Napoli,NA,False,A064
+casoria,Casoria,Campania,Napoli,NA,False,B990
+salerno,Salerno,Campania,Salerno,SA,True,H703
+marcianise,Marcianise,Campania,Caserta,CE,False,E932
+nola,Nola,Campania,Napoli,NA,False,F924
+bari,Bari,Puglia,Bari,BA,True,A662
+molfetta,Molfetta,Puglia,Bari,BA,False,F284
+casamassima,Casamassima,Puglia,Bari,BA,False,B923
+surbo,Surbo,Puglia,Lecce,LE,False,L011
+catania,Catania,Sicilia,Catania,CT,True,C351
+misterbianco,Misterbianco,Sicilia,Catania,CT,False,F250
+belpasso,Belpasso,Sicilia,Catania,CT,False,A766
+palermo,Palermo,Sicilia,Palermo,PA,True,G273
+messina,Messina,Sicilia,Messina,ME,True,F158
+quartucciu,Quartucciu,Sardegna,Cagliari,CA,False,H119
+cagliari,Cagliari,Sardegna,Cagliari,CA,True,B354
+sassari,Sassari,Sardegna,Sassari,SS,True,I452
+sestu,Sestu,Sardegna,Cagliari,CA,False,I695
+corciano,Corciano,Umbria,Perugia,PG,False,C990
+melzo,Melzo,Lombardia,Milano,MI,False,F119
+stezzano,Stezzano,Lombardia,Bergamo,BG,False,I951
+bellinzago-lombardo,Bellinzago Lombardo,Lombardia,Milano,MI,False,A751
+erbusco,Erbusco,Lombardia,Brescia,BS,False,D421
+sesto-san-giovanni,Sesto San Giovanni,Lombardia,Milano,MI,False,I690
+limena,Limena,Veneto,Padova,PD,False,E592
+torri-di-quartesolo,Torri di Quartesolo,Veneto,Vicenza,VI,False,L297
+lugagnano-di-sona,Sona,Veneto,Verona,VR,False,I826
+marcon,Marcon,Veneto,Venezia,VE,False,E936
+silea,Silea,Veneto,Treviso,TV,False,F116
+pradamano,Pradamano,Friuli-Venezia Giulia,Udine,UD,False,G969
+villesse,Villesse,Friuli-Venezia Giulia,Gorizia,GO,False,M043
+ferrara,Ferrara,Emilia-Romagna,Ferrara,FE,True,D548
+reggio-nell-emilia,Reggio nell'Emilia,Emilia-Romagna,Reggio nell'Emilia,RE,True,H223
+piacenza,Piacenza,Emilia-Romagna,Piacenza,PC,True,G535
+parma,Parma,Emilia-Romagna,Parma,PR,True,G337
+savignano-sul-rubicone,Savignano sul Rubicone,Emilia-Romagna,Forlì-Cesena,FC,False,I472
+campi-bisenzio,Campi Bisenzio,Toscana,Firenze,FI,False,B507
+firenze,Firenze,Toscana,Firenze,FI,True,D612
+arezzo,Arezzo,Toscana,Arezzo,AR,True,A390
+ancona,Ancona,Marche,Ancona,AN,True,A271
+fano,Fano,Marche,Pesaro e Urbino,PU,False,D488
+jesi,Jesi,Marche,Ancona,AN,False,E388
+porto-sant-elpidio,Porto Sant'Elpidio,Marche,Fermo,FM,False,G921
+san-benedetto-del-tronto,San Benedetto del Tronto,Marche,Ascoli Piceno,AP,False,H769
+roma,Roma,Lazio,Roma,RM,True,H501
+fiumicino,Fiumicino,Lazio,Roma,RM,False,M297
+guidonia-montecelio,Guidonia Montecelio,Lazio,Roma,RM,False,E263
+colleferro,Colleferro,Lazio,Roma,RM,False,C858
+latina,Latina,Lazio,Latina,LT,True,E472
+marcianise,Marcianise,Campania,Caserta,CE,False,E932
+casoria,Casoria,Campania,Napoli,NA,False,B990
+afragola,Afragola,Campania,Napoli,NA,False,A064
+salerno,Salerno,Campania,Salerno,SA,True,H703
+bari,Bari,Puglia,Bari,BA,True,A662
+molfetta,Molfetta,Puglia,Bari,BA,False,F284
+casamassima,Casamassima,Puglia,Bari,BA,False,B923
+palermo,Palermo,Sicilia,Palermo,PA,True,G273
+catania,Catania,Sicilia,Catania,CT,True,C351
+misterbianco,Misterbianco,Sicilia,Catania,CT,False,F250
+belpasso,Belpasso,Sicilia,Catania,CT,False,A766
+messina,Messina,Sicilia,Messina,ME,True,F158
+sestu,Sestu,Sardegna,Cagliari,CA,False,I695
+quartucciu,Quartucciu,Sardegna,Cagliari,CA,False,H119
+genova,Genova,Liguria,Genova,GE,True,D969
+torino,Torino,Piemonte,Torino,TO,True,L219
+bologna,Bologna,Emilia-Romagna,Bologna,BO,True,A944
+trieste,Trieste,Friuli-Venezia Giulia,Trieste,TS,True,L424
+montebello-della-battaglia,Montebello della Battaglia,Lombardia,Pavia,PV,False,F440
+moncalieri,Moncalieri,Piemonte,Torino,TO,False,F335
+beinasco,Beinasco,Piemonte,Torino,TO,False,A734
+grugliasco,Grugliasco,Piemonte,Torino,TO,False,E216
+san-giuliano-milanese,San Giuliano Milanese,Lombardia,Milano,MI,False,H930
+cornaredo,Cornaredo,Lombardia,Milano,MI,False,D018
+vignate,Vignate,Lombardia,Milano,MI,False,L883
+brescia,Brescia,Lombardia,Brescia,BS,True,B157
+mantova,Mantova,Lombardia,Mantova,MN,True,E897
+rovigo,Rovigo,Veneto,Rovigo,RO,True,H620
+vercelli,Vercelli,Piemonte,Vercelli,VC,True,L750
+biella,Biella,Piemonte,Biella,BI,True,A859
+cuneo,Cuneo,Piemonte,Cuneo,CN,True,D205
+imperia,Imperia,Liguria,Imperia,IM,True,E290
+la-spezia,La Spezia,Liguria,La Spezia,SP,True,E463
+savona,Savona,Liguria,Savona,SV,True,I480
+sondrio,Sondrio,Lombardia,Sondrio,SO,True,I829
+belluno,Belluno,Veneto,Belluno,BL,True,A757
+pordenone,Pordenone,Friuli-Venezia Giulia,Pordenone,PN,True,G888
+gorizia,Gorizia,Friuli-Venezia Giulia,Gorizia,GO,True,E098
+massa,Massa,Toscana,Massa-Carrara,MS,True,F023
+siena,Siena,Toscana,Siena,SI,True,I726
+pescia,Pescia,Toscana,Pistoia,PT,False,G491
+montecatini-terme,Montecatini-Terme,Toscana,Pistoia,PT,False,A561
+san-giovanni-valdarno,San Giovanni Valdarno,Toscana,Arezzo,AR,False,H901
+poggibonsi,Poggibonsi,Toscana,Siena,SI,False,G752
+orbetello,Orbetello,Toscana,Grosseto,GR,False,G088
+spoleto,Spoleto,Umbria,Perugia,PG,False,I921
+citta-di-castello,Città di Castello,Umbria,Perugia,PG,False,C745
+orvieto,Orvieto,Umbria,Terni,TR,False,G148
+narni,Narni,Umbria,Terni,TR,False,F844
+rieti,Rieti,Lazio,Rieti,RI,True,H282
+frosinone,Frosinone,Lazio,Frosinone,FR,True,D810
+cassino,Cassino,Lazio,Frosinone,FR,False,C034
+sora,Sora,Lazio,Frosinone,FR,False,I838
+formia,Formia,Lazio,Latina,LT,False,D708
+gaeta,Gaeta,Lazio,Latina,LT,False,D843
+terracina,Terracina,Lazio,Latina,LT,False,L120
+chieti,Chieti,Abruzzo,Chieti,CH,True,C632
+teramo,Teramo,Abruzzo,Teramo,TE,True,L103
+vasto,Vasto,Abruzzo,Chieti,CH,False,E372
+avezzano,Avezzano,Abruzzo,L'Aquila,AQ,False,A515
+sulmona,Sulmona,Abruzzo,L'Aquila,AQ,False,I804
+campobasso,Campobasso,Molise,Campobasso,CB,True,B519
+isernia,Isernia,Molise,Isernia,IS,True,E335
+termoli,Termoli,Molise,Campobasso,CB,False,L113
+san-severo,San Severo,Puglia,Foggia,FG,False,I158
+lucera,Lucera,Puglia,Foggia,FG,False,E716
+trani,Trani,Puglia,Barletta-Andria-Trani,BT,True,L328
+bisceglie,Bisceglie,Puglia,Barletta-Andria-Trani,BT,False,A883
+monopoli,Monopoli,Puglia,Bari,BA,False,F376
+martina-franca,Martina Franca,Puglia,Taranto,TA,False,E986
+francavilla-fontana,Francavilla Fontana,Puglia,Brindisi,BR,False,D761
+ostuni,Ostuni,Puglia,Brindisi,BR,False,G187
+fasano,Fasano,Puglia,Brindisi,BR,False,D508
+gallipoli,Gallipoli,Puglia,Lecce,LE,False,D883
+nardo,Nardò,Puglia,Lecce,LE,False,F842
+maglie,Maglie,Puglia,Lecce,LE,False,E815
+scorrano,Scorrano,Puglia,Lecce,LE,False,I549
+tricase,Tricase,Puglia,Lecce,LE,False,L419
+vibo-valentia,Vibo Valentia,Calabria,Vibo Valentia,VV,True,F537
+lamezia-terme,Lamezia Terme,Calabria,Catanzaro,CZ,False,M208
+paola,Paola,Calabria,Cosenza,CS,False,G317
+castrovillari,Castrovillari,Calabria,Cosenza,CS,False,C349
+gioia-tauro,Gioia Tauro,Calabria,Reggio Calabria,RC,False,E041
+palmi,Palmi,Calabria,Reggio Calabria,RC,False,G288
+siderno,Siderno,Calabria,Reggio Calabria,RC,False,I725
+locri,Locri,Calabria,Reggio Calabria,RC,False,D976
+soverato,Soverato,Calabria,Catanzaro,CZ,False,I872
+caltanissetta,Caltanissetta,Sicilia,Caltanissetta,CL,True,B429
+enna,Enna,Sicilia,Enna,EN,True,C342
+sciacca,Sciacca,Sicilia,Agrigento,AG,False,I533
+marsala,Marsala,Sicilia,Trapani,TP,False,E974
+mazara-del-vallo,Mazara del Vallo,Sicilia,Trapani,TP,False,F061
+castelvetrano,Castelvetrano,Sicilia,Trapani,TP,False,C286
+alcamo,Alcamo,Sicilia,Trapani,TP,False,A176
+termini-imerese,Termini Imerese,Sicilia,Palermo,PA,False,L112
+cefalu,Cefalù,Sicilia,Palermo,PA,False,C421
+acireale,Acireale,Sicilia,Catania,CT,False,A028
+caltagirone,Caltagirone,Sicilia,Catania,CT,False,B428
+paterno-ct,Paternò,Sicilia,Catania,CT,False,G371
+barcellona-pozzo-di-gotto,Barcellona Pozzo di Gotto,Sicilia,Messina,ME,False,A638
+milazzo,Milazzo,Sicilia,Messina,ME,False,F206
+taormina,Taormina,Sicilia,Messina,ME,False,L042
+modica,Modica,Sicilia,Ragusa,RG,False,F258
+comiso,Comiso,Sicilia,Ragusa,RG,False,C927
+augusta,Augusta,Sicilia,Siracusa,SR,False,A494
+avola,Avola,Sicilia,Siracusa,SR,False,A522
+noto,Noto,Sicilia,Siracusa,SR,False,F943
+oristano,Oristano,Sardegna,Oristano,OR,True,G113
+nuoro,Nuoro,Sardegna,Nuoro,NU,True,F979
+alghero,Alghero,Sardegna,Sassari,SS,False,A192
+porto-torres,Porto Torres,Sardegna,Sassari,SS,False,G924
+carbonia,Carbonia,Sardegna,Sulcis Iglesiente,CI,True,B745
+iglesias,Iglesias,Sardegna,Sulcis Iglesiente,CI,True,E281
+tortoli,Tortolì,Sardegna,Ogliastra,OG,True,A355
+lanusei,Lanusei,Sardegna,Ogliastra,OG,True,E441
+tempio-pausania,Tempio Pausania,Sardegna,Gallura Nord-Est Sardegna,OT,True,L093
+arzachena,Arzachena,Sardegna,Gallura Nord-Est Sardegna,OT,False,A453
+la-maddalena,La Maddalena,Sardegna,Gallura Nord-Est Sardegna,OT,False,E425
+santa-teresa-gallura,Santa Teresa Gallura,Sardegna,Gallura Nord-Est Sardegna,OT,False,I312
+san-vito-lo-capo,San Vito Lo Capo,Sicilia,Trapani,TP,False,I407
+pantelleria,Pantelleria,Sicilia,Trapani,TP,False,G315
+lampedusa-e-linosa,Lampedusa e Linosa,Sicilia,Agrigento,AG,False,E431
+lipari,Lipari,Sicilia,Messina,ME,False,E606
+aosta,Aosta,Valle d'Aosta/Vallée d'Aoste,Valle d'Aosta/Vallée d'Aoste,AO,True,A326
+courmayeur,Courmayeur,Valle d'Aosta/Vallée d'Aoste,Valle d'Aosta/Vallée d'Aoste,AO,False,D012
+saint-vincent,Saint-Vincent,Valle d'Aosta/Vallée d'Aoste,Valle d'Aosta/Vallée d'Aoste,AO,False,H676
+bormio,Bormio,Lombardia,Sondrio,SO,False,B049
+livigno,Livigno,Lombardia,Sondrio,SO,False,E621
+cortina-d-ampezzo,Cortina d'Ampezzo,Veneto,Belluno,BL,False,A266
+merano,Merano,Trentino-Alto Adige/Südtirol,Bolzano/Bozen,BZ,False,F132
+bressanone,Bressanone,Trentino-Alto Adige/Südtirol,Bolzano/Bozen,BZ,False,B160
+brunico,Brunico,Trentino-Alto Adige/Südtirol,Bolzano/Bozen,BZ,False,B220
+rovereto,Rovereto,Trentino-Alto Adige/Südtirol,Trento,TN,False,H612
+riva-del-garda,Riva del Garda,Trentino-Alto Adige/Südtirol,Trento,TN,False,H330
+desenzano-del-garda,Desenzano del Garda,Lombardia,Brescia,BS,False,D284
+peschiera-del-garda,Peschiera del Garda,Veneto,Verona,VR,False,G489
+sirmione,Sirmione,Lombardia,Brescia,BS,False,I633
+salo,Salò,Lombardia,Brescia,BS,False,H717
+chioggia,Chioggia,Veneto,Venezia,VE,False,C638
+caorle,Caorle,Veneto,Venezia,VE,False,B642
+lignano-sabbiadoro,Lignano Sabbiadoro,Friuli-Venezia Giulia,Udine,UD,False,E584
+grado,Grado,Friuli-Venezia Giulia,Gorizia,GO,False,E125
+cervia,Cervia,Emilia-Romagna,Ravenna,RA,False,C553
+cesenatico,Cesenatico,Emilia-Romagna,Forlì-Cesena,FC,False,C574
+riccione,Riccione,Emilia-Romagna,Rimini,RN,False,H274
+bellaria-igea-marina,Bellaria-Igea Marina,Emilia-Romagna,Rimini,RN,False,A747
+cattolica,Cattolica,Emilia-Romagna,Rimini,RN,False,C357
+misano-adriatico,Misano Adriatico,Emilia-Romagna,Rimini,RN,False,F244
+senigallia,Senigallia,Marche,Ancona,AN,False,I608
+civitanova-marche,Civitanova Marche,Marche,Macerata,MC,False,C770
+porto-recanati,Porto Recanati,Marche,Macerata,MC,False,G919
+san-benedetto-del-tronto,San Benedetto del Tronto,Marche,Ascoli Piceno,AP,False,H769
+giulianova,Giulianova,Abruzzo,Teramo,TE,False,E058
+roseto-degli-abruzzi,Roseto degli Abruzzi,Abruzzo,Teramo,TE,False,F585
+pineto,Pineto,Abruzzo,Teramo,TE,False,F831
+silvi,Silvi,Abruzzo,Teramo,TE,False,I741
+montesilvano,Montesilvano,Abruzzo,Pescara,PE,False,F646
+francavilla-al-mare,Francavilla al Mare,Abruzzo,Chieti,CH,False,D763
+ortona,Ortona,Abruzzo,Chieti,CH,False,G141
+san-salvo,San Salvo,Abruzzo,Chieti,CH,False,I148
+termoli,Termoli,Molise,Campobasso,CB,False,L113
+vieste,Vieste,Puglia,Foggia,FG,False,L858
+peschici,Peschici,Puglia,Foggia,FG,False,G487
+rodi-garganico,Rodi Garganico,Puglia,Foggia,FG,False,H480
+trani,Trani,Puglia,Barletta-Andria-Trani,BT,True,L328
+bisceglie,Bisceglie,Puglia,Barletta-Andria-Trani,BT,False,A883
+molfetta,Molfetta,Puglia,Bari,BA,False,F284
+giovinazzo,Giovinazzo,Puglia,Bari,BA,False,E047
+polignano-a-mare,Polignano a Mare,Puglia,Bari,BA,False,G787
+monopoli,Monopoli,Puglia,Bari,BA,False,F376
+ostuni,Ostuni,Puglia,Brindisi,BR,False,G187
+otranto,Otranto,Puglia,Lecce,LE,False,G188
+gallipoli,Gallipoli,Puglia,Lecce,LE,False,D883
+ugento,Ugento,Puglia,Lecce,LE,False,L484
+castrignano-del-capo,Castrignano del Capo,Puglia,Lecce,LE,False,C336
+porto-cesareo,Porto Cesareo,Puglia,Lecce,LE,False,M263
+ginosa,Ginosa,Puglia,Taranto,TA,False,E036
+maratea,Maratea,Basilicata,Potenza,PZ,False,E919
+praia-a-mare,Praia a Mare,Calabria,Cosenza,CS,False,G975
+scalea,Scalea,Calabria,Cosenza,CS,False,I489
+diamante,Diamante,Calabria,Cosenza,CS,False,D289
+cetraro,Cetraro,Calabria,Cosenza,CS,False,C588
+paola,Paola,Calabria,Cosenza,CS,False,G317
+tropea,Tropea,Calabria,Vibo Valentia,VV,False,L452
+pizzo,Pizzo,Calabria,Vibo Valentia,VV,False,G722
+scilla,Scilla,Calabria,Reggio Calabria,RC,False,I537
+roccella-ionica,Roccella Ionica,Calabria,Reggio Calabria,RC,False,H456
+soverato,Soverato,Calabria,Catanzaro,CZ,False,I872
+isola-di-capo-rizzuto,Isola di Capo Rizzuto,Calabria,Crotone,KR,False,E339
+cariati,Cariati,Calabria,Cosenza,CS,False,B774
+trebisacce,Trebisacce,Calabria,Cosenza,CS,False,L353
+agropoli,Agropoli,Campania,Salerno,SA,False,A091
+castellabate,Castellabate,Campania,Salerno,SA,False,C125
+centola,Centola,Campania,Salerno,SA,False,C470
+pisciotta,Pisciotta,Campania,Salerno,SA,False,G707
+ascea,Ascea,Campania,Salerno,SA,False,A460
+sapri,Sapri,Campania,Salerno,SA,False,I422
+amalfi,Amalfi,Campania,Salerno,SA,False,A251
+positano,Positano,Campania,Salerno,SA,False,G932
+ravello,Ravello,Campania,Salerno,SA,False,H198
+maiori,Maiori,Campania,Salerno,SA,False,E839
+minori,Minori,Campania,Salerno,SA,False,F223
+cetara,Cetara,Campania,Salerno,SA,False,C584
+vietri-sul-mare,Vietri sul Mare,Campania,Salerno,SA,False,L860
+vico-equense,Vico Equense,Campania,Napoli,NA,False,L845
+meta,Meta,Campania,Napoli,NA,False,F162
+piano-di-sorrento,Piano di Sorrento,Campania,Napoli,NA,False,G568
+sant-agnello,Sant'Agnello,Campania,Napoli,NA,False,I208
+sorrento,Sorrento,Campania,Napoli,NA,False,I862
+massa-lubrense,Massa Lubrense,Campania,Napoli,NA,False,F030
+ischia,Ischia,Campania,Napoli,NA,False,E329
+casamicciola-terme,Casamicciola Terme,Campania,Napoli,NA,False,B924
+lacco-ameno,Lacco Ameno,Campania,Napoli,NA,False,E396
+forio,Forio,Campania,Napoli,NA,False,D702
+barano-d-ischia,Barano d'Ischia,Campania,Napoli,NA,False,A617
+serrara-fontana,Serrara Fontana,Campania,Napoli,NA,False,I652
+procida,Procida,Campania,Napoli,NA,False,H072
+capri,Capri,Campania,Napoli,NA,False,B696
+anacapri,Anacapri,Campania,Napoli,NA,False,A268
+gaeta,Gaeta,Lazio,Latina,LT,False,D843
+formia,Formia,Lazio,Latina,LT,False,D708
+minturno,Minturno,Lazio,Latina,LT,False,F224
+sperlonga,Sperlonga,Lazio,Latina,LT,False,I892
+terracina,Terracina,Lazio,Latina,LT,False,L120
+san-felice-circeo,San Felice Circeo,Lazio,Latina,LT,False,H836
+sabaudia,Sabaudia,Lazio,Latina,LT,False,H647
+anzio,Anzio,Lazio,Roma,RM,False,A323
+nettuno,Nettuno,Lazio,Roma,RM,False,F880
+fiumicino,Fiumicino,Lazio,Roma,RM,False,M297
+ladispoli,Ladispoli,Lazio,Roma,RM,False,M212
+cerveteri,Cerveteri,Lazio,Roma,RM,False,C552
+santa-marinella,Santa Marinella,Lazio,Roma,RM,False,I255
+civitavecchia,Civitavecchia,Lazio,Roma,RM,False,C773
+tarquinia,Tarquinia,Lazio,Viterbo,VT,False,D024
+montalto-di-castro,Montalto di Castro,Lazio,Viterbo,VT,False,F419
+orbetello,Orbetello,Toscana,Grosseto,GR,False,G088
+monte-argentario,Monte Argentario,Toscana,Grosseto,GR,False,F437
+castiglione-della-pescaia,Castiglione della Pescaia,Toscana,Grosseto,GR,False,C310
+follonica,Follonica,Toscana,Grosseto,GR,False,D656
+piombino,Piombino,Toscana,Livorno,LI,False,G687
+san-vincenzo,San Vincenzo,Toscana,Livorno,LI,False,I390
+castagneto-carducci,Castagneto Carducci,Toscana,Livorno,LI,False,C044
+cecina,Cecina,Toscana,Livorno,LI,False,C415
+rosignano-marittimo,Rosignano Marittimo,Toscana,Livorno,LI,False,H570
+livorno,Livorno,Toscana,Livorno,LI,True,E625
+pisa,Pisa,Toscana,Pisa,PI,True,G702
+viareggio,Viareggio,Toscana,Lucca,LU,False,L833
+camaiore,Camaiore,Toscana,Lucca,LU,False,B455
+pietrasanta,Pietrasanta,Toscana,Lucca,LU,False,G628
+forte-dei-marmi,Forte dei Marmi,Toscana,Lucca,LU,False,D730
+massa,Massa,Toscana,Massa-Carrara,MS,True,F023
+carrara,Carrara,Toscana,Massa-Carrara,MS,True,B832
+sarzana,Sarzana,Liguria,La Spezia,SP,False,I449
+lerici,Lerici,Liguria,La Spezia,SP,False,E542
+portovenere,Portovenere,Liguria,La Spezia,SP,False,G925
+riomaggiore,Riomaggiore,Liguria,La Spezia,SP,False,H304
+monterosso-al-mare,Monterosso al Mare,Liguria,La Spezia,SP,False,F609
+levanto,Levanto,Liguria,La Spezia,SP,False,E560
+deiva-marina,Deiva Marina,Liguria,La Spezia,SP,False,D265
+sestri-levante,Sestri Levante,Liguria,Genova,GE,False,I693
+lavagna,Lavagna,Liguria,Genova,GE,False,E488
+chiavari,Chiavari,Liguria,Genova,GE,False,C621
+rapallo,Rapallo,Liguria,Genova,GE,False,H183
+santa-margherita-ligure,Santa Margherita Ligure,Liguria,Genova,GE,False,I225
+portofino,Portofino,Liguria,Genova,GE,False,G913
+camogli,Camogli,Liguria,Genova,GE,False,B490
+recco,Recco,Liguria,Genova,GE,False,H212
+bogliasco,Bogliasco,Liguria,Genova,GE,False,A922
+arenzano,Arenzano,Liguria,Genova,GE,False,A388
+cogoleto,Cogoleto,Liguria,Genova,GE,False,C823
+varazze,Varazze,Liguria,Savona,SV,False,L675
+celle-ligure,Celle Ligure,Liguria,Savona,SV,False,C443
+albisola-superiore,Albisola Superiore,Liguria,Savona,SV,False,A166
+savona,Savona,Liguria,Savona,SV,True,I480
+vado-ligure,Vado Ligure,Liguria,Savona,SV,False,L528
+spotorno,Spotorno,Liguria,Savona,SV,False,I926
+noli,Noli,Liguria,Savona,SV,False,F926
+finale-ligure,Finale Ligure,Liguria,Savona,SV,False,D600
+pietra-ligure,Pietra Ligure,Liguria,Savona,SV,False,G605
+loano,Loano,Liguria,Savona,SV,False,E632
+borghetto-santo-spirito,Borghetto Santo Spirito,Liguria,Savona,SV,False,A999
+ceriale,Ceriale,Liguria,Savona,SV,False,C510
+albenga,Albenga,Liguria,Savona,SV,False,A145
+alassio,Alassio,Liguria,Savona,SV,False,A122
+laigueglia,Laigueglia,Liguria,Savona,SV,False,E414
+andora,Andora,Liguria,Savona,SV,False,A278
+diano-marina,Diano Marina,Liguria,Savona,SV,False,D297
+san-bartolomeo-al-mare,San Bartolomeo al Mare,Liguria,Imperia,IM,False,H763
+imperia,Imperia,Liguria,Imperia,IM,True,E290
+san-lorenzo-al-mare,San Lorenzo al Mare,Liguria,Imperia,IM,False,H957
+santo-stefano-al-mare,Santo Stefano al Mare,Liguria,Imperia,IM,False,I365
+taggia,Taggia,Liguria,Imperia,IM,False,L024
+sanremo,Sanremo,Liguria,Imperia,IM,False,I138
+ospedaletti,Ospedaletti,Liguria,Imperia,IM,False,G164
+bordighera,Bordighera,Liguria,Imperia,IM,False,A984
+vallecrosia,Vallecrosia,Liguria,Imperia,IM,False,L599
+camporosso,Camporosso,Liguria,Imperia,IM,False,B559
+ventimiglia,Ventimiglia,Liguria,Imperia,IM,False,L741
