@@ -118,14 +118,16 @@ async function seedContent() {
       }
     }
 
+    const cinemaSlug = c.id.replace(/^cin-/, '');
     await executeRawSql(
       `INSERT INTO cinemas (
-        id, city_id, name, chain, address, lat, lng, website_url, features
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        id, city_id, name, chain, address, lat, lng, website_url, features, slug
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         address = EXCLUDED.address,
-        website_url = EXCLUDED.website_url;`,
+        website_url = EXCLUDED.website_url,
+        slug = EXCLUDED.slug;`,
       [
         c.id,
         cityId,
@@ -135,7 +137,8 @@ async function seedContent() {
         c.lat,
         c.lng,
         c.website_url,
-        JSON.stringify(c.features || [])
+        JSON.stringify(c.features || []),
+        cinemaSlug
       ]
     );
   }

@@ -115,6 +115,7 @@ export async function initDb() {
     `CREATE INDEX IF NOT EXISTS idx_cinemas_city_id ON cinemas (city_id);`,
     `CREATE INDEX IF NOT EXISTS idx_cinemas_chain ON cinemas (chain);`,
     `CREATE INDEX IF NOT EXISTS idx_cinemas_slug ON cinemas (slug);`,
+    `UPDATE cinemas SET slug = REPLACE(id, 'cin-', '') WHERE slug IS NULL;`,
 
     // 3. Movies table
     `CREATE TABLE IF NOT EXISTS movies (

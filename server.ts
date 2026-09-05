@@ -407,7 +407,7 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
       `SELECT c.*, ci.name as city_name, ci.slug as city_slug
        FROM cinemas c
        JOIN cities ci ON c.city_id = ci.id
-       WHERE c.id = $1 LIMIT 1`,
+       WHERE c.id = $1 OR c.slug = $1 LIMIT 1`,
       [id]
     );
 
@@ -424,7 +424,7 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
        JOIN movies m ON s.movie_id = m.id
        WHERE s.cinema_id = $1 AND s.active = TRUE
        ORDER BY s.show_date ASC, s.time ASC`,
-      [id]
+      [cinema.id]
     );
 
     res.json({
