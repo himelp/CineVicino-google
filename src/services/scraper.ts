@@ -30,6 +30,10 @@ export interface ScrapeResult {
   firecrawl_credits_used: number;
   status: 'success' | 'warning' | 'error';
   details: string;
+  cursor_offset?: number;
+  next_offset?: number;
+  batch_cities?: string[];
+  total_eligible_cities?: number;
 }
 
 export interface ScrapeOptions {
@@ -37,6 +41,18 @@ export interface ScrapeOptions {
   city?: string;
   limit?: number;
   offset?: number;
+  advanceCursor?: boolean;
+}
+
+export interface ScraperCursorState {
+  current_offset: number;
+  batch_size: number;
+  total_eligible_cities: number;
+  current_batch_cities: { name: string; slug: string; province_code?: string; region?: string }[];
+  next_offset: number;
+  next_batch_cities: { name: string; slug: string; province_code?: string; region?: string }[];
+  cycle_progress_percent: number;
+  cycle_description: string;
 }
 
 export interface CityTarget {
@@ -722,6 +738,132 @@ export class NationwideCinemaScraper {
   }
 
   /**
+   * Read stored cursor offset from site_settings (default 0)
+   */
+  async getStoredCursor(): Promise<number> {
+    try {
+      const res = await executeRawSql("SELECT value FROM site_settings WHERE key = 'last_scrape_offset'");
+      if (res.rows && res.rows.length > 0) {
+        const val = parseInt(res.rows[0].value, 10);
+        return isNaN(val) || val < 0 ? 0 : val;
+      }
+    } catch (err: any) {
+      console.warn('[Scraper] Could not read last_scrape_offset from site_settings:', err.message);
+    }
+    return 0;
+  }
+
+  /**
+   * Persist cursor offset to site_settings
+   */
+  async setStoredCursor(offset: number): Promise<void> {
+    const cleanOffset = Math.max(0, Math.floor(offset));
+    try {
+      await executeRawSql(
+        `INSERT INTO site_settings (key, value)
+         VALUES ('last_scrape_offset', $1)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [cleanOffset.toString()]
+      );
+    } catch (err: any) {
+      console.error('[Scraper] Could not save last_scrape_offset to site_settings:', err.message);
+    }
+  }
+
+  /**
+   * Helper to query eligible cities ordered by national importance & name
+   */
+  async getEligibleCities(
+    limit: number = 25,
+    offset: number = 0
+  ): Promise<{ cities: CityTarget[]; total: number }> {
+    const countRes = await executeRawSql(`
+      SELECT COUNT(*) as total
+      FROM cities c
+      WHERE c.is_provincial_capital = TRUE OR EXISTS (SELECT 1 FROM cinemas WHERE city_id = c.id)
+    `);
+    const total = parseInt(countRes.rows[0]?.total || '0', 10);
+
+    const queryLimit = Math.max(1, limit);
+    const cleanOffset = Math.max(0, offset);
+
+    const citiesRes = await executeRawSql(
+      `SELECT c.id, c.name, c.slug, c.province, c.province_code, c.region, c.lat, c.lng
+       FROM cities c
+       WHERE c.is_provincial_capital = TRUE OR EXISTS (SELECT 1 FROM cinemas WHERE city_id = c.id)
+       ORDER BY
+         CASE
+           WHEN c.slug = 'roma' THEN 1
+           WHEN c.slug = 'milano' THEN 2
+           WHEN c.slug = 'torino' THEN 3
+           WHEN c.slug = 'napoli' THEN 4
+           WHEN c.slug = 'bologna' THEN 5
+           WHEN c.slug = 'firenze' THEN 6
+           WHEN c.slug = 'genova' THEN 7
+           WHEN c.slug = 'palermo' THEN 8
+           WHEN c.slug = 'bari' THEN 9
+           ELSE 20
+         END,
+         c.name ASC
+       LIMIT $1 OFFSET $2`,
+      [queryLimit, cleanOffset]
+    );
+
+    const cities: CityTarget[] = (citiesRes.rows || []).map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      province: r.province,
+      province_code: r.province_code,
+      region: r.region,
+      lat: Number(r.lat) || 41.9028,
+      lng: Number(r.lng) || 12.4964
+    }));
+
+    return { cities, total };
+  }
+
+  /**
+   * Get full cursor rotation overview for status endpoints & admin dashboard
+   */
+  async getScraperCursorState(batchLimit: number = 25): Promise<ScraperCursorState> {
+    const currentOffset = await this.getStoredCursor();
+    const { cities: currentCities, total } = await this.getEligibleCities(batchLimit, currentOffset);
+
+    // Calculate next offset: wrap back to 0 if reached end or no more cities
+    const nextOffset =
+      total > 0 && (currentOffset + currentCities.length >= total || currentCities.length === 0)
+        ? 0
+        : currentOffset + currentCities.length;
+
+    const { cities: nextCities } = await this.getEligibleCities(batchLimit, nextOffset);
+
+    const progress = total > 0 ? Math.min(100, Math.round((currentOffset / total) * 100)) : 0;
+    const cycleDesc = `Rotazione attiva: offset ${currentOffset}/${total} (${progress}% ciclo coperto). Prossimo offset: ${nextOffset}.`;
+
+    return {
+      current_offset: currentOffset,
+      batch_size: batchLimit,
+      total_eligible_cities: total,
+      current_batch_cities: currentCities.map(c => ({
+        name: c.name,
+        slug: c.slug,
+        province_code: c.province_code,
+        region: c.region
+      })),
+      next_offset: nextOffset,
+      next_batch_cities: nextCities.map(c => ({
+        name: c.name,
+        slug: c.slug,
+        province_code: c.province_code,
+        region: c.region
+      })),
+      cycle_progress_percent: progress,
+      cycle_description: cycleDesc
+    };
+  }
+
+  /**
    * Execute Full Scraper Process Across Cities
    */
   async executeFullScrape(
@@ -750,6 +892,9 @@ export class NationwideCinemaScraper {
 
     // 1. Resolve Target Cities from Database
     let targetCities: CityTarget[] = [];
+    let batchOffset = 0;
+    let nextOffset = 0;
+    let totalEligibleCities = 0;
 
     if (options.city) {
       const cleanSlug = slugify(options.city);
@@ -776,43 +921,43 @@ export class NationwideCinemaScraper {
       }
     }
 
-    // If no specific city requested or not found, query provincial capitals & major cinema hubs
+    // If no specific city requested or not found, query provincial capitals & major cinema hubs using cursor rotation
     if (targetCities.length === 0) {
-      const batchLimit = Math.min(options.limit || 5, 25);
-      const batchOffset = options.offset || 0;
+      const storedOffset = await this.getStoredCursor();
+      batchOffset = options.offset !== undefined ? Math.max(0, options.offset) : storedOffset;
+      const batchLimit = Math.min(options.limit || 25, 50);
 
-      const citiesRes = await executeRawSql(
-        `SELECT c.id, c.name, c.slug, c.province, c.province_code, c.region, c.lat, c.lng
-         FROM cities c
-         WHERE c.is_provincial_capital = TRUE OR EXISTS (SELECT 1 FROM cinemas WHERE city_id = c.id)
-         ORDER BY
-           CASE
-             WHEN c.slug = 'roma' THEN 1
-             WHEN c.slug = 'milano' THEN 2
-             WHEN c.slug = 'torino' THEN 3
-             WHEN c.slug = 'napoli' THEN 4
-             WHEN c.slug = 'bologna' THEN 5
-             WHEN c.slug = 'firenze' THEN 6
-             WHEN c.slug = 'genova' THEN 7
-             WHEN c.slug = 'palermo' THEN 8
-             WHEN c.slug = 'bari' THEN 9
-             ELSE 20
-           END,
-           c.name ASC
-         LIMIT $1 OFFSET $2`,
-        [batchLimit, batchOffset]
-      );
+      let eligibleResult = await this.getEligibleCities(batchLimit, batchOffset);
+      totalEligibleCities = eligibleResult.total;
 
-      targetCities = citiesRes.rows.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        slug: r.slug,
-        province: r.province,
-        province_code: r.province_code,
-        region: r.region,
-        lat: Number(r.lat) || 41.9028,
-        lng: Number(r.lng) || 12.4964
-      }));
+      // Wrap back to 0 if offset reached or exceeded the end of the list
+      if (totalEligibleCities > 0 && (batchOffset >= totalEligibleCities || eligibleResult.cities.length === 0)) {
+        batchOffset = 0;
+        eligibleResult = await this.getEligibleCities(batchLimit, 0);
+      }
+
+      targetCities = eligibleResult.cities;
+
+      // Compute next offset: wrap back to 0 if batch reached or exceeded end
+      if (
+        totalEligibleCities > 0 &&
+        (batchOffset + targetCities.length >= totalEligibleCities || targetCities.length < batchLimit)
+      ) {
+        nextOffset = 0;
+      } else {
+        nextOffset = batchOffset + targetCities.length;
+      }
+
+      // If advanceCursor requested, persist to site_settings
+      if (options.advanceCursor) {
+        await this.setStoredCursor(nextOffset);
+        notify(
+          'rotation',
+          'System',
+          nextOffset,
+          `Rotazione avanzata: offset aggiornato da ${batchOffset} a ${nextOffset} in site_settings (su ${totalEligibleCities} comuni).`
+        );
+      }
     }
 
     // Safety fallback
@@ -1048,8 +1193,13 @@ export class NationwideCinemaScraper {
 
     const logId = `log-${Date.now()}`;
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    const rotationPrefix = options.city
+      ? `Città singola: ${targetCities[0]?.name || options.city}`
+      : `Rotazione [Offset: ${batchOffset}/${totalEligibleCities}, Prossimo: ${nextOffset}]`;
+
     const details =
-      `Scraping completato in ${durationSec}s per ${citiesTouchedSet.size} città (${cityNamesStr}). ` +
+      `${rotationPrefix}. Scraping completato in ${durationSec}s per ${citiesTouchedSet.size} città (${cityNamesStr}). ` +
       `Cinema aggiornati: ${cinemasTouched}, Film aggiornati: ${moviesTouched}, Orari sincronizzati: ${showtimesTouched}. ` +
       `Sorgenti verificate: CinemaTimes.com, MYmovies.it, ComingSoon.it.`;
 
@@ -1082,7 +1232,11 @@ export class NationwideCinemaScraper {
       showtimes_touched: showtimesTouched,
       firecrawl_credits_used: 0,
       status: 'success',
-      details
+      details,
+      cursor_offset: options.city ? undefined : batchOffset,
+      next_offset: options.city ? undefined : nextOffset,
+      batch_cities: targetCities.map(c => c.name),
+      total_eligible_cities: options.city ? undefined : totalEligibleCities
     };
   }
 }

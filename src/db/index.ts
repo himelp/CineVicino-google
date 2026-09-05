@@ -316,6 +316,7 @@ async function seedDefaults() {
     ['privacy_policy_en', 'CineVicino complies with GDPR. We do not sell your personal data.'],
     ['firecrawl_monthly_limit', '1000'],
     ['firecrawl_credits_used', '0'],
+    ['last_scrape_offset', '0'],
   ];
 
   for (const [k, v] of defaultSettings) {
