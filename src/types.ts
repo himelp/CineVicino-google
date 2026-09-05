@@ -65,7 +65,7 @@ export interface Showtime {
   time: string; // HH:MM
   format: MovieFormat;
   language: MovieLanguage;
-  ticket_url: string;
+  ticket_url?: string | null;
   ticket_source: TicketSource;
   active: boolean;
   scraped_at: string;

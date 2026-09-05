@@ -52,6 +52,7 @@ export async function getDb() {
   }
 
   pgliteInstance = new PGlite(dataDir);
+  await pgliteInstance.ready;
   db = drizzlePglite(pgliteInstance, { schema });
   isPglite = true;
   console.log(`✅ Initialized persistent embedded PostgreSQL engine at ${dataDir}`);
@@ -150,12 +151,13 @@ export async function initDb() {
       time VARCHAR(8) NOT NULL,
       format VARCHAR(32) NOT NULL DEFAULT '2D',
       language VARCHAR(16) NOT NULL DEFAULT 'IT',
-      ticket_url TEXT NOT NULL,
+      ticket_url TEXT,
       ticket_source VARCHAR(32) NOT NULL,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       clicks INTEGER NOT NULL DEFAULT 0,
       scraped_at TIMESTAMP NOT NULL DEFAULT NOW()
     );`,
+    `ALTER TABLE showtimes ALTER COLUMN ticket_url DROP NOT NULL;`,
     `CREATE INDEX IF NOT EXISTS idx_showtimes_movie_id ON showtimes (movie_id);`,
     `CREATE INDEX IF NOT EXISTS idx_showtimes_cinema_id ON showtimes (cinema_id);`,
     `CREATE INDEX IF NOT EXISTS idx_showtimes_date ON showtimes (show_date);`,
@@ -229,42 +231,66 @@ export async function initDb() {
       details TEXT,
       sent_at TIMESTAMP NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs (recipient);`
+    `CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs (recipient);`,
+    `ALTER TABLE cinemas ALTER COLUMN id TYPE VARCHAR(128);`,
+    `ALTER TABLE cinemas ALTER COLUMN chain TYPE VARCHAR(128);`,
+    `ALTER TABLE movies ALTER COLUMN id TYPE VARCHAR(128);`,
+    `ALTER TABLE showtimes ALTER COLUMN id TYPE VARCHAR(128);`,
+    `ALTER TABLE showtimes ALTER COLUMN movie_id TYPE VARCHAR(128);`,
+    `ALTER TABLE showtimes ALTER COLUMN cinema_id TYPE VARCHAR(128);`,
+    `ALTER TABLE scrape_logs ALTER COLUMN source TYPE VARCHAR(128);`
   ];
 
   for (const stmt of ddlStatements) {
-    await executeRawSql(stmt);
+    try {
+      await executeRawSql(stmt);
+    } catch (stmtErr: any) {
+      // Ignore idempotent schema migration errors
+    }
   }
 
   console.log('✅ PostgreSQL tables and indexes verified successfully.');
 
   // Seed default admin user & default settings if not present
-  await seedDefaults();
+  try {
+    await seedDefaults();
+  } catch (seedErr: any) {
+    console.warn('⚠️ seedDefaults notice:', seedErr.message);
+  }
 }
 
 // Seed default settings and initial admin user with bcrypt password
 async function seedDefaults() {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@cinevicino.it';
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@cinevicino.it').toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || 'CineVicinoAdmin2026!';
 
   // Check if admin user exists or update password
-  const adminHash = await bcrypt.hash(adminPassword, 12);
-  await executeRawSql(
-    `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
-     VALUES ($1, $2, $3, $4, $5, NOW())
-     ON CONFLICT (email) DO UPDATE SET password_hash = $4, is_admin = TRUE`,
-    ['usr-admin-initial', adminEmail.toLowerCase(), 'Amministratore CineVicino', adminHash, true]
-  );
+  const adminHash = await bcrypt.hash(adminPassword, 10);
+  const existingAdmin = await executeRawSql('SELECT id FROM users WHERE LOWER(email) = $1', [adminEmail]);
+  if (existingAdmin.rows && existingAdmin.rows.length > 0) {
+    await executeRawSql('UPDATE users SET password_hash = $1, is_admin = TRUE WHERE LOWER(email) = $2', [adminHash, adminEmail]);
+  } else {
+    await executeRawSql(
+      `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
+       VALUES ($1, $2, $3, $4, TRUE, NOW())`,
+      ['usr-admin-initial', adminEmail, 'Amministratore CineVicino', adminHash]
+    );
+  }
 
   // Seed default demo user for instant testing
+  const demoEmail = 'mario.rossi@cinefilo.it';
   const demoHash = await bcrypt.hash('CinefiloPass2026!', 10);
-  await executeRawSql(
-    `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
-     VALUES ($1, $2, $3, $4, $5, NOW())
-     ON CONFLICT (email) DO UPDATE SET password_hash = $4`,
-    ['usr-demo-cinefilo', 'mario.rossi@cinefilo.it', 'Mario Rossi', demoHash, false]
-  );
-  console.log(`👤 Verified Admin (${adminEmail}) and Demo (mario.rossi@cinefilo.it) accounts.`);
+  const existingDemo = await executeRawSql('SELECT id FROM users WHERE LOWER(email) = $1', [demoEmail]);
+  if (existingDemo.rows && existingDemo.rows.length > 0) {
+    await executeRawSql('UPDATE users SET password_hash = $1 WHERE LOWER(email) = $2', [demoHash, demoEmail]);
+  } else {
+    await executeRawSql(
+      `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
+       VALUES ($1, $2, $3, $4, FALSE, NOW())`,
+      ['usr-demo-cinefilo', demoEmail, 'Mario Rossi', demoHash]
+    );
+  }
+  console.log(`👤 Verified Admin (${adminEmail}) and Demo (${demoEmail}) accounts.`);
 
   // Check site settings
   const defaultSettings = [

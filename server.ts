@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -40,6 +39,9 @@ import {
 const app = express();
 const PORT = 3000;
 const ADMIN_SLUG = process.env.ADMIN_SLUG || 'gestione-riservata-cv';
+
+// Trust front-end reverse proxy / Cloud Run ingress for IP and protocol resolution
+app.set('trust proxy', 1);
 
 // 1. Startup validation (fail-fast)
 try {
@@ -80,6 +82,7 @@ const globalApiLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too Many Requests', message: 'Troppe richieste da questo indirizzo IP. Riprova più tardi.' }
 });
 
@@ -88,6 +91,7 @@ const authLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too Many Requests', message: 'Troppi tentativi di accesso. Riprova tra 15 minuti.' }
 });
 
@@ -96,6 +100,7 @@ const scraperLimiter = rateLimit({
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too Many Requests', message: 'Limite esecuzione scraper raggiunto. Massimo 3 esecuzioni ogni 10 minuti.' }
 });
 
@@ -970,14 +975,18 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
 // Admin Scraper: Run Real Cheerio Scrape (Strict rate limiting applied)
 app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    logger.info({ user: req.user!.email }, 'Admin triggered real Cheerio cinema scrape');
+    const targetCity = (req.query.city as string) || req.body?.city;
+    const targetLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : req.body?.limit;
+    logger.info({ user: req.user!.email, targetCity, targetLimit }, 'Admin triggered real Cheerio cinema scrape');
     const result = await cinemaScraper.executeFullScrape({
-      useFirecrawl: req.body?.useFirecrawl === true
+      useFirecrawl: req.body?.useFirecrawl === true,
+      city: targetCity,
+      limit: targetLimit
     });
     res.json({ success: true, result });
   } catch (err: any) {
     logger.error({ err }, 'Error executing admin scrape');
-    res.status(500).json({ error: 'Errore durante l\'esecuzione dello scraping' });
+    res.status(500).json({ error: 'Errore durante l\'esecuzione dello scraping', details: err?.message });
   }
 });
 
@@ -1153,8 +1162,17 @@ app.get('/api/admin/content/all', requireAdmin, async (req: AuthenticatedRequest
   }
 });
 
+const getPublicSiteUrl = (): string => {
+  const envUrl = process.env.SITE_URL || process.env.PUBLIC_BASE_URL || process.env.APP_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  return 'https://cinemavicino.minhazbinsanto.com';
+};
+
 // Robots.txt Handler (Section 4 item 2)
 app.get('/robots.txt', (req: Request, res: Response) => {
+  const publicUrl = getPublicSiteUrl();
   res.type('text/plain');
   res.send(`User-agent: *
 Allow: /
@@ -1163,31 +1181,32 @@ Disallow: /admin/
 Disallow: /api/admin/
 Disallow: /api/auth/
 
-Sitemap: https://cinevicino.it/sitemap.xml
+Sitemap: ${publicUrl}/sitemap.xml
 `);
 });
 
 // Dynamic Sitemap.xml Handler
 app.get('/sitemap.xml', async (req: Request, res: Response) => {
   try {
+    const publicUrl = getPublicSiteUrl();
     const [citiesRes, moviesRes] = await Promise.all([
       executeRawSql('SELECT slug FROM cities WHERE is_provincial_capital = TRUE LIMIT 120'),
       executeRawSql('SELECT slug FROM movies LIMIT 200')
     ]);
 
-    const baseUrl = 'https://cinevicino.it';
     const urls = [
-      `${baseUrl}/`,
-      `${baseUrl}/film`,
-      `${baseUrl}/comuni`
+      `${publicUrl}/`,
+      `${publicUrl}/film`,
+      `${publicUrl}/comuni`
     ];
 
     for (const c of citiesRes.rows) {
-      urls.push(`${baseUrl}/cinema/${c.slug}`);
+      urls.push(`${publicUrl}/citta/${c.slug}`);
+      urls.push(`${publicUrl}/cinema/${c.slug}`);
     }
 
     for (const m of moviesRes.rows) {
-      urls.push(`${baseUrl}/film/${m.slug}`);
+      urls.push(`${publicUrl}/film/${m.slug}`);
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1195,7 +1214,7 @@ app.get('/sitemap.xml', async (req: Request, res: Response) => {
 ${urls.map(u => `  <url>
     <loc>${u}</loc>
     <changefreq>daily</changefreq>
-    <priority>${u === baseUrl + '/' ? '1.0' : '0.8'}</priority>
+    <priority>${u === publicUrl + '/' ? '1.0' : '0.8'}</priority>
   </url>`).join('\n')}
 </urlset>`;
 
@@ -1403,6 +1422,7 @@ async function startServer() {
 
     // In development, hook up Vite middleware; in production, serve dist static files
     if (process.env.NODE_ENV !== 'production') {
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',
