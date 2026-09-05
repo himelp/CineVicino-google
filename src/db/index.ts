@@ -49,6 +49,17 @@ export async function getDb() {
   const dataDir = path.join(process.cwd(), 'data', 'pgdata');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
+  } else {
+    // Remove stale postmaster.pid if dev server was restarted or previously crashed
+    const pidFile = path.join(dataDir, 'postmaster.pid');
+    if (fs.existsSync(pidFile)) {
+      try {
+        fs.unlinkSync(pidFile);
+        console.log('🧹 Removed stale postmaster.pid from prior run');
+      } catch {
+        // ignore
+      }
+    }
   }
 
   pgliteInstance = new PGlite(dataDir);
