@@ -738,27 +738,39 @@ export class NationwideCinemaScraper {
   }
 
   /**
-   * Read stored cursor offset from site_settings (default 0)
+   * Read stored cursor offset from scraper_state table (default 0)
    */
   async getStoredCursor(): Promise<number> {
     try {
-      const res = await executeRawSql("SELECT value FROM site_settings WHERE key = 'last_scrape_offset'");
+      const res = await executeRawSql("SELECT last_scrape_offset FROM scraper_state WHERE id = 'default' LIMIT 1");
       if (res.rows && res.rows.length > 0) {
-        const val = parseInt(res.rows[0].value, 10);
+        const val = parseInt(res.rows[0].last_scrape_offset, 10);
+        return isNaN(val) || val < 0 ? 0 : val;
+      }
+      // Fallback to site_settings if scraper_state row not yet present
+      const fallbackRes = await executeRawSql("SELECT value FROM site_settings WHERE key = 'last_scrape_offset'");
+      if (fallbackRes.rows && fallbackRes.rows.length > 0) {
+        const val = parseInt(fallbackRes.rows[0].value, 10);
         return isNaN(val) || val < 0 ? 0 : val;
       }
     } catch (err: any) {
-      console.warn('[Scraper] Could not read last_scrape_offset from site_settings:', err.message);
+      console.warn('[Scraper] Could not read last_scrape_offset from scraper_state:', err.message);
     }
     return 0;
   }
 
   /**
-   * Persist cursor offset to site_settings
+   * Persist cursor offset to scraper_state and site_settings
    */
   async setStoredCursor(offset: number): Promise<void> {
     const cleanOffset = Math.max(0, Math.floor(offset));
     try {
+      await executeRawSql(
+        `INSERT INTO scraper_state (id, last_scrape_offset, updated_at)
+         VALUES ('default', $1, NOW())
+         ON CONFLICT (id) DO UPDATE SET last_scrape_offset = EXCLUDED.last_scrape_offset, updated_at = NOW()`,
+        [cleanOffset]
+      );
       await executeRawSql(
         `INSERT INTO site_settings (key, value)
          VALUES ('last_scrape_offset', $1)
@@ -766,7 +778,7 @@ export class NationwideCinemaScraper {
         [cleanOffset.toString()]
       );
     } catch (err: any) {
-      console.error('[Scraper] Could not save last_scrape_offset to site_settings:', err.message);
+      console.error('[Scraper] Could not save last_scrape_offset to scraper_state:', err.message);
     }
   }
 

@@ -243,6 +243,13 @@ export async function initDb() {
       sent_at TIMESTAMP NOT NULL DEFAULT NOW()
     );`,
     `CREATE INDEX IF NOT EXISTS idx_email_logs_recipient ON email_logs (recipient);`,
+
+    // 11. Scraper state table
+    `CREATE TABLE IF NOT EXISTS scraper_state (
+      id VARCHAR(64) PRIMARY KEY,
+      last_scrape_offset INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );`,
     `ALTER TABLE cinemas ALTER COLUMN id TYPE VARCHAR(128);`,
     `ALTER TABLE cinemas ALTER COLUMN chain TYPE VARCHAR(128);`,
     `ALTER TABLE movies ALTER COLUMN id TYPE VARCHAR(128);`,
@@ -325,6 +332,13 @@ async function seedDefaults() {
       [k, v]
     );
   }
+
+  // Initialize default row in scraper_state
+  await executeRawSql(
+    `INSERT INTO scraper_state (id, last_scrape_offset, updated_at)
+     VALUES ('default', 0, NOW())
+     ON CONFLICT (id) DO NOTHING`
+  );
 }
 
 // Graceful shutdown
