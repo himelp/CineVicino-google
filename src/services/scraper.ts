@@ -972,6 +972,20 @@ export class NationwideCinemaScraper {
     const cityNamesStr = targetCities.map(c => c.name).join(', ');
     notify('init', 'System', targetCities.length, `Scraping per ${targetCities.length} città selezionate: ${cityNamesStr}`);
 
+    // Ensure all targetCities exist in the cities table so foreign key references never fail
+    for (const c of targetCities) {
+      try {
+        await executeRawSql(
+          `INSERT INTO cities (id, slug, name, region, province, province_code, is_provincial_capital, lat, lng, geocode_status)
+           VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, 'complete')
+           ON CONFLICT (slug) DO UPDATE SET id = EXCLUDED.id`,
+          [c.id, c.slug, c.name, c.region || 'Italia', c.province || c.name, c.province_code || 'IT', c.lat, c.lng]
+        );
+      } catch (cErr: any) {
+        // Safe to ignore if already exists
+      }
+    }
+
     // Map for fast city lookup by slug
     const cityMap = new Map<string, CityTarget>();
     for (const c of targetCities) {
@@ -1068,6 +1082,16 @@ export class NationwideCinemaScraper {
       }
 
       const assignedCityId = cityTarget.id;
+      // Ensure city exists in table to avoid FK violation
+      try {
+        await executeRawSql(
+          `INSERT INTO cities (id, slug, name, region, province, province_code, is_provincial_capital, lat, lng, geocode_status)
+           VALUES ($1, $2, $3, 'Italia', $3, 'IT', FALSE, $4, $5, 'complete')
+           ON CONFLICT (id) DO NOTHING
+           ON CONFLICT (slug) DO NOTHING`,
+          [cityTarget.id, cityTarget.slug, cityTarget.name, cityTarget.lat, cityTarget.lng]
+        );
+      } catch {}
       citiesTouchedSet.add(assignedCityId);
 
       // Jitter lat/lng slightly so multiple cinemas in same city have distinct map pins

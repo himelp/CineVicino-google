@@ -965,28 +965,72 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
         (SELECT run_at FROM scrape_logs ORDER BY run_at DESC LIMIT 1) as last_scrape_time
     `);
 
-    res.json(stats.rows[0]);
+    // Include nationwide rotation cursor status
+    const scraperRotation = await cinemaScraper.getScraperCursorState(25);
+
+    res.json({
+      ...stats.rows[0],
+      scraper_rotation: scraperRotation
+    });
   } catch (err: any) {
     logger.error({ err }, 'Error in /api/admin/status');
     res.status(500).json({ error: 'Errore nel recupero dello stato di sistema' });
   }
 });
 
-// Admin Scraper: Run Real Cheerio Scrape (Strict rate limiting applied)
+// Admin Scraper: Run Real Cheerio Scrape with Optional Offset and Cursor Rotation
 app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const targetCity = (req.query.city as string) || req.body?.city;
-    const targetLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : req.body?.limit;
-    logger.info({ user: req.user!.email, targetCity, targetLimit }, 'Admin triggered real Cheerio cinema scrape');
+    const targetLimit = req.query.limit ? parseInt(req.query.limit as string, 10) : (req.body?.limit ? parseInt(req.body.limit, 10) : undefined);
+    const rawOffset = req.query.offset !== undefined ? req.query.offset : req.body?.offset;
+    const targetOffset = rawOffset !== undefined && rawOffset !== '' ? parseInt(rawOffset as string, 10) : undefined;
+    const advanceCursor = req.query.advance_cursor === 'true' || req.body?.advance_cursor === true || req.body?.rotate === true;
+
+    logger.info({ user: req.user!.email, targetCity, targetLimit, targetOffset, advanceCursor }, 'Admin triggered real Cheerio cinema scrape');
     const result = await cinemaScraper.executeFullScrape({
       useFirecrawl: req.body?.useFirecrawl === true,
       city: targetCity,
-      limit: targetLimit
+      limit: targetLimit,
+      offset: targetOffset,
+      advanceCursor
     });
-    res.json({ success: true, result });
+
+    const cursorState = await cinemaScraper.getScraperCursorState(targetLimit || 25);
+
+    res.json({
+      success: true,
+      result,
+      scraper_rotation: cursorState
+    });
   } catch (err: any) {
     logger.error({ err }, 'Error executing admin scrape');
     res.status(500).json({ error: 'Errore durante l\'esecuzione dello scraping', details: err?.message });
+  }
+});
+
+// Get Scraper Rotation Cursor Details
+app.get('/api/admin/scrape/cursor', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 25;
+    const cursor = await cinemaScraper.getScraperCursorState(limit);
+    res.json(cursor);
+  } catch (err: any) {
+    logger.error({ err }, 'Error fetching scraper cursor');
+    res.status(500).json({ error: 'Errore nel recupero dello stato di rotazione' });
+  }
+});
+
+// Update or Reset Scraper Rotation Cursor
+app.post('/api/admin/scrape/cursor', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const newOffset = typeof req.body?.offset === 'number' ? req.body.offset : parseInt(req.body?.offset || '0', 10);
+    await cinemaScraper.setStoredCursor(isNaN(newOffset) ? 0 : newOffset);
+    const cursor = await cinemaScraper.getScraperCursorState(25);
+    res.json({ success: true, cursor });
+  } catch (err: any) {
+    logger.error({ err }, 'Error updating scraper cursor');
+    res.status(500).json({ error: 'Errore nell\'aggiornamento dell\'offset' });
   }
 });
 

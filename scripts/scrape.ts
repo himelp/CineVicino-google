@@ -58,6 +58,8 @@ async function main() {
     console.log(`- Orari spettacoli attivi: ${result.showtimes_touched}`);
     console.log(`- Crediti Firecrawl consumati: ${result.firecrawl_credits_used}`);
     console.log('====================================================');
+
+    process.exit(0);
   } catch (error) {
     console.error('❌ Errore durante l\'esecuzione dello scraper:', error);
     process.exit(1);

@@ -91,6 +91,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [newMovieTitle, setNewMovieTitle] = useState('');
   const [newMovieDirector, setNewMovieDirector] = useState('');
 
+  // Scraper rotation parameters
+  const [scrapeTargetCity, setScrapeTargetCity] = useState('');
+  const [scrapeLimit, setScrapeLimit] = useState('25');
+  const [scrapeOffset, setScrapeOffset] = useState('');
+  const [scrapeAdvanceCursor, setScrapeAdvanceCursor] = useState(true);
+
   // Customization state
   const [customSettings, setCustomSettings] = useState<SiteSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -194,9 +200,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     ]);
 
     try {
+      const payload: any = { useFirecrawl };
+      if (scrapeTargetCity.trim()) payload.city = scrapeTargetCity.trim();
+      if (scrapeLimit) payload.limit = parseInt(scrapeLimit, 10);
+      if (scrapeOffset !== '') payload.offset = parseInt(scrapeOffset, 10);
+      payload.advance_cursor = scrapeAdvanceCursor;
+
       const res = await authFetch('/api/admin/scrape/run', {
         method: 'POST',
-        body: JSON.stringify({ useFirecrawl })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.success && data.result) {
@@ -216,6 +228,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       setScrapeConsole(prev => [...prev, `[ERRORE] ${err.message}`]);
     } finally {
       setIsScraping(false);
+    }
+  };
+
+  // Reset Scraper Cursor to 0
+  const handleResetCursor = async () => {
+    try {
+      const res = await authFetch('/api/admin/scrape/cursor', {
+        method: 'POST',
+        body: JSON.stringify({ offset: 0 })
+      });
+      if (res.ok) {
+        setScrapeOffset('');
+        loadStatus();
+      }
+    } catch (err) {
+      console.error('Failed to reset cursor', err);
     }
   };
 
@@ -554,6 +582,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                   </div>
                 </div>
 
+                {/* Nationwide Scraper Rotation Engine */}
+                <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-amber-400" />
+                      <span className="font-bold text-sm text-white">Rotazione Cursore Scraper</span>
+                    </div>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-semibold">
+                      Offset: {statusData?.scraper_rotation?.current_offset ?? 0} / {statusData?.scraper_rotation?.total_eligible_cities ?? 0} comuni
+                    </span>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[11px] text-neutral-400 mb-1">
+                      <span>Ciclo Nazionale Coperto</span>
+                      <span className="font-mono text-amber-400">{statusData?.scraper_rotation?.cycle_progress_percent ?? 0}%</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-neutral-800 overflow-hidden">
+                      <div 
+                        className="h-full bg-amber-500 rounded-full transition-all"
+                        style={{ width: `${statusData?.scraper_rotation?.cycle_progress_percent ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {statusData?.scraper_rotation?.current_batch_cities && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[11px] uppercase tracking-wider text-neutral-400 font-semibold block">
+                        Batch in corso ({statusData.scraper_rotation.current_batch_cities.length} città):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                        {statusData.scraper_rotation.current_batch_cities.map((c: any) => (
+                          <span key={c.slug} className="text-[10px] px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-300">
+                            {c.name} {c.province_code ? `(${c.province_code})` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {statusData?.scraper_rotation?.next_batch_cities && statusData.scraper_rotation.next_batch_cities.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t border-neutral-900">
+                      <span className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold block">
+                        Prossimo turno rotazione (Offset {statusData.scraper_rotation.next_offset}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                        {statusData.scraper_rotation.next_batch_cities.slice(0, 10).map((c: any) => (
+                          <span key={c.slug} className="text-[10px] px-2 py-0.5 rounded-md bg-neutral-900/60 border border-neutral-800/60 text-neutral-400">
+                            {c.name} {c.province_code ? `(${c.province_code})` : ''}
+                          </span>
+                        ))}
+                        {statusData.scraper_rotation.next_batch_cities.length > 10 && (
+                          <span className="text-[10px] text-neutral-500 py-0.5">
+                            +{statusData.scraper_rotation.next_batch_cities.length - 10} altri...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           )}
@@ -561,18 +650,88 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           {/* TAB 2: SCRAPE */}
           {activeTab === 'scrape' && (
             <div className="space-y-6">
+              {/* Rotation Overview Card in Scrape Tab */}
               <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
                   <div>
-                    <h3 className="text-base font-bold text-white">
-                      Esecuzione Manuale Scraper Nazionale
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-base font-bold text-white">
+                        Rotazione Continua Copertura Nazionale
+                      </h3>
+                    </div>
                     <p className="text-xs text-neutral-400 mt-1">
-                      Scansiona aggregatori (MYmovies, ComingSoon, CinemaTimes) e catene (UCI, The Space, Notorious, Arcadia, Anteo).
+                      {statusData?.scraper_rotation?.cycle_description || 'Il cron giornaliero avanza automaticamente il batch di città ogni esecuzione, coprendo tutta Italia a rotazione.'}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleResetCursor}
+                      title="Resetta il cursore all'inizio dell'elenco"
+                      className="px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-[11px] font-semibold text-neutral-300 transition-colors cursor-pointer"
+                    >
+                      Resetta Cursore (0)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scraper Configuration Form */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-medium text-neutral-400 mb-1">
+                      Città Specifica (opzionale)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="es. Roma, Milano, Napoli"
+                      value={scrapeTargetCity}
+                      onChange={e => setScrapeTargetCity(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-neutral-400 mb-1">
+                      Dimensione Batch (Città)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={scrapeLimit}
+                      onChange={e => setScrapeLimit(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-neutral-400 mb-1">
+                      Offset Manuale (vuoto = memorizzato: {statusData?.scraper_rotation?.current_offset ?? 0})
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder={`Cursore: ${statusData?.scraper_rotation?.current_offset ?? 0}`}
+                      value={scrapeOffset}
+                      onChange={e => setScrapeOffset(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-neutral-900">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={scrapeAdvanceCursor}
+                        onChange={e => setScrapeAdvanceCursor(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-neutral-800 border-neutral-700"
+                      />
+                      <span>Avanza cursore in site_settings dopo lo scrape</span>
+                    </label>
+
                     <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer">
                       <input
                         type="checkbox"
@@ -582,17 +741,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       />
                       <span>Usa Firecrawl per pagine JS</span>
                     </label>
-
-                    <button
-                      onClick={handleTriggerScrape}
-                      disabled={isScraping}
-                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      <Play className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
-                      <span>{isScraping ? 'Scraping in corso...' : 'Avvia Scrape Ora'}</span>
-                    </button>
                   </div>
+
+                  <button
+                    onClick={handleTriggerScrape}
+                    disabled={isScraping}
+                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Play className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
+                    <span>{isScraping ? 'Scraping in corso...' : 'Avvia Scrape Batch'}</span>
+                  </button>
                 </div>
+
+                {/* Cities in Current Batch Badge View */}
+                {statusData?.scraper_rotation?.current_batch_cities && !scrapeTargetCity && (
+                  <div className="p-3 rounded-xl bg-neutral-900/60 border border-neutral-800/80 text-xs space-y-1.5">
+                    <span className="text-[11px] font-semibold text-neutral-400 block uppercase tracking-wider">
+                      Città target nel batch odierno (Offset {statusData.scraper_rotation.current_offset}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                      {statusData.scraper_rotation.current_batch_cities.map((c: any) => (
+                        <span key={c.slug} className="text-[10px] px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-amber-200">
+                          {c.name} {c.province_code ? `(${c.province_code})` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Scrape Terminal Window */}
                 {scrapeConsole.length > 0 && (
