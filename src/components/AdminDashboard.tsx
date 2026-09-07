@@ -3,7 +3,7 @@ import {
   Shield, Activity, Database, RefreshCw, Play, 
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
-  Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap
+  Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe
 } from 'lucide-react';
 import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings } from '../types';
 
@@ -89,6 +89,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     settings: SiteSettings;
   } | null>(null);
   const [contentSearch, setContentSearch] = useState('');
+
+  // GeoIP state
+  const [updatingGeoip, setUpdatingGeoip] = useState(false);
+  const [geoipLicenseInput, setGeoipLicenseInput] = useState('');
+  const [geoipMessage, setGeoipMessage] = useState('');
 
   // Add cinema/movie form toggles
   const [showAddCinema, setShowAddCinema] = useState(false);
@@ -312,6 +317,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       console.error(e);
     } finally {
       setTestingScrapers(false);
+    }
+  };
+
+  // Update or download MaxMind GeoLite2 database
+  const handleUpdateGeoip = async () => {
+    try {
+      setUpdatingGeoip(true);
+      setGeoipMessage('');
+      const res = await authFetch('/api/admin/geoip/update', {
+        method: 'POST',
+        body: JSON.stringify({ license_key: geoipLicenseInput.trim() || undefined })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setGeoipMessage(`✅ ${data.message || 'Database GeoLite2 aggiornato'}`);
+        loadStatus();
+      } else {
+        setGeoipMessage(`❌ ${data.error || 'Errore durante l\'aggiornamento'}`);
+      }
+    } catch (err: any) {
+      setGeoipMessage(`❌ ${err.message}`);
+    } finally {
+      setUpdatingGeoip(false);
     }
   };
 
@@ -702,6 +730,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       </div>
                     );
                   })()}
+                </div>
+
+                {/* MaxMind GeoLite2-City Database Engine */}
+                <div className="p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-amber-400" />
+                      <span className="font-bold text-sm text-white">MaxMind GeoLite2-City — Auto-Rilevamento IP</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {statusData?.geoip?.is_active ? (
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Database Locale Attivo
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Fallback Attivo (Download Richiesto)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Database geografico IP self-hosted (.mmdb). Rileva istantaneamente la città del visitatore tramite intestazione <code className="text-amber-400">CF-Connecting-IP</code> di Cloudflare senza costi API né limiti.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-neutral-900 p-2.5 rounded-xl">
+                      <span className="text-neutral-400 block text-[11px]">Dimensione file database:</span>
+                      <span className="font-bold text-white font-mono">
+                        {statusData?.geoip?.is_active ? `${statusData?.geoip?.database_size_mb} MB` : 'Non presente'}
+                      </span>
+                    </div>
+                    <div className="bg-neutral-900 p-2.5 rounded-xl">
+                      <span className="text-neutral-400 block text-[11px]">Header Cloudflare rilevato:</span>
+                      <span className="font-mono text-emerald-400 font-medium">
+                        {statusData?.geoip?.cf_connecting_ip_header === 'present' ? 'CF-Connecting-IP Presente' : 'Non in proxy Cloudflare'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-neutral-900/90 rounded-xl border border-neutral-800 space-y-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={geoipLicenseInput}
+                        onChange={(e) => setGeoipLicenseInput(e.target.value)}
+                        placeholder="MaxMind License Key (se non in .env)..."
+                        className="flex-1 bg-black/70 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUpdateGeoip}
+                        disabled={updatingGeoip}
+                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${updatingGeoip ? 'animate-spin' : ''}`} />
+                        <span>{updatingGeoip ? 'Download in corso...' : 'Aggiorna Database GeoLite2'}</span>
+                      </button>
+                    </div>
+                    {geoipMessage && (
+                      <div className="text-xs font-mono text-neutral-300 mt-1">{geoipMessage}</div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Database Engine Status */}

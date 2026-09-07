@@ -16,3 +16,6 @@ data/test_pgdata/
 data/test_pgdata/*
 *.pgdata
 *.pgdata/
+data/geoip/*.mmdb
+data/geoip/*.tar.gz
+data/geoip/*.gz

@@ -11,6 +11,14 @@ import { cinemaScraper } from './src/services/scraper';
 import { checkTmdb, checkFirecrawl, checkScraperSources, getDiagnosticsSummary } from './src/services/diagnostics';
 import { runBatchGeocoding } from './src/services/geocoder';
 import {
+  initGeoIp,
+  extractClientIp,
+  detectCityFromIp,
+  downloadGeoLite2,
+  getGeoIpStatus,
+  maskIp
+} from './src/services/geoip';
+import {
   hashPassword,
   verifyPassword,
   generateSessionToken,
@@ -41,8 +49,8 @@ const app = express();
 const PORT = 3000;
 const ADMIN_SLUG = process.env.ADMIN_SLUG || 'gestione-riservata-cv';
 
-// Trust front-end reverse proxy / Cloud Run ingress for IP and protocol resolution
-app.set('trust proxy', 1);
+// Trust front-end reverse proxy / Cloudflare Tunnel / Nginx for real client IP
+app.set('trust proxy', true);
 
 // 1. Startup validation (fail-fast)
 try {
@@ -349,6 +357,75 @@ app.get('/api/nearby', async (req: Request, res: Response) => {
   } catch (err: any) {
     logger.error({ err }, 'Error in /api/nearby');
     res.status(500).json({ error: 'Errore durante la geolocalizzazione' });
+  }
+});
+
+// Auto-detect visitor's city using MaxMind GeoLite2 & Cloudflare CF-Connecting-IP
+app.get('/api/geo/my-city', async (req: Request, res: Response) => {
+  try {
+    const clientIp = extractClientIp(req);
+    const result = await detectCityFromIp(clientIp);
+
+    // If a city is detected, return full details
+    if (result && result.city_slug) {
+      return res.json({
+        success: true,
+        city_slug: result.city_slug,
+        city_name: result.city_name,
+        province_code: result.province_code,
+        region: result.region,
+        lat: result.lat,
+        lng: result.lng,
+        distance_km: result.distance_km,
+        confidence: result.confidence || 'high',
+        method: result.method || 'maxmind_geolite2',
+        client_ip: result.client_ip
+      });
+    }
+
+    // IP cannot be resolved (localhost, private ranges, VPNs/foreign country)
+    return res.json({
+      success: false,
+      city_slug: null,
+      reason: result?.reason || 'unresolved',
+      client_ip: result?.client_ip || ''
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/geo/my-city');
+    res.status(500).json({ success: false, city_slug: null, error: 'Errore durante la geolocalizzazione IP' });
+  }
+});
+
+// GeoIP database status endpoint (Diagnostics)
+app.get('/api/geo/status', (req: Request, res: Response) => {
+  const status = getGeoIpStatus();
+  const clientIp = extractClientIp(req);
+  res.json({
+    ...status,
+    detected_client_ip: maskIp(clientIp),
+    cf_connecting_ip_header: req.headers['cf-connecting-ip'] ? 'present' : 'absent',
+    x_forwarded_for_header: req.headers['x-forwarded-for'] ? 'present' : 'absent'
+  });
+});
+
+// Trigger GeoLite2 download or update (Admin only)
+app.post('/api/admin/geoip/update', requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const licenseKey = (req.body?.license_key as string) || process.env.MAXMIND_LICENSE_KEY;
+    if (!licenseKey) {
+      return res.status(400).json({
+        error: 'MAXMIND_LICENSE_KEY non configurata. Specificala nel payload o nel file .env.'
+      });
+    }
+
+    const result = await downloadGeoLite2(licenseKey);
+    if (result.success) {
+      return res.json({ success: true, message: result.message, status: getGeoIpStatus() });
+    } else {
+      return res.status(500).json({ success: false, error: result.message });
+    }
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -991,6 +1068,7 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
       tmdb: diagnostics.tmdb,
       firecrawl: diagnostics.firecrawl,
       scrapers_health: diagnostics.scrapers,
+      geoip: getGeoIpStatus(),
       database: {
         records: {
           cities: stats.rows[0]?.total_cities || 0,
@@ -1544,6 +1622,12 @@ async function startServer() {
   try {
     // Initialize PostgreSQL schema, tables, indexes, and defaults
     await initDb();
+
+    // Initialize MaxMind GeoLite2-City reader if database exists
+    await initGeoIp().catch((err: any) => logger.warn({ err: err.message }, 'GeoIP init skipped on boot'));
+    if (process.env.MAXMIND_LICENSE_KEY && !getGeoIpStatus().is_active) {
+      downloadGeoLite2().catch((err: any) => logger.warn({ err: err.message }, 'Background GeoLite2 download failed'));
+    }
 
     // In development, hook up Vite middleware; in production, serve dist static files
     if (process.env.NODE_ENV !== 'production') {

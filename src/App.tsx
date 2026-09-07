@@ -11,6 +11,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { CookieBanner } from './components/CookieBanner';
 import { PrivacyModal } from './components/PrivacyModal';
 import { LoginModal } from './components/LoginModal';
+import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
 import { Language, translations } from './utils/i18n';
 import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight } from 'lucide-react';
@@ -52,9 +53,12 @@ export default function App() {
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [movieSearchQuery, setMovieSearchQuery] = useState<string>('');
 
-  // Geolocation & Nearby state
+  // Geolocation & Auto-detection state
   const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [isPreciseLocating, setIsPreciseLocating] = useState<boolean>(false);
   const [nearbyCinemas, setNearbyCinemas] = useState<(Cinema & { distance_km: number })[]>([]);
+  const [autoDetectInfo, setAutoDetectInfo] = useState<AutoDetectInfo | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(false);
 
   // Favorites & User state
   const [favoriteMovieIds, setFavoriteMovieIds] = useState<string[]>(() => {
@@ -151,14 +155,61 @@ export default function App() {
     localStorage.setItem('cinevicino_fav_cinemas', JSON.stringify(favoriteCinemaIds));
   }, [favoriteCinemaIds]);
 
-  // Geolocation Handler
-  const handleLocateMe = () => {
-    if (!navigator.geolocation) {
-      alert('La geolocalizzazione non è supportata dal tuo browser.');
+  // Auto-detect visitor's city on page load via /api/geo/my-city
+  useEffect(() => {
+    // Respect explicit direct navigation to a city route (e.g. /citta/milano)
+    if (window.location.pathname.startsWith('/citta/') || window.location.pathname.startsWith('/city/')) {
       return;
     }
 
-    setIsLocating(true);
+    async function detectVisitorCity() {
+      try {
+        const res = await fetch('/api/geo/my-city');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.city_slug) {
+          // Fetch the city and its cinemas immediately
+          const cityRes = await fetch(`/api/cities/${data.city_slug}`);
+          if (cityRes.ok) {
+            const cityData = await cityRes.json();
+            if (cityData.city) {
+              setActiveCity(cityData.city);
+              setAutoDetectInfo({
+                detected: true,
+                city_slug: data.city_slug,
+                city_name: data.city_name || cityData.city.name,
+                province_code: data.province_code || cityData.city.province_code,
+                region: data.region || cityData.city.region,
+                method: 'ip',
+                confidence: data.confidence || 'high',
+                distance_km: data.distance_km
+              });
+
+              if (cityData.cinemas && cityData.cinemas.length > 0) {
+                setNearbyCinemas(cityData.cinemas.map((c: any) => ({ ...c, distance_km: 0 })));
+              } else if (cityData.nearest_cinemas && cityData.nearest_cinemas.length > 0) {
+                setNearbyCinemas(cityData.nearest_cinemas);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Fall back gracefully to manual search without blocking
+        console.debug('IP geolocation check skipped or unresolvable', err);
+      }
+    }
+
+    detectVisitorCity();
+  }, []);
+
+  // Precise Geolocation Handler (navigator.geolocation GPS/Wi-Fi)
+  const handlePreciseLocate = () => {
+    if (!navigator.geolocation) {
+      alert('La geolocalizzazione GPS/Wi-Fi non è supportata dal tuo browser.');
+      return;
+    }
+
+    setIsPreciseLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -168,29 +219,68 @@ export default function App() {
             const data = await res.json();
             if (data.closest_city) {
               setActiveCity(data.closest_city);
+              setAutoDetectInfo({
+                detected: true,
+                city_slug: data.closest_city.slug,
+                city_name: data.closest_city.name,
+                province_code: data.closest_city.province_code,
+                region: data.closest_city.region,
+                method: 'gps',
+                confidence: 'high',
+                distance_km: data.closest_city.distance_km || 0
+              });
+              setBannerDismissed(false);
             }
             if (data.cinemas) {
               setNearbyCinemas(data.cinemas);
             }
           }
         } catch (err) {
-          console.error('Failed to resolve nearby cinemas', err);
+          console.error('Failed to resolve GPS coordinates', err);
         } finally {
-          setIsLocating(false);
+          setIsPreciseLocating(false);
         }
       },
       (err) => {
-        console.warn('Geolocation denied or unavailable, using Roma default anchor', err);
-        setIsLocating(false);
-        // Fallback default anchor to Roma
-        fetch('/api/cities/roma')
-          .then(r => r.json())
-          .then(data => {
-            if (data.city) setActiveCity(data.city);
-          });
+        console.warn('GPS location denied or timed out', err);
+        setIsPreciseLocating(false);
       },
-      { timeout: 8000 }
+      { timeout: 10000, enableHighAccuracy: true }
     );
+  };
+
+  // Handler for city selection within the AutoCityBanner dropdown
+  const handleBannerSelectCity = async (city: City) => {
+    setActiveCity(city);
+    setAutoDetectInfo({
+      detected: true,
+      city_slug: city.slug,
+      city_name: city.name,
+      province_code: city.province_code,
+      region: city.region,
+      method: 'gps',
+      confidence: 'high',
+      distance_km: 0
+    });
+
+    try {
+      const res = await fetch(`/api/cities/${city.slug}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.cinemas && data.cinemas.length > 0) {
+          setNearbyCinemas(data.cinemas.map((c: any) => ({ ...c, distance_km: 0 })));
+        } else if (data.nearest_cinemas) {
+          setNearbyCinemas(data.nearest_cinemas);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // Standard Hero Geolocation Handler (can delegate to handlePreciseLocate)
+  const handleLocateMe = () => {
+    handlePreciseLocate();
   };
 
   // Toggle Favorite Movie
@@ -392,6 +482,18 @@ export default function App() {
         user={user}
         onOpenLogin={() => setShowLogin(true)}
       />
+
+      {/* Auto-Detected Visitor City Pill / Banner */}
+      {autoDetectInfo && !bannerDismissed && (
+        <AutoCityBanner
+          autoDetectInfo={autoDetectInfo}
+          activeCity={activeCity}
+          onSelectCity={handleBannerSelectCity}
+          onPreciseLocate={handlePreciseLocate}
+          isPreciseLocating={isPreciseLocating}
+          onDismiss={() => setBannerDismissed(true)}
+        />
+      )}
 
       {/* 2. Main Viewport Router */}
       <main className="flex-1">

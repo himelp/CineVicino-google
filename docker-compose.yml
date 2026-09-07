@@ -16,6 +16,9 @@ services:
       - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}
       - EMAIL_ALERT_API_KEY=${EMAIL_ALERT_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
+    volumes:
+      - ./data/geoip:/app/data/geoip
     depends_on:
       postgres:
         condition: service_healthy
