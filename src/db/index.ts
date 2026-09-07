@@ -6,6 +6,7 @@ import * as schema from './schema';
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const { Pool } = pg;
 
@@ -294,35 +295,42 @@ export async function initDb() {
 // Seed default settings and initial admin user with bcrypt password
 async function seedDefaults() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@cinevicino.it').toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'CineVicinoAdmin2026!';
+  const explicitAdminPass = process.env.ADMIN_PASSWORD;
 
-  // Check if admin user exists or update password
-  const adminHash = await bcrypt.hash(adminPassword, 10);
-  const existingAdmin = await executeRawSql('SELECT id FROM users WHERE LOWER(email) = $1', [adminEmail]);
+  // Check if admin user exists
+  const existingAdmin = await executeRawSql('SELECT id, password_hash FROM users WHERE LOWER(email) = $1', [adminEmail]);
   if (existingAdmin.rows && existingAdmin.rows.length > 0) {
-    await executeRawSql('UPDATE users SET password_hash = $1, is_admin = TRUE WHERE LOWER(email) = $2', [adminHash, adminEmail]);
+    if (explicitAdminPass) {
+      const adminHash = await bcrypt.hash(explicitAdminPass, 10);
+      await executeRawSql('UPDATE users SET password_hash = $1, is_admin = TRUE WHERE LOWER(email) = $2', [adminHash, adminEmail]);
+    }
   } else {
+    const adminPassword = explicitAdminPass || crypto.randomBytes(16).toString('hex');
+    const adminHash = await bcrypt.hash(adminPassword, 10);
     await executeRawSql(
       `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
        VALUES ($1, $2, $3, $4, TRUE, NOW())`,
       ['usr-admin-initial', adminEmail, 'Amministratore CineVicino', adminHash]
     );
+    if (!explicitAdminPass) {
+      console.log(`🔐 Generated random admin password for ${adminEmail}: ${adminPassword}`);
+    }
   }
 
-  // Seed default demo user for instant testing
-  const demoEmail = 'mario.rossi@cinefilo.it';
-  const demoHash = await bcrypt.hash('CinefiloPass2026!', 10);
-  const existingDemo = await executeRawSql('SELECT id FROM users WHERE LOWER(email) = $1', [demoEmail]);
-  if (existingDemo.rows && existingDemo.rows.length > 0) {
-    await executeRawSql('UPDATE users SET password_hash = $1 WHERE LOWER(email) = $2', [demoHash, demoEmail]);
-  } else {
-    await executeRawSql(
-      `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
-       VALUES ($1, $2, $3, $4, FALSE, NOW())`,
-      ['usr-demo-cinefilo', demoEmail, 'Mario Rossi', demoHash]
-    );
+  // Seed default demo user for instant testing in local development only
+  if (process.env.NODE_ENV !== 'production') {
+    const demoEmail = 'mario.rossi@cinefilo.it';
+    const demoHash = await bcrypt.hash('CinefiloPass2026!', 10);
+    const existingDemo = await executeRawSql('SELECT id FROM users WHERE LOWER(email) = $1', [demoEmail]);
+    if (!existingDemo.rows || existingDemo.rows.length === 0) {
+      await executeRawSql(
+        `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
+         VALUES ($1, $2, $3, $4, FALSE, NOW())`,
+        ['usr-demo-cinefilo', demoEmail, 'Mario Rossi', demoHash]
+      );
+    }
   }
-  console.log(`👤 Verified Admin (${adminEmail}) and Demo (${demoEmail}) accounts.`);
+  console.log(`👤 Verified Admin account (${adminEmail}).`);
 
   // Check site settings
   const defaultSettings = [

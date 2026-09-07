@@ -125,10 +125,12 @@ JWT_SECRET=your_jwt_secret_hex_32
 # Admin dashboard credentials
 ADMIN_EMAIL=admin@cinevicino.it
 ADMIN_PASSWORD=your_secure_admin_password
+ADMIN_SLUG=gestione-riservata-cv
 
-# External API Keys (Optional)
+# External Services & GeoIP (Optional)
 TMDB_API_KEY=your_tmdb_api_key_v3
 FIRECRAWL_API_KEY=your_firecrawl_api_key
+MAXMIND_LICENSE_KEY=your_maxmind_license_key
 ```
 
 ---
@@ -166,23 +168,49 @@ docker compose restart nginx
 
 ---
 
-### Step 5: Configure Daily Scraper in Crontab (Daily at 12:05)
+### Step 5: Configure MaxMind GeoLite2-City Auto-Detection (Optional but Recommended)
 
-To keep all Italian showtimes and ticketing links fresh, schedule the nationwide scraper in host cron:
+CineVicino includes built-in visitor city auto-detection powered by a local self-hosted MaxMind GeoLite2-City binary database (`.mmdb`), resolving visitor coordinates at 0ms latency with zero API per-call costs. When paired with Cloudflare, it automatically extracts the visitor's real client IP from `CF-Connecting-IP`.
+
+1. **Sign Up for a Free MaxMind Account**:
+   - Register at [https://www.maxmind.com/en/geolite2/signup](https://www.maxmind.com/en/geolite2/signup).
+2. **Generate a Free License Key**:
+   - Navigate to **Account** -> **Manage License Keys** -> **Generate new license key**.
+3. **Set the Key in `.env`**:
+   ```ini
+   MAXMIND_LICENSE_KEY=your_license_key_here
+   ```
+4. **Initial Download & Persistent Volume**:
+   - The database auto-downloads on first visitor request or can be downloaded manually:
+   ```bash
+   docker compose exec -T app npx tsx scripts/update-geoip.ts
+   ```
+   The database (`GeoLite2-City.mmdb`, ~70MB) is persistently stored in the `./data/geoip/` volume mount across container rebuilds.
+5. **Admin Diagnostics**:
+   - You can inspect database status, file size, Cloudflare header presence, or trigger updates anytime from the Admin Diagnostics panel at `https://yourdomain.it/gestione-riservata-cv`.
+
+---
+
+### Step 6: Configure Scheduled Cron Jobs (Daily Scraper & Weekly GeoIP Update)
+
+To keep all Italian showtimes fresh and ensure GeoLite2 IP mappings remain accurate (MaxMind releases updates twice weekly), add both jobs to your host crontab:
 
 ```bash
 crontab -e
 ```
 
-Add this line:
+Add these lines:
 ```cron
 # Run CineVicino nationwide cinema scraper every day at 12:05 PM
 5 12 * * * cd /home/ubuntu/cinevicino && docker compose exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1
+
+# Refresh MaxMind GeoLite2-City database every Sunday at 03:00 AM
+0 3 * * 0 cd /home/ubuntu/cinevicino && docker compose exec -T app npx tsx scripts/update-geoip.ts >> /var/log/cinevicino-geoip.log 2>&1
 ```
 
 ---
 
-### Step 6: Initial City Seeding (One-time)
+### Step 7: Initial City Seeding (One-time)
 
 Populate all 7,894 Italian comuni and coordinates into the database:
 
@@ -190,4 +218,4 @@ Populate all 7,894 Italian comuni and coordinates into the database:
 docker compose exec -T app npx tsx scripts/seed-cities.ts
 ```
 
-Your CineVicino instance is now fully operational with automated updates, official ticketing outbound links, and SSL encryption!
+Your CineVicino instance is now fully operational with automated updates, official ticketing outbound links, visitor city auto-detection, and SSL encryption!

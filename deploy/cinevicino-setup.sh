@@ -392,8 +392,10 @@ CUR_POSTGRES_PASS="$(get_env_val "POSTGRES_PASSWORD")"
 CUR_POSTGRES_DB="$(get_env_val "POSTGRES_DB")"
 CUR_ADMIN_EMAIL="$(get_env_val "ADMIN_EMAIL")"
 CUR_ADMIN_PASSWORD="$(get_env_val "ADMIN_PASSWORD")"
+CUR_ADMIN_SLUG="$(get_env_val "ADMIN_SLUG")"
 CUR_TMDB_API_KEY="$(get_env_val "TMDB_API_KEY")"
 CUR_FIRECRAWL_API_KEY="$(get_env_val "FIRECRAWL_API_KEY")"
+CUR_MAXMIND_LICENSE_KEY="$(get_env_val "MAXMIND_LICENSE_KEY")"
 CUR_EMAIL_ALERT_API_KEY="$(get_env_val "EMAIL_ALERT_API_KEY")"
 
 NEW_JWT_SECRET="${CUR_JWT_SECRET:-$(generate_secret_hex 32)}"
@@ -402,6 +404,7 @@ NEW_POSTGRES_PASS="${CUR_POSTGRES_PASS:-$(generate_password)}"
 NEW_POSTGRES_DB="${CUR_POSTGRES_DB:-cinevicino}"
 NEW_ADMIN_EMAIL="${CUR_ADMIN_EMAIL:-admin@cinevicino.it}"
 NEW_ADMIN_PASSWORD="${CUR_ADMIN_PASSWORD:-$(generate_password)}"
+NEW_ADMIN_SLUG="${CUR_ADMIN_SLUG:-gestione-riservata-cv}"
 NEW_DATABASE_URL="postgres://${NEW_POSTGRES_USER}:${NEW_POSTGRES_PASS}@postgres:5432/${NEW_POSTGRES_DB}"
 
 # Optional API keys: if missing and interactive terminal, offer prompt
@@ -413,6 +416,11 @@ fi
 if [ -z "${CUR_FIRECRAWL_API_KEY}" ] && [ -t 0 ]; then
   read -r -p "Enter Firecrawl API key (optional, press Enter to skip): " INPUT_FC || true
   CUR_FIRECRAWL_API_KEY="${INPUT_FC:-}"
+fi
+
+if [ -z "${CUR_MAXMIND_LICENSE_KEY}" ] && [ -t 0 ]; then
+  read -r -p "Enter MaxMind License Key for GeoIP auto-city detection (free at maxmind.com, press Enter to skip): " INPUT_MM || true
+  CUR_MAXMIND_LICENSE_KEY="${INPUT_MM:-}"
 fi
 
 # Write updated .env idempotently
@@ -436,10 +444,12 @@ DATABASE_URL="${NEW_DATABASE_URL}"
 JWT_SECRET="${NEW_JWT_SECRET}"
 ADMIN_EMAIL="${NEW_ADMIN_EMAIL}"
 ADMIN_PASSWORD="${NEW_ADMIN_PASSWORD}"
+ADMIN_SLUG="${NEW_ADMIN_SLUG}"
 
 # External Services
 TMDB_API_KEY="${CUR_TMDB_API_KEY}"
 FIRECRAWL_API_KEY="${CUR_FIRECRAWL_API_KEY}"
+MAXMIND_LICENSE_KEY="${CUR_MAXMIND_LICENSE_KEY}"
 EMAIL_ALERT_API_KEY="${CUR_EMAIL_ALERT_API_KEY}"
 EOF
 
@@ -618,7 +628,7 @@ echo -e "${BOLD}Public Website URL:${NC}       https://${DOMAIN}"
 echo -e "${BOLD}Local Host Fallback:${NC}      http://127.0.0.1:${LOCAL_PORT}"
 echo -e "${BOLD}Cloudflare Tunnel:${NC}        ${CINE_TUNNEL_NAME} (ID: ${CINE_TUNNEL_ID})"
 echo -e "${BOLD}Architecture Built:${NC}       ${ARCH_RAW} (${ARCH})"
-echo -e "${BOLD}Admin Access Dashboard:${NC}   https://${DOMAIN}/admin"
+echo -e "${BOLD}Admin Access Dashboard:${NC}   https://${DOMAIN}/${NEW_ADMIN_SLUG}"
 echo -e "${BOLD}Admin Email:${NC}              ${NEW_ADMIN_EMAIL}"
 echo -e "${BOLD}Admin Password:${NC}           ${NEW_ADMIN_PASSWORD}"
 echo -e "${GREEN}------------------------------------------------------------------${NC}"
@@ -627,5 +637,12 @@ echo "  View container status:   ${DOCKER_COMPOSE} ps"
 echo "  View live logs:          ${DOCKER_COMPOSE} logs -f"
 echo "  Restart services:        ${DOCKER_COMPOSE} restart"
 echo "  Run national scrape:     ${DOCKER_COMPOSE} exec app npx tsx scripts/scrape.ts"
+echo "  Update GeoIP database:   ${DOCKER_COMPOSE} exec app npx tsx scripts/update-geoip.ts"
+echo ""
+echo "Recommended Cron Jobs (add via 'crontab -e'):"
+echo "  # Daily nationwide showtime scraper at 12:05"
+echo "  5 12 * * * cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1"
+echo "  # Weekly GeoLite2-City database refresh (Sundays at 03:00)"
+echo "  0 3 * * 0 cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/update-geoip.ts >> /var/log/cinevicino-geoip.log 2>&1"
 echo -e "${GREEN}==================================================================${NC}"
 echo ""

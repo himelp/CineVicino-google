@@ -109,12 +109,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
     }
   };
 
-  const handleQuickFill = (targetEmail: string, targetPass: string) => {
-    setEmail(targetEmail);
-    setPassword(targetPass);
-    setErrorMsg('');
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto min-h-[100dvh]">
       <div 
@@ -219,30 +213,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
             >
               {loading ? 'Accesso in corso...' : 'Accedi'}
             </button>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-              <div className="relative flex justify-center text-[10px] uppercase text-neutral-500 bg-[#0a0a0a] px-3 font-mono tracking-widest">oppure credenziali test</div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-left">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('mario.rossi@cinefilo.it', 'CinefiloPass2026!')}
-                className="min-h-[44px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors active:scale-95 cursor-pointer"
-              >
-                <span className="block font-semibold text-white">Utente Demo</span>
-                <span className="text-[10px] text-neutral-500 font-mono truncate block">mario.rossi</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin@cinevicino.it', 'CineVicinoAdmin2026!')}
-                className="min-h-[44px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 text-[11px] border border-white/10 transition-colors active:scale-95 cursor-pointer"
-              >
-                <span className="block font-semibold text-[#D4AF37]">Admin Test</span>
-                <span className="text-[10px] text-neutral-500 font-mono truncate block">admin@cinevicino</span>
-              </button>
-            </div>
           </form>
         )}
 
