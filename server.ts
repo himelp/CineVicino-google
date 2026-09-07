@@ -8,6 +8,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { initDb, executeRawSql, closeDb } from './src/db/index';
 import { cinemaScraper } from './src/services/scraper';
+import { checkTmdb, checkFirecrawl, checkScraperSources, getDiagnosticsSummary } from './src/services/diagnostics';
 import { runBatchGeocoding } from './src/services/geocoder';
 import {
   hashPassword,
@@ -96,12 +97,12 @@ const authLimiter = rateLimit({
 });
 
 const scraperLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 3,
+  windowMs: 5 * 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   validate: false,
-  message: { error: 'Too Many Requests', message: 'Limite esecuzione scraper raggiunto. Massimo 3 esecuzioni ogni 10 minuti.' }
+  message: { error: 'Too Many Requests', message: 'Limite esecuzione scraper raggiunto. Massimo 60 esecuzioni ogni 5 minuti.' }
 });
 
 app.use('/api/', globalApiLimiter);
@@ -965,16 +966,96 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
         (SELECT run_at FROM scrape_logs ORDER BY run_at DESC LIMIT 1) as last_scrape_time
     `);
 
-    // Include nationwide rotation cursor status
+    // 1. Fetch current last_scrape_offset from scraper_state
+    const lastScrapeOffset = await cinemaScraper.getStoredCursor();
+    const stateRowRes = await executeRawSql(
+      "SELECT last_scrape_offset, updated_at FROM scraper_state WHERE id = 'default' LIMIT 1"
+    );
+    const lastScrapeUpdatedAt = stateRowRes.rows?.[0]?.updated_at || null;
+
+    // 2. Fetch list of recently covered cities
+    const recentlyCoveredCities = await cinemaScraper.getRecentlyCoveredCities(25);
+
+    // 3. Include nationwide rotation cursor status
     const scraperRotation = await cinemaScraper.getScraperCursorState(25);
+
+    // 4. Check external APIs and scrapers health
+    const forceRefresh = req.query.refresh === 'true';
+    const diagnostics = await getDiagnosticsSummary(forceRefresh);
 
     res.json({
       ...stats.rows[0],
-      scraper_rotation: scraperRotation
+      last_scrape_offset: lastScrapeOffset,
+      last_scrape_offset_updated_at: lastScrapeUpdatedAt,
+      recently_covered_cities: recentlyCoveredCities,
+      tmdb: diagnostics.tmdb,
+      firecrawl: diagnostics.firecrawl,
+      scrapers_health: diagnostics.scrapers,
+      database: {
+        records: {
+          cities: stats.rows[0]?.total_cities || 0,
+          cinemas: stats.rows[0]?.total_cinemas || 0,
+          movies: stats.rows[0]?.total_movies || 0,
+          showtimes: stats.rows[0]?.active_showtimes || 0
+        }
+      },
+      scraper_rotation: {
+        ...scraperRotation,
+        last_scrape_offset: lastScrapeOffset,
+        recently_covered_cities: recentlyCoveredCities
+      }
     });
   } catch (err: any) {
     logger.error({ err }, 'Error in /api/admin/status');
     res.status(500).json({ error: 'Errore nel recupero dello stato di sistema' });
+  }
+});
+
+// Admin Diagnostics: Comprehensive API and Scraper Health Check
+app.get('/api/admin/diagnostics', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    const summary = await getDiagnosticsSummary(forceRefresh);
+    res.json({ success: true, ...summary });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/diagnostics');
+    res.status(500).json({ error: 'Errore durante l\'esecuzione della diagnostica', details: err?.message });
+  }
+});
+
+// Test TMDb API with live query
+app.post('/api/admin/diagnostics/tmdb/test', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const testQuery = req.body?.query || 'Dune';
+    const result = await checkTmdb({ testQuery });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, 'Error testing TMDb');
+    res.status(500).json({ error: 'Errore nel test TMDb', details: err?.message });
+  }
+});
+
+// Test Firecrawl API with live test scrape
+app.post('/api/admin/diagnostics/firecrawl/test', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const testUrl = req.body?.url;
+    const result = await checkFirecrawl({ testScrape: true, testUrl });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, 'Error testing Firecrawl');
+    res.status(500).json({ error: 'Errore nel test Firecrawl', details: err?.message });
+  }
+});
+
+// Test Scraper Sources directly
+app.post(['/api/admin/diagnostics/scraper/test', '/api/admin/diagnostics/scrapers/test'], requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const citySlug = req.body?.city || 'roma';
+    const result = await checkScraperSources({ citySlug });
+    res.json({ success: true, result });
+  } catch (err: any) {
+    logger.error({ err }, 'Error testing Scrapers');
+    res.status(500).json({ error: 'Errore nel test Scrapers', details: err?.message });
   }
 });
 
@@ -1010,7 +1091,7 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
 });
 
 // Get Scraper Rotation Cursor Details
-app.get('/api/admin/scrape/cursor', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+app.get(['/api/admin/scrape/cursor', '/api/admin/scraper-state'], requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 25;
     const cursor = await cinemaScraper.getScraperCursorState(limit);
@@ -1022,7 +1103,7 @@ app.get('/api/admin/scrape/cursor', requireAdmin, async (req: AuthenticatedReque
 });
 
 // Update or Reset Scraper Rotation Cursor
-app.post('/api/admin/scrape/cursor', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+app.post(['/api/admin/scrape/cursor', '/api/admin/scraper-state/offset'], requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const newOffset = typeof req.body?.offset === 'number' ? req.body.offset : parseInt(req.body?.offset || '0', 10);
     await cinemaScraper.setStoredCursor(isNaN(newOffset) ? 0 : newOffset);

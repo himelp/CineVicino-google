@@ -14,60 +14,71 @@ export let pgliteInstance: PGlite | null = null;
 export let db: any = null;
 export let isPglite = false;
 
+let getDbPromise: Promise<any> | null = null;
+
 // Initialize Database connection
 export async function getDb() {
   if (db) return db;
+  if (getDbPromise) return getDbPromise;
 
-  const databaseUrl = process.env.DATABASE_URL;
+  getDbPromise = (async () => {
+    const databaseUrl = process.env.DATABASE_URL;
 
-  if (databaseUrl && !databaseUrl.includes('placeholder')) {
-    try {
-      pool = new Pool({
-        connectionString: databaseUrl,
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
-      });
-
-      // Test connectivity
-      const client = await pool.connect();
-      client.release();
-      db = drizzlePg(pool, { schema });
-      isPglite = false;
-      console.log('✅ Connected to external PostgreSQL database via DATABASE_URL');
-      return db;
-    } catch (err: any) {
-      console.warn('⚠️ Could not connect to DATABASE_URL, falling back to local persistent PostgreSQL (PGlite):', err.message);
-      if (pool) {
-        await pool.end().catch(() => {});
-        pool = null;
-      }
-    }
-  }
-
-  // Fallback to embedded persistent PostgreSQL engine (PGlite)
-  const dataDir = path.join(process.cwd(), 'data', 'pgdata');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  } else {
-    // Remove stale postmaster.pid if dev server was restarted or previously crashed
-    const pidFile = path.join(dataDir, 'postmaster.pid');
-    if (fs.existsSync(pidFile)) {
+    if (databaseUrl && !databaseUrl.includes('placeholder')) {
       try {
-        fs.unlinkSync(pidFile);
-        console.log('🧹 Removed stale postmaster.pid from prior run');
-      } catch {
-        // ignore
+        pool = new Pool({
+          connectionString: databaseUrl,
+          max: 20,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 5000,
+        });
+
+        // Test connectivity
+        const client = await pool.connect();
+        client.release();
+        db = drizzlePg(pool, { schema });
+        isPglite = false;
+        console.log('✅ Connected to external PostgreSQL database via DATABASE_URL');
+        return db;
+      } catch (err: any) {
+        console.warn('⚠️ Could not connect to DATABASE_URL, falling back to local persistent PostgreSQL (PGlite):', err.message);
+        if (pool) {
+          await pool.end().catch(() => {});
+          pool = null;
+        }
       }
     }
-  }
 
-  pgliteInstance = new PGlite(dataDir);
-  await pgliteInstance.ready;
-  db = drizzlePglite(pgliteInstance, { schema });
-  isPglite = true;
-  console.log(`✅ Initialized persistent embedded PostgreSQL engine at ${dataDir}`);
-  return db;
+    // Fallback to embedded persistent PostgreSQL engine (PGlite)
+    const dataDir = path.join(process.cwd(), 'data', 'pgdata');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    } else {
+      // Remove stale postmaster.pid if dev server was restarted or previously crashed
+      const pidFile = path.join(dataDir, 'postmaster.pid');
+      if (fs.existsSync(pidFile)) {
+        try {
+          fs.unlinkSync(pidFile);
+          console.log('🧹 Removed stale postmaster.pid from prior run');
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    const instance = new PGlite(dataDir);
+    await instance.ready;
+    pgliteInstance = instance;
+    db = drizzlePglite(instance, { schema });
+    isPglite = true;
+    console.log(`✅ Initialized persistent embedded PostgreSQL engine at ${dataDir}`);
+    return db;
+  })().catch((err) => {
+    getDbPromise = null;
+    throw err;
+  });
+
+  return getDbPromise;
 }
 
 // Execute raw SQL query across both pool or PGlite
@@ -249,14 +260,7 @@ export async function initDb() {
       id VARCHAR(64) PRIMARY KEY,
       last_scrape_offset INTEGER NOT NULL DEFAULT 0,
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    );`,
-    `ALTER TABLE cinemas ALTER COLUMN id TYPE VARCHAR(128);`,
-    `ALTER TABLE cinemas ALTER COLUMN chain TYPE VARCHAR(128);`,
-    `ALTER TABLE movies ALTER COLUMN id TYPE VARCHAR(128);`,
-    `ALTER TABLE showtimes ALTER COLUMN id TYPE VARCHAR(128);`,
-    `ALTER TABLE showtimes ALTER COLUMN movie_id TYPE VARCHAR(128);`,
-    `ALTER TABLE showtimes ALTER COLUMN cinema_id TYPE VARCHAR(128);`,
-    `ALTER TABLE scrape_logs ALTER COLUMN source TYPE VARCHAR(128);`
+    );`
   ];
 
   for (const stmt of ddlStatements) {
@@ -274,6 +278,16 @@ export async function initDb() {
     await seedDefaults();
   } catch (seedErr: any) {
     console.warn('⚠️ seedDefaults notice:', seedErr.message);
+  }
+
+  // Seed Italian Comuni dataset if empty
+  try {
+    const { seedCitiesIfEmpty } = await import('./seedCities');
+    seedCitiesIfEmpty().catch(err => {
+      console.warn('⚠️ seedCitiesIfEmpty background error:', err?.message);
+    });
+  } catch (err: any) {
+    console.warn('⚠️ seedCitiesIfEmpty import notice:', err?.message);
   }
 }
 

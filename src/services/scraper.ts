@@ -46,11 +46,23 @@ export interface ScrapeOptions {
 
 export interface ScraperCursorState {
   current_offset: number;
+  last_scrape_offset: number;
   batch_size: number;
   total_eligible_cities: number;
   current_batch_cities: { name: string; slug: string; province_code?: string; region?: string }[];
   next_offset: number;
   next_batch_cities: { name: string; slug: string; province_code?: string; region?: string }[];
+  recently_covered_cities?: {
+    id?: string;
+    name: string;
+    slug: string;
+    province?: string;
+    province_code?: string;
+    region?: string;
+    last_scraped_at?: string;
+    cinemas_count?: number;
+    showtimes_count?: number;
+  }[];
   cycle_progress_percent: number;
   cycle_description: string;
 }
@@ -281,33 +293,120 @@ export class NationwideCinemaScraper {
   private tmdbCache = new Map<string, any>();
 
   /**
-   * Helper: Execute real HTTP GET and measure status + response byte size
+   * Helper: Execute scrape via Firecrawl API for JS-rendered pages and bot protection bypass
    */
-  async fetchWithStats(url: string): Promise<{ ok: boolean; status: number; byteSize: number; html: string }> {
+  async fetchWithFirecrawl(
+    url: string
+  ): Promise<{ ok: boolean; status: number; byteSize: number; html: string; creditsUsed: number; error?: string }> {
+    const key = process.env.FIRECRAWL_API_KEY;
+    if (!key) {
+      return { ok: false, status: 0, byteSize: 0, html: '', creditsUsed: 0, error: 'FIRECRAWL_API_KEY non configurata' };
+    }
+    try {
+      const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url,
+          formats: ['html']
+        }),
+        signal: AbortSignal.timeout(20000)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.data?.html) {
+        const html = data.data.html;
+        return {
+          ok: true,
+          status: res.status,
+          byteSize: Buffer.byteLength(html, 'utf8'),
+          html,
+          creditsUsed: 1
+        };
+      }
+      return {
+        ok: false,
+        status: res.status,
+        byteSize: 0,
+        html: '',
+        creditsUsed: 0,
+        error: data.error || `HTTP ${res.status}`
+      };
+    } catch (err: any) {
+      return {
+        ok: false,
+        status: 0,
+        byteSize: 0,
+        html: '',
+        creditsUsed: 0,
+        error: err.message
+      };
+    }
+  }
+
+  /**
+   * Helper: Execute HTTP GET and measure status + response byte size,
+   * supporting Firecrawl integration and automatic fallback
+   */
+  async fetchWithStats(
+    url: string,
+    options?: { useFirecrawl?: boolean }
+  ): Promise<{ ok: boolean; status: number; byteSize: number; html: string; creditsUsed: number }> {
+    // 1. If explicit Firecrawl mode requested and key present, attempt Firecrawl first
+    if (options?.useFirecrawl && process.env.FIRECRAWL_API_KEY) {
+      const fc = await this.fetchWithFirecrawl(url);
+      if (fc.ok) {
+        return { ok: true, status: fc.status, byteSize: fc.byteSize, html: fc.html, creditsUsed: fc.creditsUsed };
+      }
+      console.warn(`[Scraper] ⚠️ Firecrawl fallito (${fc.error}), fallback a fetch HTTP diretto per: ${url}`);
+    }
+
     try {
       const res = await fetch(url, {
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(10000),
         headers: {
           'User-Agent': this.userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
         }
       });
+
+      // 2. If blocked (HTTP 403 or 503) and Firecrawl key is available, attempt Firecrawl rescue fallback
+      if (!res.ok && (res.status === 403 || res.status === 503) && process.env.FIRECRAWL_API_KEY) {
+        console.log(`[Scraper] 🛡️ Rilevato blocco HTTP ${res.status}, attivazione Firecrawl di salvataggio per: ${url}`);
+        const fc = await this.fetchWithFirecrawl(url);
+        if (fc.ok) {
+          return { ok: true, status: fc.status, byteSize: fc.byteSize, html: fc.html, creditsUsed: fc.creditsUsed };
+        }
+      }
+
       const buffer = await res.arrayBuffer();
       const byteSize = buffer.byteLength;
       const html = new TextDecoder('utf-8').decode(buffer);
-      return { ok: res.ok, status: res.status, byteSize, html };
+      return { ok: res.ok, status: res.status, byteSize, html, creditsUsed: 0 };
     } catch (err: any) {
-      return { ok: false, status: 0, byteSize: 0, html: '' };
+      // 3. If direct fetch timed out or failed and Firecrawl requested/available, attempt rescue
+      if (options?.useFirecrawl && process.env.FIRECRAWL_API_KEY) {
+        const fc = await this.fetchWithFirecrawl(url);
+        if (fc.ok) {
+          return { ok: true, status: fc.status, byteSize: fc.byteSize, html: fc.html, creditsUsed: fc.creditsUsed };
+        }
+      }
+      return { ok: false, status: 0, byteSize: 0, html: '', creditsUsed: 0 };
     }
   }
+
+  private totalFirecrawlCreditsUsed = 0;
 
   /**
    * Scrape CinemaTimes.com across target cities for Italian multiplexes and active showtimes
    */
   async scrapeCinemaTimes(
     targetCities: CityTarget[],
-    notify: (step: string, source: string, count: number, msg: string) => void
+    notify: (step: string, source: string, count: number, msg: string) => void,
+    options?: { useFirecrawl?: boolean }
   ): Promise<ExtractedCinema[]> {
     const extractedCinemas: ExtractedCinema[] = [];
 
@@ -316,7 +415,8 @@ export class NationwideCinemaScraper {
       notify('scrape', 'CinemaTimes.com', extractedCinemas.length, `Ricerca sale per ${city.name} (${city.slug})...`);
 
       await new Promise(r => setTimeout(r, 350));
-      const resp = await this.fetchWithStats(listUrl);
+      const resp = await this.fetchWithStats(listUrl, options);
+      if (resp.creditsUsed) this.totalFirecrawlCreditsUsed += resp.creditsUsed;
       console.log(
         `[Scraper] 🌐 CinemaTimes.com (${city.name} - ${listUrl}) -> HTTP ${resp.status} (${resp.byteSize.toLocaleString('it-IT')} bytes)`
       );
@@ -346,7 +446,8 @@ export class NationwideCinemaScraper {
       for (const c of cityCinemas) {
         notify('scrape', 'CinemaTimes.com', extractedCinemas.length, `Parsing ${c.name} (${city.name})...`);
         await new Promise(r => setTimeout(r, 120));
-        const detailResp = await this.fetchWithStats(c.url);
+        const detailResp = await this.fetchWithStats(c.url, options);
+        if (detailResp.creditsUsed) this.totalFirecrawlCreditsUsed += detailResp.creditsUsed;
 
         if (detailResp.ok) {
           const d$ = cheerio.load(detailResp.html);
@@ -432,7 +533,8 @@ export class NationwideCinemaScraper {
    */
   async scrapeMYmovies(
     targetCities: CityTarget[],
-    notify: (step: string, source: string, count: number, msg: string) => void
+    notify: (step: string, source: string, count: number, msg: string) => void,
+    options?: { useFirecrawl?: boolean }
   ): Promise<ExtractedCinema[]> {
     const extractedCinemas: ExtractedCinema[] = [];
 
@@ -441,7 +543,8 @@ export class NationwideCinemaScraper {
       notify('scrape', 'MYmovies.it', extractedCinemas.length, `Ricerca cinema per ${city.name} su MYmovies...`);
 
       await new Promise(r => setTimeout(r, 350));
-      const resp = await this.fetchWithStats(cityUrl);
+      const resp = await this.fetchWithStats(cityUrl, options);
+      if (resp.creditsUsed) this.totalFirecrawlCreditsUsed += resp.creditsUsed;
       console.log(
         `[Scraper] 🌐 MYmovies.it (${city.name} - ${cityUrl}) -> HTTP ${resp.status} (${resp.byteSize.toLocaleString('it-IT')} bytes)`
       );
@@ -474,7 +577,8 @@ export class NationwideCinemaScraper {
       for (const c of cityCinemas) {
         notify('scrape', 'MYmovies.it', extractedCinemas.length, `Parsing: ${c.name} (${city.name})...`);
         await new Promise(r => setTimeout(r, 120));
-        const detailResp = await this.fetchWithStats(c.url);
+        const detailResp = await this.fetchWithStats(c.url, options);
+        if (detailResp.creditsUsed) this.totalFirecrawlCreditsUsed += detailResp.creditsUsed;
 
         if (detailResp.ok) {
           const d$ = cheerio.load(detailResp.html);
@@ -547,7 +651,8 @@ export class NationwideCinemaScraper {
    */
   async scrapeComingSoon(
     targetCities: CityTarget[],
-    notify: (step: string, source: string, count: number, msg: string) => void
+    notify: (step: string, source: string, count: number, msg: string) => void,
+    options?: { useFirecrawl?: boolean }
   ): Promise<Array<{ name: string; url: string; city: string; city_name: string; city_id: string }>> {
     const discovered: Array<{ name: string; url: string; city: string; city_name: string; city_id: string }> = [];
 
@@ -556,7 +661,8 @@ export class NationwideCinemaScraper {
       notify('scrape', 'ComingSoon.it', discovered.length, `Ricerca cinema per ${city.name} su ComingSoon...`);
 
       await new Promise(r => setTimeout(r, 350));
-      const resp = await this.fetchWithStats(listUrl);
+      const resp = await this.fetchWithStats(listUrl, options);
+      if (resp.creditsUsed) this.totalFirecrawlCreditsUsed += resp.creditsUsed;
       console.log(
         `[Scraper] 🌐 ComingSoon.it (${city.name} - ${listUrl}) -> HTTP ${resp.status} (${resp.byteSize.toLocaleString('it-IT')} bytes)`
       );
@@ -836,6 +942,73 @@ export class NationwideCinemaScraper {
   }
 
   /**
+   * Helper to get recently covered cities (from showtimes scraped_at or previous batch)
+   */
+  async getRecentlyCoveredCities(limit: number = 25): Promise<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    province?: string;
+    province_code?: string;
+    region?: string;
+    last_scraped_at?: string;
+    cinemas_count: number;
+    showtimes_count: number;
+  }>> {
+    try {
+      const recentRes = await executeRawSql(`
+        SELECT
+          c.id,
+          c.name,
+          c.slug,
+          c.province,
+          c.province_code,
+          c.region,
+          MAX(s.scraped_at) as last_scraped_at,
+          COUNT(DISTINCT cin.id) as cinemas_count,
+          COUNT(s.id) as showtimes_count
+        FROM cities c
+        JOIN cinemas cin ON cin.city_id = c.id
+        JOIN showtimes s ON s.cinema_id = cin.id
+        GROUP BY c.id, c.name, c.slug, c.province, c.province_code, c.region
+        ORDER BY last_scraped_at DESC
+        LIMIT $1
+      `, [limit]);
+
+      if (recentRes.rows && recentRes.rows.length > 0) {
+        return recentRes.rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          slug: r.slug,
+          province: r.province,
+          province_code: r.province_code,
+          region: r.region,
+          last_scraped_at: r.last_scraped_at,
+          cinemas_count: parseInt(r.cinemas_count || '0', 10),
+          showtimes_count: parseInt(r.showtimes_count || '0', 10),
+        }));
+      }
+    } catch (err: any) {
+      console.warn('[Scraper] Could not query recently covered cities from showtimes:', err.message);
+    }
+
+    // Fallback: previous batch based on current stored offset
+    const currentOffset = await this.getStoredCursor();
+    const prevOffset = currentOffset > 0 ? Math.max(0, currentOffset - limit) : 0;
+    const fallback = await this.getEligibleCities(limit, prevOffset);
+    return fallback.cities.map(c => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      province: c.province,
+      province_code: c.province_code,
+      region: c.region,
+      cinemas_count: 0,
+      showtimes_count: 0,
+    }));
+  }
+
+  /**
    * Get full cursor rotation overview for status endpoints & admin dashboard
    */
   async getScraperCursorState(batchLimit: number = 25): Promise<ScraperCursorState> {
@@ -849,12 +1022,14 @@ export class NationwideCinemaScraper {
         : currentOffset + currentCities.length;
 
     const { cities: nextCities } = await this.getEligibleCities(batchLimit, nextOffset);
+    const recentlyCovered = await this.getRecentlyCoveredCities(batchLimit);
 
     const progress = total > 0 ? Math.min(100, Math.round((currentOffset / total) * 100)) : 0;
     const cycleDesc = `Rotazione attiva: offset ${currentOffset}/${total} (${progress}% ciclo coperto). Prossimo offset: ${nextOffset}.`;
 
     return {
       current_offset: currentOffset,
+      last_scrape_offset: currentOffset,
       batch_size: batchLimit,
       total_eligible_cities: total,
       current_batch_cities: currentCities.map(c => ({
@@ -870,6 +1045,7 @@ export class NationwideCinemaScraper {
         province_code: c.province_code,
         region: c.region
       })),
+      recently_covered_cities: recentlyCovered,
       cycle_progress_percent: progress,
       cycle_description: cycleDesc
     };
@@ -882,6 +1058,7 @@ export class NationwideCinemaScraper {
     options: ScrapeOptions = {},
     onProgress?: (update: ScrapeProgressUpdate) => void
   ): Promise<ScrapeResult> {
+    this.totalFirecrawlCreditsUsed = 0;
     const startTime = Date.now();
     let cinemasTouched = 0;
     let moviesTouched = 0;
@@ -889,6 +1066,7 @@ export class NationwideCinemaScraper {
     const citiesTouchedSet = new Set<string>();
 
     const notify = (step: string, source: string, count: number, message: string) => {
+      console.log(`[Scraper] [${step.toUpperCase()}] [${source}] ${message}`);
       if (onProgress) {
         onProgress({
           step,
@@ -900,7 +1078,12 @@ export class NationwideCinemaScraper {
       }
     };
 
-    notify('init', 'System', 0, 'Avvio dello scraper nazionale multicanale con Cheerio & fetch HTTP reali...');
+    const scrapeOptions = { useFirecrawl: options.useFirecrawl === true };
+    if (scrapeOptions.useFirecrawl) {
+      notify('init', 'Firecrawl', 0, 'Integrazione Firecrawl API attivata per bypass JS e bot protection...');
+    } else {
+      notify('init', 'System', 0, 'Avvio dello scraper nazionale multicanale con Cheerio & fetch HTTP diretti...');
+    }
 
     // 1. Resolve Target Cities from Database
     let targetCities: CityTarget[] = [];
@@ -909,14 +1092,26 @@ export class NationwideCinemaScraper {
     let totalEligibleCities = 0;
 
     if (options.city) {
-      const cleanSlug = slugify(options.city);
+      const rawCity = options.city.trim();
+      const cleanSlug = slugify(rawCity);
+      const strippedSlug = cleanSlug.replace(/^c-/, '');
+      const prefixedSlug = `c-${strippedSlug}`;
+
       const singleCityRes = await executeRawSql(
         `SELECT id, name, slug, province, province_code, region, lat, lng
          FROM cities
-         WHERE slug = $1 OR LOWER(name) = LOWER($2) OR name ILIKE $3
-         ORDER BY (slug = $1) DESC, (LOWER(name) = LOWER($2)) DESC
+         WHERE slug = $1 
+            OR slug = $2 
+            OR id = $3 
+            OR id = $4
+            OR LOWER(name) = LOWER($5) 
+            OR name ILIKE $6
+         ORDER BY 
+           (slug = $1 OR slug = $2) DESC,
+           (LOWER(name) = LOWER($5)) DESC,
+           cinema_count DESC
          LIMIT 1`,
-        [cleanSlug, options.city.trim(), `%${options.city.trim()}%`]
+        [cleanSlug, strippedSlug, rawCity, prefixedSlug, rawCity, `%${rawCity}%`]
       );
       if (singleCityRes.rows && singleCityRes.rows.length > 0) {
         const r = singleCityRes.rows[0];
@@ -937,7 +1132,7 @@ export class NationwideCinemaScraper {
     if (targetCities.length === 0) {
       const storedOffset = await this.getStoredCursor();
       batchOffset = options.offset !== undefined ? Math.max(0, options.offset) : storedOffset;
-      const batchLimit = Math.min(options.limit || 25, 50);
+      const batchLimit = Math.min(options.limit || 5, 50);
 
       let eligibleResult = await this.getEligibleCities(batchLimit, batchOffset);
       totalEligibleCities = eligibleResult.total;
@@ -1008,7 +1203,7 @@ export class NationwideCinemaScraper {
 
     // Phase 1: Real Scrape of CinemaTimes.com
     try {
-      const ctCinemas = await this.scrapeCinemaTimes(targetCities, notify);
+      const ctCinemas = await this.scrapeCinemaTimes(targetCities, notify, scrapeOptions);
       allDiscoveredCinemas.push(...ctCinemas);
     } catch (err: any) {
       console.error('[Scraper] CinemaTimes error:', err.message);
@@ -1016,7 +1211,7 @@ export class NationwideCinemaScraper {
 
     // Phase 2: Real Scrape of MYmovies.it
     try {
-      const myCinemas = await this.scrapeMYmovies(targetCities, notify);
+      const myCinemas = await this.scrapeMYmovies(targetCities, notify, scrapeOptions);
       for (const mc of myCinemas) {
         const existing = allDiscoveredCinemas.find(c => c.name.toLowerCase() === mc.name.toLowerCase());
         if (existing) {
@@ -1035,7 +1230,7 @@ export class NationwideCinemaScraper {
 
     // Phase 3: ComingSoon.it Discovery
     try {
-      const csCinemas = await this.scrapeComingSoon(targetCities, notify);
+      const csCinemas = await this.scrapeComingSoon(targetCities, notify, scrapeOptions);
       for (const cs of csCinemas) {
         if (!allDiscoveredCinemas.some(c => c.name.toLowerCase() === cs.name.toLowerCase())) {
           allDiscoveredCinemas.push({
@@ -1245,12 +1440,12 @@ export class NationwideCinemaScraper {
        VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         logId,
-        'CinemaTimes.com + MYmovies.it + ComingSoon.it',
+        options.useFirecrawl ? 'Firecrawl API + Multi-Source' : 'CinemaTimes.com + MYmovies.it + ComingSoon.it',
         citiesTouchedSet.size,
         cinemasTouched,
         moviesTouched,
         showtimesTouched,
-        0,
+        this.totalFirecrawlCreditsUsed,
         'success',
         details
       ]
@@ -1261,12 +1456,12 @@ export class NationwideCinemaScraper {
     return {
       id: logId,
       run_at: new Date().toISOString(),
-      source: 'CinemaTimes.com + MYmovies.it + ComingSoon.it',
+      source: options.useFirecrawl ? 'Firecrawl API + Multi-Source' : 'CinemaTimes.com + MYmovies.it + ComingSoon.it',
       cities_touched: citiesTouchedSet.size,
       cinemas_touched: cinemasTouched,
       movies_touched: moviesTouched,
       showtimes_touched: showtimesTouched,
-      firecrawl_credits_used: 0,
+      firecrawl_credits_used: this.totalFirecrawlCreditsUsed,
       status: 'success',
       details,
       cursor_offset: options.city ? undefined : batchOffset,

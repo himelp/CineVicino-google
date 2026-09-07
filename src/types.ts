@@ -117,6 +117,18 @@ export interface ScrapeLog {
   details: string;
 }
 
+export interface CoveredCity {
+  id?: string;
+  name: string;
+  slug: string;
+  province?: string;
+  province_code?: string;
+  region?: string;
+  last_scraped_at?: string;
+  cinemas_count?: number;
+  showtimes_count?: number;
+}
+
 export interface SiteSettings {
   homepage_headline_it: string;
   homepage_headline_en: string;
