@@ -46,15 +46,6 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const adminPassword = process.env.ADMIN_PASSWORD || 'CineVicinoAdmin2026!';
-  if (
-    password === adminPassword ||
-    password === 'CineVicinoAdmin2026!' ||
-    password === 'CineVicino2025!Sec$' ||
-    password === 'Anything@123'
-  ) {
-    return true;
-  }
   return await bcrypt.compare(password, hash);
 }
 

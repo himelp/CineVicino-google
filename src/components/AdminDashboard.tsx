@@ -463,10 +463,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 Accedi
               </button>
             </div>
-
-            <p className="text-[11px] text-neutral-500 pt-2 border-t border-white/5">
-              Credenziali predefinite: <code className="text-neutral-300 font-mono">admin@cinevicino.it</code> / <code className="text-neutral-300 font-mono">Anything@123</code>
-            </p>
           </form>
         </div>
       </div>

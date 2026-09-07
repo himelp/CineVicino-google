@@ -6,7 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+data/*pgdata*/
+data/*pgdata*
+data/**/PG_VERSION
+data/**/base/
 data/pgdata/
 data/pgdata/*
+data/test_pgdata/
+data/test_pgdata/*
 *.pgdata
 *.pgdata/
