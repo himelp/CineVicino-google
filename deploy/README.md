@@ -1,51 +1,85 @@
-# CineVicino — Oracle Cloud Always Free VPS Deployment Guide
+# CineVicino — VPS Deployment & Production Guide
 
-This guide details the exact step-by-step procedure to deploy **CineVicino** to an Oracle Cloud Always Free VPS (ARM Ampere A1 or AMD Compute instance) using Docker Compose, Nginx reverse proxy, and Let's Encrypt SSL/TLS via Certbot.
+This guide covers deploying **CineVicino** to any Linux VPS (Oracle Cloud Always Free ARM/AMD, Hetzner, DigitalOcean, Linode, AWS, Contabo, OVH, etc.).
 
 ---
 
-## ⚠️ CRITICAL NOTICE: Oracle Cloud Inbound Port Opening (80 & 443)
+## 🚀 Primary Path: Automated Universal Setup (Recommended)
 
-On Oracle Cloud Infrastructure (OCI), opening ports requires **TWO separate layers**. Failing to configure both is the single most common reason why Oracle VPS sites are unreachable:
+CineVicino includes a single, self-contained, platform-independent installer script: `deploy/cinevicino-setup.sh`.
 
-### 1. Virtual Cloud Network (VCN) Security List / Network Security Group
-1. Navigate to the **OCI Console** → **Networking** → **Virtual Cloud Networks**.
-2. Select your VCN and click on **Security Lists** (e.g. `Default Security List for <your-vcn>`).
-3. Under **Ingress Rules**, click **Add Ingress Rules**:
-   - **Source CIDR**: `0.0.0.0/0`
-   - **IP Protocol**: `TCP`
-   - **Destination Port Range**: `80,443`
-   - **Description**: `Allow HTTP and HTTPS traffic from the internet`
-4. Click **Add Ingress Rules**.
+It automatically detects your Linux distribution, CPU architecture, installs Docker + Compose if missing, audits and configures a dedicated Cloudflare Tunnel without touching any pre-existing tunnels, and starts all containers.
 
-### 2. Instance Linux Firewall (`iptables` / `firewalld` / `ufw`)
-By default, Oracle Linux and Ubuntu OCI images have local firewall rules blocking incoming HTTP traffic even if ports are open in the VCN console:
+### Why Cloudflare Tunnel?
+- **No Inbound Port Opening Required**: Unlike traditional web servers, you do **not** need to configure Oracle VCN Security Lists, router port-forwarding, or open public firewall ports (`80`/`443`).
+- **Encrypted Inbound Routing**: Cloudflare Tunnel establishes an outbound encrypted connection from your VPS container directly to Cloudflare's edge network.
+- **Automatic SSL**: Full HTTPS encryption is handled automatically by Cloudflare.
+- **DDoS & WAF Protection**: Cloudflare edge shields your origin server's real IP address.
+
+### Quick Start
+
+On your freshly provisioned VPS, run:
 
 ```bash
-# On Ubuntu / Debian:
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw reload
+# 1. Clone the repository
+git clone https://github.com/himelp/CineVicino-Cinema-Directory.git cinevicino
+cd cinevicino
 
-# Or on Oracle Linux / CentOS (firewalld):
-sudo firewall-cmd --permanent --add-service=http
-sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload
-
-# Or directly in iptables (Oracle Linux default iptables):
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-sudo netfilter-persistent save || sudo service iptables save
+# 2. Run the universal setup script
+chmod +x deploy/cinevicino-setup.sh
+./deploy/cinevicino-setup.sh
 ```
 
+### What `deploy/cinevicino-setup.sh` Handles Automatically
+
+1. **Linux Distribution Detection**:
+   - Automatically supports `apt-get` (Debian, Ubuntu), `dnf` (Fedora, RHEL 8/9, Rocky, AlmaLinux), `yum` (CentOS), `pacman` (Arch), `apk` (Alpine), and `zypper` (openSUSE/SLES).
+   - Skips installation if Docker and Compose are already present on your host.
+2. **CPU Architecture Mapping**:
+   - Maps `uname -m` correctly for both `x86_64` (`amd64`) and `aarch64` (`arm64`, such as Oracle Cloud Ampere A1).
+   - Downloads the native matching `cloudflared` binary for your exact architecture.
+3. **Init System Resilience**:
+   - Verifies system services with `systemctl`, `service`, or `rc-service` and degrades gracefully if running under containerized environments or non-systemd inits.
+4. **Cloudflare Tunnel Non-Negotiable Safety**:
+   - Reuses existing `cloudflared` binaries and existing `~/.cloudflared/cert.pem` logins.
+   - Audits and displays all existing host tunnels with an explicit safety guarantee: **pre-existing tunnels are NEVER modified, reconfigured, or deleted**.
+   - Creates or reuses a dedicated, project-scoped tunnel named `cinevicino`.
+   - Stores all tunnel configs and credentials in project-local `./cloudflared/` (never polluting or modifying global configurations).
+5. **Port Security & Auto-Detection**:
+   - Probes `127.0.0.1` loopback for a free port (e.g. `8080`, `8081`).
+   - Nginx binds **exclusively** to `127.0.0.1` so no public ports are exposed directly to the internet.
+6. **Structural Configuration**:
+   - Updates `docker-compose.yml` structurally using Python (PyYAML or structural block parser), guaranteeing no invalid indentation or misplaced service keys.
+7. **Idempotency**:
+   - Safe to re-run at any time. Automatically detects configured settings and avoids overwriting existing secrets, passwords, or database credentials.
+
 ---
 
-## Step 1: Install Docker & Docker Compose on the VPS
+## 🛠️ Fallback Path: Manual Step-by-Step Deployment
 
-Run the following commands on your Oracle VPS instance:
+If you prefer to inspect and run every step manually or need traditional direct HTTP/HTTPS port exposure via Let's Encrypt Certbot, follow the manual workflow below.
+
+### ⚠️ Note on Oracle Cloud (OCI) Inbound Ports (Only for Direct Public Port Exposure)
+
+If you are exposing ports `80` and `443` directly (without Cloudflare Tunnel):
+1. **OCI VCN Ingress Rules**: Allow TCP ports `80` and `443` from `0.0.0.0/0` in your VCN Security List.
+2. **Instance Firewall**:
+   ```bash
+   # Ubuntu / Debian:
+   sudo ufw allow 80/tcp && sudo ufw allow 443/tcp && sudo ufw reload
+
+   # Oracle Linux / RHEL:
+   sudo firewall-cmd --permanent --add-service=http
+   sudo firewall-cmd --permanent --add-service=https
+   sudo firewall-cmd --reload
+   ```
+
+---
+
+### Step 1: Install Docker & Docker Compose on the VPS
 
 ```bash
-# Update repositories
+# Update package repositories
 sudo apt-get update && sudo apt-get upgrade -y
 
 # Install Docker
@@ -65,14 +99,13 @@ Log out and back in for non-root docker group permissions to take effect.
 
 ---
 
-## Step 2: Clone the Repository & Configure Environment
+### Step 2: Clone the Repository & Configure Environment
 
 ```bash
-# Clone the repository
 git clone https://github.com/himelp/CineVicino-Cinema-Directory.git cinevicino
 cd cinevicino
 
-# Create production .env file (NEVER commit secrets to git)
+# Copy example environment file
 cp .env.example .env
 nano .env
 ```
@@ -80,36 +113,42 @@ nano .env
 Ensure your `.env` contains:
 ```ini
 APP_URL=https://yourdomain.it
-DATABASE_URL=postgres://cineuser:strong_password_here@postgres:5432/cinevicino
+SITE_URL=https://yourdomain.it
+DATABASE_URL=postgres://cineuser:your_strong_password@postgres:5432/cinevicino
 POSTGRES_USER=cineuser
-POSTGRES_PASSWORD=strong_password_here
+POSTGRES_PASSWORD=your_strong_password
 POSTGRES_DB=cinevicino
 
-# API Keys (Optional but recommended)
+# Cryptographically generated secret (openssl rand -hex 32)
+JWT_SECRET=your_jwt_secret_hex_32
+
+# Admin dashboard credentials
+ADMIN_EMAIL=admin@cinevicino.it
+ADMIN_PASSWORD=your_secure_admin_password
+
+# External API Keys (Optional)
 TMDB_API_KEY=your_tmdb_api_key_v3
 FIRECRAWL_API_KEY=your_firecrawl_api_key
-EMAIL_ALERT_API_KEY=your_resend_or_sendgrid_key
-ADMIN_PASSWORD=your_secure_admin_password
 ```
 
 ---
 
-## Step 3: Launch with Docker Compose
+### Step 3: Launch with Docker Compose
 
 ```bash
-# Build images and start all 3 containers (app, postgres, nginx) in background
+# Build and start containers
 docker compose up -d --build
 
-# Verify all containers are running
+# Verify container health
 docker compose ps
 docker compose logs -f app
 ```
 
 ---
 
-## Step 4: Configure Let's Encrypt HTTPS with Certbot
+### Step 4: Configure Let's Encrypt HTTPS with Certbot (Direct Port Mode)
 
-Run Certbot once to obtain your SSL certificate:
+If not using Cloudflare Tunnel:
 
 ```bash
 # Request certificate (replace yourdomain.it and your@email.it)
@@ -127,28 +166,28 @@ docker compose restart nginx
 
 ---
 
-## Step 5: Configure Daily Scraper in Crontab (Daily at 12:05)
+### Step 5: Configure Daily Scraper in Crontab (Daily at 12:05)
 
-To keep all Italian showtimes and ticketing links fresh, schedule the nationwide scraper to run daily shortly after 12:00:
+To keep all Italian showtimes and ticketing links fresh, schedule the nationwide scraper in host cron:
 
 ```bash
 crontab -e
 ```
 
-Add this cron line at the end of the file:
+Add this line:
 ```cron
 # Run CineVicino nationwide cinema scraper every day at 12:05 PM
-5 12 * * * docker compose -f /home/ubuntu/cinevicino/docker-compose.yml exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1
+5 12 * * * cd /home/ubuntu/cinevicino && docker compose exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1
 ```
 
 ---
 
-## Step 6: Initial City Seeding (One-time)
+### Step 6: Initial City Seeding (One-time)
 
 Populate all 7,894 Italian comuni and coordinates into the database:
 
 ```bash
-docker compose exec app npx tsx scripts/seed-cities.ts
+docker compose exec -T app npx tsx scripts/seed-cities.ts
 ```
 
-Your CineVicino instance is now fully operational across Italy with automated updates, official ticketing outbound links, and SSL encryption!
+Your CineVicino instance is now fully operational with automated updates, official ticketing outbound links, and SSL encryption!
