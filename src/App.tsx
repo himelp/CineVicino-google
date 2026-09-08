@@ -14,6 +14,7 @@ import { LoginModal } from './components/LoginModal';
 import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
 import { Language, translations } from './utils/i18n';
+import { safeFetchJson, safeReadJson } from './utils/api';
 import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight } from 'lucide-react';
 
 export default function App() {
@@ -103,36 +104,36 @@ export default function App() {
           fetch('/api/cities?limit=1')
         ]);
 
-        if (movRes.ok) setMovies(await movRes.json());
-        if (cinRes.ok) setCinemas(await cinRes.json());
-        if (setRes.ok) setSettings(await setRes.json());
-        if (citRes.ok) {
-          const citData = await citRes.json();
-          if (citData.total) setCitiesCount(citData.total);
-        }
+        const [movData, cinData, setVal, citData] = await Promise.all([
+          safeReadJson<Movie[]>(movRes),
+          safeReadJson<Cinema[]>(cinRes),
+          safeReadJson<SiteSettings>(setRes),
+          safeReadJson<any>(citRes)
+        ]);
+
+        if (movData.ok && Array.isArray(movData.data)) setMovies(movData.data);
+        if (cinData.ok && Array.isArray(cinData.data)) setCinemas(cinData.data);
+        if (setVal.ok && setVal.data) setSettings(setVal.data);
+        if (citData.ok && citData.data?.total) setCitiesCount(citData.data.total);
 
         // Restore user session if token exists
         const storedToken = localStorage.getItem('cinevicino_token');
         if (storedToken) {
           try {
-            const meRes = await fetch('/api/auth/me', {
+            const meParsed = await safeFetchJson<any>('/api/auth/me', {
               headers: { 'Authorization': `Bearer ${storedToken}` }
             });
-            if (meRes.ok) {
-              const meData = await meRes.json();
-              if (meData.user) {
-                setUser(meData.user);
-                // Also fetch server favorites
-                const favRes = await fetch('/api/favorites', {
-                  headers: { 'Authorization': `Bearer ${storedToken}` }
-                });
-                if (favRes.ok) {
-                  const favData = await favRes.json();
-                  if (favData.movies?.length) setFavoriteMovieIds(favData.movies);
-                  if (favData.cinemas?.length) setFavoriteCinemaIds(favData.cinemas);
-                }
+            if (meParsed.ok && meParsed.data?.user) {
+              setUser(meParsed.data.user);
+              // Also fetch server favorites
+              const favParsed = await safeFetchJson<any>('/api/favorites', {
+                headers: { 'Authorization': `Bearer ${storedToken}` }
+              });
+              if (favParsed.ok && favParsed.data) {
+                if (favParsed.data.movies?.length) setFavoriteMovieIds(favParsed.data.movies);
+                if (favParsed.data.cinemas?.length) setFavoriteCinemaIds(favParsed.data.cinemas);
               }
-            } else {
+            } else if (meParsed.status === 401 || meParsed.status === 403) {
               localStorage.removeItem('cinevicino_token');
             }
           } catch (e) {
@@ -164,33 +165,30 @@ export default function App() {
 
     async function detectVisitorCity() {
       try {
-        const res = await fetch('/api/geo/my-city');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.success && data.city_slug) {
-          // Fetch the city and its cinemas immediately
-          const cityRes = await fetch(`/api/cities/${data.city_slug}`);
-          if (cityRes.ok) {
-            const cityData = await cityRes.json();
-            if (cityData.city) {
-              setActiveCity(cityData.city);
-              setAutoDetectInfo({
-                detected: true,
-                city_slug: data.city_slug,
-                city_name: data.city_name || cityData.city.name,
-                province_code: data.province_code || cityData.city.province_code,
-                region: data.region || cityData.city.region,
-                method: 'ip',
-                confidence: data.confidence || 'high',
-                distance_km: data.distance_km
-              });
+        const parsed = await safeFetchJson<any>('/api/geo/my-city');
+        if (!parsed.ok || !parsed.data?.city_slug) return;
+        const data = parsed.data;
 
-              if (cityData.cinemas && cityData.cinemas.length > 0) {
-                setNearbyCinemas(cityData.cinemas.map((c: any) => ({ ...c, distance_km: 0 })));
-              } else if (cityData.nearest_cinemas && cityData.nearest_cinemas.length > 0) {
-                setNearbyCinemas(cityData.nearest_cinemas);
-              }
-            }
+        // Fetch the city and its cinemas immediately
+        const cityParsed = await safeFetchJson<any>(`/api/cities/${data.city_slug}`);
+        if (cityParsed.ok && cityParsed.data?.city) {
+          const cityData = cityParsed.data;
+          setActiveCity(cityData.city);
+          setAutoDetectInfo({
+            detected: true,
+            city_slug: data.city_slug,
+            city_name: data.city_name || cityData.city.name,
+            province_code: data.province_code || cityData.city.province_code,
+            region: data.region || cityData.city.region,
+            method: 'ip',
+            confidence: data.confidence || 'high',
+            distance_km: data.distance_km
+          });
+
+          if (cityData.cinemas && cityData.cinemas.length > 0) {
+            setNearbyCinemas(cityData.cinemas.map((c: any) => ({ ...c, distance_km: 0 })));
+          } else if (cityData.nearest_cinemas && cityData.nearest_cinemas.length > 0) {
+            setNearbyCinemas(cityData.nearest_cinemas);
           }
         }
       } catch (err) {
@@ -214,9 +212,9 @@ export default function App() {
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          const res = await fetch(`/api/nearby?lat=${latitude}&lng=${longitude}`);
-          if (res.ok) {
-            const data = await res.json();
+          const parsed = await safeFetchJson<any>(`/api/nearby?lat=${latitude}&lng=${longitude}`);
+          if (parsed.ok && parsed.data) {
+            const data = parsed.data;
             if (data.closest_city) {
               setActiveCity(data.closest_city);
               setAutoDetectInfo({
@@ -264,9 +262,9 @@ export default function App() {
     });
 
     try {
-      const res = await fetch(`/api/cities/${city.slug}`);
-      if (res.ok) {
-        const data = await res.json();
+      const parsed = await safeFetchJson<any>(`/api/cities/${city.slug}`);
+      if (parsed.ok && parsed.data) {
+        const data = parsed.data;
         if (data.cinemas && data.cinemas.length > 0) {
           setNearbyCinemas(data.cinemas.map((c: any) => ({ ...c, distance_km: 0 })));
         } else if (data.nearest_cinemas) {
@@ -370,10 +368,9 @@ export default function App() {
 
   const handleSelectPopularCity = async (slug: string) => {
     try {
-      const res = await fetch(`/api/cities/${slug}`);
-      if (res.ok) {
-        const data = await res.json();
-        selectCity(data.city);
+      const parsed = await safeFetchJson<any>(`/api/cities/${slug}`);
+      if (parsed.ok && parsed.data?.city) {
+        selectCity(parsed.data.city);
       }
     } catch (e) {
       console.error(e);
@@ -392,10 +389,9 @@ export default function App() {
         if (found) {
           setSelectedMovie(found);
         } else {
-          fetch(`/api/movies/${slug}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data.movie) setSelectedMovie(data.movie);
+          safeFetchJson<any>(`/api/movies/${slug}`)
+            .then(parsed => {
+              if (parsed.ok && parsed.data?.movie) setSelectedMovie(parsed.data.movie);
             })
             .catch(err => console.error('Failed to load movie from URL', err));
         }
@@ -409,11 +405,10 @@ export default function App() {
       const slug = path.replace(/^\/(citta|city)\//, '').split('/')[0];
       if (slug) {
         if (!activeCity || activeCity.slug !== slug) {
-          fetch(`/api/cities/${slug}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data.city) {
-                setActiveCity(data.city);
+          safeFetchJson<any>(`/api/cities/${slug}`)
+            .then(parsed => {
+              if (parsed.ok && parsed.data?.city) {
+                setActiveCity(parsed.data.city);
                 setView('city');
               }
             })
@@ -428,15 +423,13 @@ export default function App() {
     if (path.startsWith('/cinema/')) {
       const slug = path.replace('/cinema/', '').split('/')[0];
       if (slug) {
-        fetch(`/api/cinemas/${slug}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.cinema?.city_slug) {
-              fetch(`/api/cities/${data.cinema.city_slug}`)
-                .then(r => r.json())
-                .then(cData => {
-                  if (cData.city) {
-                    setActiveCity(cData.city);
+        safeFetchJson<any>(`/api/cinemas/${slug}`)
+          .then(parsed => {
+            if (parsed.ok && parsed.data?.cinema?.city_slug) {
+              safeFetchJson<any>(`/api/cities/${parsed.data.cinema.city_slug}`)
+                .then(cParsed => {
+                  if (cParsed.ok && cParsed.data?.city) {
+                    setActiveCity(cParsed.data.city);
                     setView('city');
                   }
                 });
@@ -828,9 +821,9 @@ export default function App() {
               navigate(`/cinema/${c.slug}`);
               setShowFavorites(false);
             } else if (c.city_id) {
-              fetch(`/api/cities/${c.city_id}`).then(r => r.json()).then(d => {
-                if (d.city) {
-                  selectCity(d.city);
+              safeFetchJson<any>(`/api/cities/${c.city_id}`).then(d => {
+                if (d.ok && d.data?.city) {
+                  selectCity(d.data.city);
                   setShowFavorites(false);
                 }
               });

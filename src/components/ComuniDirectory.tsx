@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, MapPin, Film, Building2, ChevronRight, CheckCircle, ArrowLeft } from 'lucide-react';
 import { City } from '../types';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface ComuniDirectoryProps {
   lang: Language;
@@ -45,11 +46,10 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
           url += `&with_cinemas=true`;
         }
 
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          setCities(data.cities || []);
-          setTotalCount(data.total || 0);
+        const parsed = await safeFetchJson<any>(url);
+        if (parsed.ok && parsed.data) {
+          setCities(parsed.data.cities || []);
+          setTotalCount(parsed.data.total || 0);
         }
       } catch (e) {
         console.error('Failed to load comuni', e);

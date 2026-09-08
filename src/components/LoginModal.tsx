@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, Mail, Key, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface LoginModalProps {
   lang: Language;
@@ -26,28 +27,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
 
     try {
       setLoading(true);
-      const res = await fetch('/api/auth/login', {
+      const parsed = await safeFetchJson<any>('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Credenziali non valide');
+      if (!parsed.ok) {
+        setErrorMsg(parsed.error || 'Credenziali non valide');
         return;
       }
 
-      if (data.token) {
+      const data = parsed.data;
+      if (data?.token) {
         localStorage.setItem('cinevicino_token', data.token);
       }
       setSuccessMsg('Accesso effettuato con successo!');
       setTimeout(() => {
-        onLoginSuccess(data.user);
+        onLoginSuccess(data?.user);
         onClose();
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message}`);
+      setErrorMsg(`Errore di rete: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -60,28 +61,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
 
     try {
       setLoading(true);
-      const res = await fetch('/api/auth/register', {
+      const parsed = await safeFetchJson<any>('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password, name: name.trim() })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error || 'Errore durante la registrazione');
+      if (!parsed.ok) {
+        setErrorMsg(parsed.error || 'Errore durante la registrazione');
         return;
       }
 
-      if (data.token) {
+      const data = parsed.data;
+      if (data?.token) {
         localStorage.setItem('cinevicino_token', data.token);
       }
       setSuccessMsg('Account creato con successo!');
       setTimeout(() => {
-        onLoginSuccess(data.user);
+        onLoginSuccess(data?.user);
         onClose();
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message}`);
+      setErrorMsg(`Errore di rete: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -94,16 +95,21 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
 
     try {
       setLoading(true);
-      const res = await fetch('/api/auth/reset-request', {
+      const parsed = await safeFetchJson<any>('/api/auth/reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() })
       });
 
-      const data = await res.json();
-      setSuccessMsg(data.message || 'Se l\'email è registrata riceverai un link di ripristino.');
+      if (!parsed.ok) {
+        setErrorMsg(parsed.error || 'Impossibile inviare la richiesta di ripristino');
+        return;
+      }
+
+      const data = parsed.data;
+      setSuccessMsg(data?.message || 'Se l\'email è registrata riceverai un link di ripristino.');
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message}`);
+      setErrorMsg(`Errore di rete: ${err.message || err}`);
     } finally {
       setLoading(false);
     }

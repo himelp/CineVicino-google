@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Search, X, Check, Globe, Crosshair, ChevronDown, Sparkles } from 'lucide-react';
 import { City } from '../types';
+import { safeFetchJson } from '../utils/api';
 
 export interface AutoDetectInfo {
   detected: boolean;
@@ -61,10 +62,9 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const res = await fetch(`/api/cities?q=${encodeURIComponent(query.trim())}&limit=6`);
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data.cities || []);
+        const parsed = await safeFetchJson<any>(`/api/cities?q=${encodeURIComponent(query.trim())}&limit=6`);
+        if (parsed.ok && parsed.data?.cities) {
+          setSuggestions(parsed.data.cities);
         }
       } catch (err) {
         console.error('Error searching cities in banner', err);

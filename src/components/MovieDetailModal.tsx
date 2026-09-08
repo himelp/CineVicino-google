@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface MovieDetailModalProps {
   movie: Movie | null;
@@ -35,10 +36,9 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
     async function loadMovieShowtimes() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/movies/${movie?.slug}`);
-        if (res.ok) {
-          const data = await res.json();
-          setShowtimes(data.showtimes || []);
+        const parsed = await safeFetchJson<any>(`/api/movies/${movie?.slug}`);
+        if (parsed.ok && parsed.data?.showtimes) {
+          setShowtimes(parsed.data.showtimes);
         }
       } catch (e) {
         console.error('Error fetching showtimes', e);

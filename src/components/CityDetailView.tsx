@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle, Share2, Check } from 'lucide-react';
 import { City, Cinema, Showtime, Movie } from '../types';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface CityDetailViewProps {
   city: City;
@@ -83,23 +84,20 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
     async function loadCityData() {
       try {
         setLoading(true);
-        const [cityRes, stRes, movRes] = await Promise.all([
-          fetch(`/api/cities/${city.slug}`),
-          fetch(`/api/showtimes?city_slug=${city.slug}`),
-          fetch('/api/movies')
+        const [cityParsed, stParsed, movParsed] = await Promise.all([
+          safeFetchJson<any>(`/api/cities/${city.slug}`),
+          safeFetchJson<Showtime[]>(`/api/showtimes?city_slug=${city.slug}`),
+          safeFetchJson<Movie[]>('/api/movies')
         ]);
 
-        if (cityRes.ok) {
-          const cData = await cityRes.json();
-          setData(cData);
+        if (cityParsed.ok && cityParsed.data) {
+          setData(cityParsed.data);
         }
-        if (stRes.ok) {
-          const sData = await stRes.json();
-          setCityShowtimes(sData);
+        if (stParsed.ok && Array.isArray(stParsed.data)) {
+          setCityShowtimes(stParsed.data);
         }
-        if (movRes.ok) {
-          const mData = await movRes.json();
-          setMoviesList(mData);
+        if (movParsed.ok && Array.isArray(movParsed.data)) {
+          setMoviesList(movParsed.data);
         }
       } catch (err) {
         console.error('Failed to load city detail', err);

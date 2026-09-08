@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, Sparkles, Menu } from 'lucide-react';
 import { City } from '../types';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface HeaderProps {
   lang: Language;
@@ -74,10 +75,9 @@ export const Header: React.FC<HeaderProps> = ({
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const res = await fetch(`/api/cities?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data.cities || []);
+        const parsed = await safeFetchJson<any>(`/api/cities?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
+        if (parsed.ok && parsed.data?.cities) {
+          setSuggestions(parsed.data.cities);
           setShowDropdown(true);
         }
       } catch (err) {

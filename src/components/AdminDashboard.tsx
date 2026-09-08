@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Shield, Activity, Database, RefreshCw, Play, 
   Settings, Film, MapPin, Ticket, CheckCircle2, 
@@ -6,6 +6,7 @@ import {
   Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe
 } from 'lucide-react';
 import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings } from '../types';
+import { safeReadJson, safeFetchJson, ApiResponse } from '../utils/api';
 
 interface AdminDashboardProps {
   onClose: () => void;
@@ -18,6 +19,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [activeTab, setActiveTab] = useState<'status' | 'scrape' | 'content' | 'customization'>('status');
+
+  // Polling ref for background scrape job monitoring
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   // Authenticated fetch helper that automatically attaches JWT Bearer token
   const authFetch = async (url: string, options: RequestInit = {}) => {
@@ -35,21 +40,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     return res;
   };
 
+  // Safe authenticated JSON fetch helper that inspects content-type and handles 502/504 gateway timeouts gracefully
+  const authFetchJson = async <T = any>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> => {
+    try {
+      const res = await authFetch(url, options);
+      return await safeReadJson<T>(res);
+    } catch (netErr: any) {
+      return {
+        ok: false,
+        status: 0,
+        error: `Errore di rete o connessione interrotta: ${netErr?.message || netErr}`
+      };
+    }
+  };
+
   // Check existing session on mount
   useEffect(() => {
     async function checkExistingAuth() {
       const storedToken = localStorage.getItem('cinevicino_token');
       if (!storedToken) return;
       try {
-        const res = await fetch('/api/auth/me', {
+        const parsed = await safeFetchJson<any>('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${storedToken}` }
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.user?.is_admin) {
-            setIsAuthenticated(true);
-            setToken(storedToken);
-          }
+        if (parsed.ok && parsed.data?.user?.is_admin) {
+          setIsAuthenticated(true);
+          setToken(storedToken);
         }
       } catch (err) {
         console.error('Failed to verify stored session', err);
@@ -114,33 +130,129 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [customSettings, setCustomSettings] = useState<SiteSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Handle Login via real POST /api/auth/login
+  // Handle Login via real POST /api/auth/login with safe JSON handling
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const parsed = await safeFetchJson<any>('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
       });
 
-      const data = await res.json();
-      if (res.ok && data.token && data.user?.is_admin) {
+      if (!parsed.ok) {
+        setLoginError(parsed.error || 'Credenziali di accesso non valide.');
+        return;
+      }
+
+      const data = parsed.data;
+      if (data?.token && data.user?.is_admin) {
         setToken(data.token);
         localStorage.setItem('cinevicino_token', data.token);
         setIsAuthenticated(true);
         setLoginError('');
-      } else if (res.ok && !data.user?.is_admin) {
+      } else if (!data?.user?.is_admin) {
         setLoginError('Accesso negato: questo account non dispone dei privilegi di amministratore.');
       } else {
-        setLoginError(data.error || 'Credenziali di accesso non valide.');
+        setLoginError(data?.error || 'Credenziali di accesso non valide.');
       }
     } catch (err: any) {
-      setLoginError(`Errore di connessione: ${err.message}`);
+      setLoginError(`Errore di connessione: ${err.message || err}`);
     }
   };
+
+  // Helper to stop polling
+  const stopPolling = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  // Poll background scrape job status and stream console logs
+  const startPollingScrapeJob = useCallback((jobId: string) => {
+    stopPolling();
+    setIsScraping(true);
+    setActiveJobId(jobId);
+
+    const poll = async () => {
+      try {
+        const parsed = await authFetchJson<{ success: boolean; job: any }>(`/api/admin/scrape/status/${jobId}`);
+        if (!parsed.ok || !parsed.data?.job) {
+          if (parsed.status === 404) {
+            stopPolling();
+            setIsScraping(false);
+            setActiveJobId(null);
+            setScrapeConsole(prev => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] [AVVISO] Job ${jobId} non più attivo nel buffer di memoria.`
+            ]);
+          }
+          return;
+        }
+
+        const job = parsed.data.job;
+        if (Array.isArray(job.logs) && job.logs.length > 0) {
+          setScrapeConsole(job.logs);
+        }
+
+        if (job.status === 'completed') {
+          stopPolling();
+          setIsScraping(false);
+          setActiveJobId(null);
+          loadScrapeLogs();
+          loadContent();
+          loadStatus();
+        } else if (job.status === 'failed') {
+          stopPolling();
+          setIsScraping(false);
+          setActiveJobId(null);
+          if (job.error) {
+            setScrapeConsole(prev => [
+              ...prev,
+              `[${new Date().toLocaleTimeString()}] [ERRORE FINALE] ${job.error}`
+            ]);
+          }
+        } else if (job.status === 'cancelled') {
+          stopPolling();
+          setIsScraping(false);
+          setActiveJobId(null);
+        }
+      } catch (err: any) {
+        console.warn('Poll error for scrape job:', err);
+      }
+    };
+
+    poll();
+    pollingIntervalRef.current = setInterval(poll, 2500);
+  }, [stopPolling, token]);
+
+  // Clean up polling timer on unmount
+  useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling]);
+
+  // Check if an active scrape job is already in flight
+  const checkActiveScrapeJob = useCallback(async () => {
+    try {
+      const parsed = await authFetchJson<{ success: boolean; has_active_job: boolean; job: any }>('/api/admin/scrape/active-job');
+      if (parsed.ok && parsed.data?.has_active_job && parsed.data.job?.job_id) {
+        const job = parsed.data.job;
+        if (job.status === 'running') {
+          if (Array.isArray(job.logs) && job.logs.length > 0) {
+            setScrapeConsole(job.logs);
+          }
+          startPollingScrapeJob(job.job_id);
+        }
+      }
+    } catch (e) {
+      console.error('Error checking active scrape job', e);
+    }
+  }, [startPollingScrapeJob]);
 
   // Trigger loads when authenticated
   useEffect(() => {
@@ -149,16 +261,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       loadScrapeLogs();
       loadContent();
       loadSettings();
+      checkActiveScrapeJob();
     }
-  }, [isAuthenticated, token]);
+  }, [isAuthenticated, token, checkActiveScrapeJob]);
 
   // Load Status
   const loadStatus = async () => {
     try {
       setLoadingStatus(true);
-      const res = await authFetch('/api/admin/status');
-      if (res.ok) {
-        setStatusData(await res.json());
+      const parsed = await authFetchJson<any>('/api/admin/status');
+      if (parsed.ok && parsed.data) {
+        setStatusData(parsed.data);
       }
     } catch (e) {
       console.error(e);
@@ -170,9 +283,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Scrape Logs
   const loadScrapeLogs = async () => {
     try {
-      const res = await authFetch('/api/admin/scrape/logs');
-      if (res.ok) {
-        setLogs(await res.json());
+      const parsed = await authFetchJson<ScrapeLog[]>('/api/admin/scrape/logs');
+      if (parsed.ok && Array.isArray(parsed.data)) {
+        setLogs(parsed.data);
       }
     } catch (e) {
       console.error(e);
@@ -182,10 +295,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Content
   const loadContent = async () => {
     try {
-      const res = await authFetch('/api/admin/content/all');
-      if (res.ok) {
-        const data = await res.json();
-        setContentData(data);
+      const parsed = await authFetchJson<any>('/api/admin/content/all');
+      if (parsed.ok && parsed.data) {
+        setContentData(parsed.data);
       }
     } catch (e) {
       console.error(e);
@@ -195,21 +307,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Load Settings
   const loadSettings = async () => {
     try {
-      const res = await authFetch('/api/admin/settings');
-      if (res.ok) {
-        setCustomSettings(await res.json());
+      const parsed = await authFetchJson<SiteSettings>('/api/admin/settings');
+      if (parsed.ok && parsed.data) {
+        setCustomSettings(parsed.data);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Run Scraper
+  // Run Scraper (as asynchronous background job)
   const handleTriggerScrape = async () => {
     setIsScraping(true);
     setScrapeConsole([
-      `[${new Date().toLocaleTimeString()}] Avvio scraping nazionale CineVicino con Cheerio...`,
-      `[${new Date().toLocaleTimeString()}] Querying ComingSoon.it, MYmovies.it, CinemaTimes.com e TMDb...`
+      `[${new Date().toLocaleTimeString()}] Avvio richiesta scraping batch in background...`,
+      `[${new Date().toLocaleTimeString()}] Connessione ai moduli di scraping (ComingSoon.it, MYmovies.it, CinemaTimes.com, TMDb)...`
     ]);
 
     try {
@@ -219,39 +331,74 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       if (scrapeOffset !== '') payload.offset = parseInt(scrapeOffset, 10);
       payload.advance_cursor = scrapeAdvanceCursor;
 
-      const res = await authFetch('/api/admin/scrape/run', {
+      const parsed = await authFetchJson<any>('/api/admin/scrape/run', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.success && data.result) {
-        const r = data.result;
+
+      if (!parsed.ok || !parsed.data) {
         setScrapeConsole(prev => [
           ...prev,
-          `[${new Date().toLocaleTimeString()}] ${r.details}`,
-          `[${new Date().toLocaleTimeString()}] Successo: ${r.showtimes_touched} orari sincronizzati in PostgreSQL.`
+          `[ERRORE SERVER] ${parsed.error || 'Risposta inattesa o non valida dal server'}`
         ]);
-        loadScrapeLogs();
-        loadContent();
-        loadStatus();
+        setIsScraping(false);
+        return;
+      }
+
+      const data = parsed.data;
+      if (data.success && data.job_id) {
+        const jobId = data.job_id;
+        setActiveJobId(jobId);
+        if (data.already_running) {
+          setScrapeConsole(prev => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] Scrape batch già attivo (Job ID: ${jobId}). Connessione al monitoraggio live...`
+          ]);
+        } else {
+          setScrapeConsole(prev => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] Job avviato in background con successo (Job ID: ${jobId}). Avvio streaming log...`
+          ]);
+        }
+        startPollingScrapeJob(jobId);
       } else {
-        setScrapeConsole(prev => [...prev, `[ERRORE] ${data.error || 'Errore durante lo scrape'}`]);
+        setScrapeConsole(prev => [...prev, `[ERRORE] ${data.error || 'Impossibile avviare il job di scraping'}`]);
+        setIsScraping(false);
       }
     } catch (err: any) {
-      setScrapeConsole(prev => [...prev, `[ERRORE] ${err.message}`]);
-    } finally {
+      setScrapeConsole(prev => [...prev, `[ERRORE RETE] ${err.message || err}`]);
       setIsScraping(false);
+    }
+  };
+
+  // Cancel/Stop active scrape job
+  const handleCancelScrape = async () => {
+    try {
+      const parsed = await authFetchJson('/api/admin/scrape/cancel', {
+        method: 'POST'
+      });
+      if (parsed.ok) {
+        stopPolling();
+        setIsScraping(false);
+        setActiveJobId(null);
+        setScrapeConsole(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] Scraping interrotto dall'amministratore.`
+        ]);
+      }
+    } catch (e: any) {
+      console.error('Failed to cancel scrape job', e);
     }
   };
 
   // Reset Scraper Cursor to 0
   const handleResetCursor = async () => {
     try {
-      const res = await authFetch('/api/admin/scrape/cursor', {
+      const parsed = await authFetchJson('/api/admin/scrape/cursor', {
         method: 'POST',
         body: JSON.stringify({ offset: 0 })
       });
-      if (res.ok) {
+      if (parsed.ok) {
         setScrapeOffset('');
         loadStatus();
       }
@@ -264,13 +411,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleTestTmdb = async () => {
     try {
       setTestingTmdb(true);
-      const res = await authFetch('/api/admin/diagnostics/tmdb/test', {
+      const parsed = await authFetchJson<any>('/api/admin/diagnostics/tmdb/test', {
         method: 'POST',
         body: JSON.stringify({ query: 'Dune' })
       });
-      const data = await res.json();
-      if (data.result) {
-        setTmdbTestResult(data.result);
+      if (parsed.ok && parsed.data?.result) {
+        setTmdbTestResult(parsed.data.result);
         loadStatus();
       }
     } catch (e: any) {
@@ -284,13 +430,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleTestFirecrawl = async () => {
     try {
       setTestingFirecrawl(true);
-      const res = await authFetch('/api/admin/diagnostics/firecrawl/test', {
+      const parsed = await authFetchJson<any>('/api/admin/diagnostics/firecrawl/test', {
         method: 'POST',
         body: JSON.stringify({ url: 'https://example.com' })
       });
-      const data = await res.json();
-      if (data.result) {
-        setFirecrawlTestResult(data.result);
+      if (parsed.ok && parsed.data?.result) {
+        setFirecrawlTestResult(parsed.data.result);
         loadStatus();
       }
     } catch (e: any) {
@@ -304,13 +449,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const handleTestScrapers = async () => {
     try {
       setTestingScrapers(true);
-      const res = await authFetch('/api/admin/diagnostics/scraper/test', {
+      const parsed = await authFetchJson<any>('/api/admin/diagnostics/scraper/test', {
         method: 'POST',
         body: JSON.stringify({ city: 'roma' })
       });
-      const data = await res.json();
-      if (data.result) {
-        setScrapersTestResult(data.result);
+      if (parsed.ok && parsed.data?.result) {
+        setScrapersTestResult(parsed.data.result);
         loadStatus();
       }
     } catch (e: any) {
@@ -325,19 +469,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     try {
       setUpdatingGeoip(true);
       setGeoipMessage('');
-      const res = await authFetch('/api/admin/geoip/update', {
+      const parsed = await authFetchJson<any>('/api/admin/geoip/update', {
         method: 'POST',
         body: JSON.stringify({ license_key: geoipLicenseInput.trim() || undefined })
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setGeoipMessage(`✅ ${data.message || 'Database GeoLite2 aggiornato'}`);
+      if (parsed.ok && parsed.data?.success) {
+        setGeoipMessage(`✅ ${parsed.data.message || 'Database GeoLite2 aggiornato'}`);
         loadStatus();
       } else {
-        setGeoipMessage(`❌ ${data.error || 'Errore durante l\'aggiornamento'}`);
+        setGeoipMessage(`❌ ${parsed.error || parsed.data?.error || 'Errore durante l\'aggiornamento'}`);
       }
     } catch (err: any) {
-      setGeoipMessage(`❌ ${err.message}`);
+      setGeoipMessage(`❌ ${err.message || err}`);
     } finally {
       setUpdatingGeoip(false);
     }
@@ -346,11 +489,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Toggle Active Showtime
   const handleToggleShowtime = async (id: string, currentActive: boolean) => {
     try {
-      const res = await authFetch('/api/admin/content/toggle-active', {
+      const parsed = await authFetchJson('/api/admin/content/toggle-active', {
         method: 'POST',
         body: JSON.stringify({ showtime_id: id, active: !currentActive })
       });
-      if (res.ok) {
+      if (parsed.ok) {
         loadContent();
       }
     } catch (e) {
@@ -364,11 +507,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!customSettings) return;
 
     try {
-      const res = await authFetch('/api/admin/settings', {
+      const parsed = await authFetchJson('/api/admin/settings', {
         method: 'PUT',
         body: JSON.stringify(customSettings)
       });
-      if (res.ok) {
+      if (parsed.ok) {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       }
@@ -383,7 +526,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!newCinemaName.trim() || !newCinemaAddress.trim()) return;
 
     try {
-      const res = await authFetch('/api/admin/content/cinema', {
+      const parsed = await authFetchJson('/api/admin/content/cinema', {
         method: 'POST',
         body: JSON.stringify({
           id: `cin-${Date.now()}`,
@@ -393,7 +536,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           city_id: 'c-roma'
         })
       });
-      if (res.ok) {
+      if (parsed.ok) {
         setNewCinemaName('');
         setNewCinemaAddress('');
         setShowAddCinema(false);
@@ -410,7 +553,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     if (!newMovieTitle.trim()) return;
 
     try {
-      const res = await authFetch('/api/admin/content/movie', {
+      const parsed = await authFetchJson('/api/admin/content/movie', {
         method: 'POST',
         body: JSON.stringify({
           id: `mov-${Date.now()}`,
@@ -423,7 +566,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           is_featured: true
         })
       });
-      if (res.ok) {
+      if (parsed.ok) {
         setNewMovieTitle('');
         setNewMovieDirector('');
         setShowAddMovie(false);
@@ -1119,14 +1262,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                     </label>
                   </div>
 
-                  <button
-                    onClick={handleTriggerScrape}
-                    disabled={isScraping}
-                    className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    <Play className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
-                    <span>{isScraping ? 'Scraping in corso...' : 'Avvia Scrape Batch'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTriggerScrape}
+                      disabled={isScraping}
+                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      <Play className={`w-4 h-4 ${isScraping ? 'animate-spin' : ''}`} />
+                      <span>{isScraping ? 'Job in corso (polling attivo)...' : 'Avvia Scrape Batch'}</span>
+                    </button>
+
+                    {isScraping && (
+                      <button
+                        onClick={handleCancelScrape}
+                        className="px-3.5 py-2.5 rounded-xl bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Segnala interruzione al job di background"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>Interrompi</span>
+                      </button>
+                    )}
+
+                    {scrapeConsole.length > 0 && !isScraping && (
+                      <button
+                        onClick={() => setScrapeConsole([])}
+                        className="px-3 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 text-xs transition-colors cursor-pointer"
+                        title="Pulisci output console"
+                      >
+                        Pulisci Console
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Recently Covered Cities Badge View in Scrape Tab */}
@@ -1178,10 +1344,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
                 {/* Scrape Terminal Window */}
                 {scrapeConsole.length > 0 && (
-                  <div className="mt-4 p-4 rounded-xl bg-black border border-neutral-800 font-mono text-xs text-emerald-400 space-y-1 max-h-48 overflow-y-auto">
-                    <div className="flex items-center gap-2 text-neutral-500 pb-2 border-b border-neutral-800 mb-2">
-                      <Terminal className="w-3.5 h-3.5 text-neutral-400" />
-                      <span>Console di esecuzione scraper</span>
+                  <div className="mt-4 p-4 rounded-xl bg-black border border-neutral-800 font-mono text-xs text-emerald-400 space-y-1 max-h-64 overflow-y-auto">
+                    <div className="flex items-center justify-between text-neutral-500 pb-2 border-b border-neutral-800 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Terminal className="w-3.5 h-3.5 text-neutral-400" />
+                        <span>Console di esecuzione scraper (Job background)</span>
+                        {isScraping && (
+                          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-semibold animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            POLLING LIVE
+                          </span>
+                        )}
+                      </div>
+                      {activeJobId && (
+                        <span className="text-[10px] text-neutral-500 font-mono">
+                          ID: {activeJobId}
+                        </span>
+                      )}
                     </div>
                     {scrapeConsole.map((line, idx) => (
                       <p key={idx} className="leading-relaxed">

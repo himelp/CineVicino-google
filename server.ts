@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -1137,7 +1138,40 @@ app.post(['/api/admin/diagnostics/scraper/test', '/api/admin/diagnostics/scraper
   }
 });
 
-// Admin Scraper: Run Real Cheerio Scrape with Optional Offset and Cursor Rotation
+// ==========================================
+// BACKGROUND SCRAPER JOB MANAGEMENT
+// ==========================================
+
+interface ScrapeBackgroundJob {
+  job_id: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  started_at: string;
+  completed_at?: string;
+  triggered_by: string;
+  options: {
+    useFirecrawl?: boolean;
+    city?: string;
+    limit?: number;
+    offset?: number;
+    advanceCursor?: boolean;
+  };
+  progress: {
+    step: string;
+    source: string;
+    count: number;
+    message: string;
+    timestamp: string;
+  };
+  logs: string[];
+  result?: any;
+  scraper_rotation?: any;
+  error?: string;
+}
+
+let activeScrapeJob: ScrapeBackgroundJob | null = null;
+const scrapeJobsHistory = new Map<string, ScrapeBackgroundJob>();
+
+// Admin Scraper: Start Scrape as Background Job (returns immediately to prevent HTTP/proxy timeouts)
 app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const targetCity = (req.query.city as string) || req.body?.city;
@@ -1145,26 +1179,173 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
     const rawOffset = req.query.offset !== undefined ? req.query.offset : req.body?.offset;
     const targetOffset = rawOffset !== undefined && rawOffset !== '' ? parseInt(rawOffset as string, 10) : undefined;
     const advanceCursor = req.query.advance_cursor === 'true' || req.body?.advance_cursor === true || req.body?.rotate === true;
+    const useFirecrawl = req.body?.useFirecrawl === true;
 
-    logger.info({ user: req.user!.email, targetCity, targetLimit, targetOffset, advanceCursor }, 'Admin triggered real Cheerio cinema scrape');
-    const result = await cinemaScraper.executeFullScrape({
-      useFirecrawl: req.body?.useFirecrawl === true,
-      city: targetCity,
-      limit: targetLimit,
-      offset: targetOffset,
-      advanceCursor
+    // Check if an active scrape is already running
+    if (activeScrapeJob && activeScrapeJob.status === 'running') {
+      const elapsedMs = Date.now() - new Date(activeScrapeJob.started_at).getTime();
+      // Guard against stale hung jobs older than 30 minutes
+      if (elapsedMs < 30 * 60 * 1000) {
+        logger.info({ existingJobId: activeScrapeJob.job_id }, 'Scrape request received while another job is active');
+        return res.status(200).json({
+          success: true,
+          status: 'running',
+          already_running: true,
+          job_id: activeScrapeJob.job_id,
+          message: 'Uno scrape batch è già attualmente in esecuzione. Connessione al monitoraggio del job...',
+          job: activeScrapeJob
+        });
+      } else {
+        // Mark stale job as failed
+        activeScrapeJob.status = 'failed';
+        activeScrapeJob.error = 'Job interrotto per timeout (superati 30 minuti).';
+        activeScrapeJob.completed_at = new Date().toISOString();
+      }
+    }
+
+    const jobId = `scrape-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+    const initialLog = `[${new Date().toLocaleTimeString()}] Avvio scraping batch CineVicino in background (Job: ${jobId})...`;
+    const targetDesc = targetCity
+      ? `Città specifica: ${targetCity}`
+      : `Batch rotazione nazionale (${targetLimit || 25} comuni, offset: ${targetOffset !== undefined ? targetOffset : 'automatico'})`;
+
+    const job: ScrapeBackgroundJob = {
+      job_id: jobId,
+      status: 'running',
+      started_at: new Date().toISOString(),
+      triggered_by: req.user?.email || 'admin',
+      options: {
+        useFirecrawl,
+        city: targetCity,
+        limit: targetLimit,
+        offset: targetOffset,
+        advanceCursor
+      },
+      progress: {
+        step: 'init',
+        source: 'System',
+        count: 0,
+        message: 'Inizializzazione dello scraper in background...',
+        timestamp: new Date().toISOString()
+      },
+      logs: [
+        initialLog,
+        `[${new Date().toLocaleTimeString()}] ${targetDesc}`,
+        `[${new Date().toLocaleTimeString()}] Motore: Cheerio + fetch HTTP ${useFirecrawl ? '+ Firecrawl fallback' : ''}`
+      ]
+    };
+
+    activeScrapeJob = job;
+    scrapeJobsHistory.set(jobId, job);
+    if (scrapeJobsHistory.size > 25) {
+      const oldestKey = scrapeJobsHistory.keys().next().value;
+      if (oldestKey) scrapeJobsHistory.delete(oldestKey);
+    }
+
+    logger.info({ user: req.user!.email, jobId, targetCity, targetLimit, targetOffset, advanceCursor }, 'Admin started background cinema scrape');
+
+    // Respond immediately with 202 Accepted so proxy / Cloudflare never times out
+    res.status(202).json({
+      success: true,
+      status: 'running',
+      job_id: jobId,
+      message: 'Scrape batch avviato con successo in background.',
+      job
     });
 
-    const cursorState = await cinemaScraper.getScraperCursorState(targetLimit || 25);
+    // Execute the scrape asynchronously
+    (async () => {
+      try {
+        const result = await cinemaScraper.executeFullScrape(
+          job.options,
+          (update) => {
+            job.progress = {
+              step: update.step,
+              source: update.source,
+              count: update.count,
+              message: update.message,
+              timestamp: update.timestamp
+            };
+            const line = `[${new Date().toLocaleTimeString()}] [${update.source}] ${update.message}`;
+            job.logs.push(line);
+            if (job.logs.length > 300) {
+              job.logs.shift();
+            }
+          }
+        );
+
+        const cursorState = await cinemaScraper.getScraperCursorState(job.options.limit || 25);
+        job.status = 'completed';
+        job.completed_at = new Date().toISOString();
+        job.result = result;
+        job.scraper_rotation = cursorState;
+        job.logs.push(`[${new Date().toLocaleTimeString()}] [Completato] ${result.details}`);
+        job.logs.push(`[${new Date().toLocaleTimeString()}] [DB] ${result.showtimes_touched} programmazioni sincronizzate su ${result.cinemas_touched} cinema.`);
+        logger.info({ jobId, showtimes: result.showtimes_touched, cinemas: result.cinemas_touched }, 'Background scrape job finished');
+      } catch (err: any) {
+        job.status = 'failed';
+        job.completed_at = new Date().toISOString();
+        job.error = err?.message || 'Errore imprevisto durante lo scraping';
+        job.logs.push(`[${new Date().toLocaleTimeString()}] [ERRORE] ${job.error}`);
+        logger.error({ jobId, err }, 'Background scrape job failed');
+      }
+    })();
+
+  } catch (err: any) {
+    logger.error({ err }, 'Error launching admin background scrape');
+    res.status(500).json({ error: 'Errore durante l\'avvio dello scraping', details: err?.message });
+  }
+});
+
+// Admin Scraper: Get Status and Streamed Logs of a Specific Job (or current)
+app.get('/api/admin/scrape/status/:job_id', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { job_id } = req.params;
+    const job = (job_id === 'current' || job_id === 'active')
+      ? activeScrapeJob
+      : (scrapeJobsHistory.get(job_id) || (activeScrapeJob?.job_id === job_id ? activeScrapeJob : null));
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job di scraping non trovato o sessione scaduta' });
+    }
 
     res.json({
       success: true,
-      result,
-      scraper_rotation: cursorState
+      job
     });
   } catch (err: any) {
-    logger.error({ err }, 'Error executing admin scrape');
-    res.status(500).json({ error: 'Errore durante l\'esecuzione dello scraping', details: err?.message });
+    logger.error({ err }, 'Error fetching scrape job status');
+    res.status(500).json({ error: 'Errore nel recupero dello stato del job' });
+  }
+});
+
+// Admin Scraper: Get Current Active Scrape Job (for UI resumption on page load)
+app.get('/api/admin/scrape/active-job', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json({
+      success: true,
+      has_active_job: !!(activeScrapeJob && activeScrapeJob.status === 'running'),
+      job: activeScrapeJob
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error fetching active scrape job');
+    res.status(500).json({ error: 'Errore nel recupero del job attivo' });
+  }
+});
+
+// Admin Scraper: Cancel/Stop Active Scrape Job
+app.post('/api/admin/scrape/cancel', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (activeScrapeJob && activeScrapeJob.status === 'running') {
+      activeScrapeJob.status = 'cancelled';
+      activeScrapeJob.completed_at = new Date().toISOString();
+      activeScrapeJob.logs.push(`[${new Date().toLocaleTimeString()}] [Annullato] Job contrassegnato come annullato dall'amministratore.`);
+      return res.json({ success: true, message: 'Job di scraping contrassegnato come annullato', job: activeScrapeJob });
+    }
+    res.json({ success: true, message: 'Nessun job attivo in corso da annullare' });
+  } catch (err: any) {
+    logger.error({ err }, 'Error cancelling scrape job');
+    res.status(500).json({ error: 'Errore nell\'annullamento del job' });
   }
 });
 

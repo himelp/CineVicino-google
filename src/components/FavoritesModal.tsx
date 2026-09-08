@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Bookmark, Film, MapPin, Bell, Trash2, CheckCircle2, ExternalLink, Mail } from 'lucide-react';
 import { Movie, Cinema, City } from '../types';
 import { Language, translations } from '../utils/i18n';
+import { safeFetchJson } from '../utils/api';
 
 interface FavoritesModalProps {
   lang: Language;
@@ -37,7 +38,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
 
     try {
       setAlertLoading(true);
-      const res = await fetch('/api/alerts', {
+      const parsed = await safeFetchJson<any>('/api/alerts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -45,7 +46,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
           city_id: activeCity?.id || 'city-rm-058091'
         })
       });
-      if (res.ok) {
+      if (parsed.ok) {
         setAlertSubscribed(true);
         setAlertEmail('');
       }
