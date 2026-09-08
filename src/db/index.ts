@@ -284,9 +284,14 @@ export async function initDb() {
   // Seed Italian Comuni dataset if empty
   try {
     const { seedCitiesIfEmpty } = await import('./seedCities');
-    seedCitiesIfEmpty().catch(err => {
-      console.warn('⚠️ seedCitiesIfEmpty background error:', err?.message);
-    });
+    seedCitiesIfEmpty()
+      .then(async () => {
+        const { seedContentIfEmpty } = await import('./seedContent');
+        await seedContentIfEmpty();
+      })
+      .catch(err => {
+        console.warn('⚠️ seedCitiesIfEmpty background error:', err?.message);
+      });
   } catch (err: any) {
     console.warn('⚠️ seedCitiesIfEmpty import notice:', err?.message);
   }
