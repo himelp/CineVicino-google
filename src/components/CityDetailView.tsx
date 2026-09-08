@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle, Share2, Check } from 'lucide-react';
 import { City, Cinema, Showtime, Movie } from '../types';
-import { Language, translations } from '../utils/i18n';
+import { Language, translations, getMovieTitle } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
 
 interface CityDetailViewProps {
@@ -297,17 +297,18 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                       {/* Today's Showtimes */}
                       <div className="mt-6 pt-4 border-t border-white/10">
                         <span className="text-xs font-semibold text-neutral-300 block mb-3">
-                          Programmazione di oggi:
+                          {t.todayProgramming}
                         </span>
 
                         {cinemaSt.length === 0 ? (
                           <p className="text-xs text-neutral-500 italic">
-                            Nessun orario corrispondente ai filtri per oggi.
+                            {t.noFilterMatch}
                           </p>
                         ) : (
                           <div className="space-y-2.5">
                             {cinemaSt.map(st => {
                               const movie = moviesList.find(m => m.id === st.movie_id);
+                              const displayedMovieTitle = movie ? getMovieTitle(movie, lang) : (st.movie_title || '');
                               return (
                                 <div key={st.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-black/40 border border-white/10">
                                   <div 
@@ -315,7 +316,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                     className="cursor-pointer group flex items-center gap-2.5 overflow-hidden flex-1 min-w-0"
                                   >
                                     <span className="text-xs font-bold text-white group-hover:text-[#D4AF37] truncate">
-                                      {st.movie_title || movie?.title_it}
+                                      {displayedMovieTitle}
                                     </span>
                                     <span className="text-[10px] text-neutral-500 font-mono shrink-0">
                                       {st.format}

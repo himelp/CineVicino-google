@@ -1,7 +1,7 @@
 import React from 'react';
 import { Star, Clock, Calendar, Bookmark, Play, ChevronRight, Sparkles } from 'lucide-react';
 import { Movie } from '../types';
-import { Language, translations } from '../utils/i18n';
+import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 
 interface MovieCardProps {
   movie: Movie;
@@ -19,8 +19,8 @@ export const MovieCard: React.FC<MovieCardProps> = ({
   onToggleFavorite
 }) => {
   const t = translations[lang];
-  const title = lang === 'en' ? movie.title_en : movie.title_it;
-  const synopsis = lang === 'en' ? movie.synopsis_en : movie.synopsis_it;
+  const title = getMovieTitle(movie, lang);
+  const { text: synopsis } = getMovieSynopsis(movie, lang);
 
   const hours = Math.floor(movie.duration_minutes / 60);
   const minutes = movie.duration_minutes % 60;
@@ -66,7 +66,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
             e.stopPropagation();
             onToggleFavorite(movie.id);
           }}
-          title={isFavorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'}
+          title={isFavorite ? t.removeFromFavorites : t.addToFavorites}
           className={`absolute bottom-3 right-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-95 ${
             isFavorite
               ? 'bg-[#D4AF37] text-black border-[#D4AF37]'
@@ -122,7 +122,7 @@ export const MovieCard: React.FC<MovieCardProps> = ({
           className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between w-full min-h-[44px] py-1 text-left group/btn transition-colors cursor-pointer"
         >
           <span className="text-[11px] uppercase tracking-widest text-white/90 group-hover/btn:text-[#D4AF37] border-b border-transparent group-hover/btn:border-[#D4AF37] pb-0.5 transition-colors">
-            Programmazione & Orari
+            {t.showtimesAndHours}
           </span>
           <span className="text-xs font-bold text-[#D4AF37] flex items-center gap-1 group-hover/btn:translate-x-1 transition-transform">
             <ChevronRight className="w-4 h-4" />

@@ -54,16 +54,17 @@ export function generateSessionToken(user: AuthUser): string {
     {
       id: user.id,
       email: user.email,
-      is_admin: user.is_admin
+      name: user.name || '',
+      is_admin: Boolean(user.is_admin)
     },
     getJwtSecret(),
     { expiresIn: TOKEN_EXPIRY }
   );
 }
 
-export function verifySessionToken(token: string): { id: string; email: string; is_admin: boolean } | null {
+export function verifySessionToken(token: string): { id: string; email: string; is_admin: boolean; name?: string } | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as { id: string; email: string; is_admin: boolean };
+    return jwt.verify(token, getJwtSecret()) as { id: string; email: string; is_admin: boolean; name?: string };
   } catch {
     return null;
   }
@@ -92,9 +93,13 @@ export async function findUserById(id: string): Promise<AuthUser | null> {
 }
 
 /**
- * Express middleware to authenticate JWT token from Authorization header or cookie
+ * Express middleware to authenticate JWT token from Authorization header or cookie.
+ * Trusts the signed JWT payload directly — does not perform a database round-trip on
+ * every request. A DB hiccup (e.g. the scraper saturating the connection pool during
+ * a batch run) must never be able to force a false "session expired" logout for an
+ * otherwise valid token.
  */
-export async function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export function authenticateToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   let token: string | undefined;
 
   const authHeader = req.headers.authorization;
@@ -113,15 +118,37 @@ export async function authenticateToken(req: AuthenticatedRequest, res: Response
     return next();
   }
 
-  try {
-    const user = await findUserById(payload.id);
-    if (user) {
-      req.user = user;
-    }
-  } catch (err) {
-    console.error('Error in authenticateToken lookup:', err);
-  }
+  // Trust the signed JWT payload directly
+  req.user = {
+    id: payload.id,
+    email: payload.email,
+    is_admin: Boolean(payload.is_admin),
+    name: payload.name || '',
+    created_at: ''
+  };
 
+  next();
+}
+
+/**
+ * Optional check for sensitive write mutations to catch deleted accounts.
+ * Treats database errors or timeouts as non-fatal (logs warning, allows through)
+ * so transient DB contention never locks out legitimate admins.
+ */
+export async function verifyActiveUser(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user?.id) return next();
+  try {
+    const user = await findUserById(req.user.id);
+    if (user === null) {
+      return res.status(401).json({
+        error: 'Account non trovato',
+        message: 'L\'account utente non è più attivo o è stato rimosso.',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+  } catch (err: any) {
+    console.warn('[AUTH] Transient database error verifying active user, allowing request:', err?.message);
+  }
   next();
 }
 

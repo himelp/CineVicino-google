@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
-import { Language, translations } from '../utils/i18n';
+import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
 
 interface MovieDetailModalProps {
@@ -52,8 +52,8 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
 
   if (!movie) return null;
 
-  const title = lang === 'en' ? movie.title_en : movie.title_it;
-  const synopsis = lang === 'en' ? movie.synopsis_en : movie.synopsis_it;
+  const title = getMovieTitle(movie, lang);
+  const { text: synopsis, isFallback } = getMovieSynopsis(movie, lang);
 
   // Available dates
   const today = new Date();
@@ -222,8 +222,13 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
           {/* Metadata & Synopsis Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-6 border-b border-white/10">
             <div className="md:col-span-2 space-y-4">
-              <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#D4AF37]">
-                {t.synopsis}
+              <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[#D4AF37] flex items-center gap-2">
+                <span>{t.synopsis}</span>
+                {isFallback && lang === 'en' && (
+                  <span className="text-[10px] lowercase italic font-normal text-amber-400/80 tracking-normal">
+                    — {t.originalSynopsisNote}
+                  </span>
+                )}
               </h4>
               <p className="text-neutral-300 text-sm sm:text-base leading-relaxed">
                 {synopsis}

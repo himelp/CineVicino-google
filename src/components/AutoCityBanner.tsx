@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Navigation, Search, X, Check, Globe, Crosshair, ChevronDown, Sparkles } from 'lucide-react';
 import { City } from '../types';
 import { safeFetchJson } from '../utils/api';
+import { useTranslation } from '../context/LanguageContext';
 
 export interface AutoDetectInfo {
   detected: boolean;
@@ -31,6 +32,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
   isPreciseLocating,
   onDismiss
 }) => {
+  const { t } = useTranslation();
   const [isChangingCity, setIsChangingCity] = useState(false);
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<City[]>([]);
@@ -103,13 +105,13 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
             ) : (
               <Globe className="w-3 h-3 text-amber-400" />
             )}
-            <span>{isGps ? 'GPS Preciso' : 'Rilevato via IP'}</span>
+            <span>{isGps ? t.bannerGps : t.bannerIp}</span>
           </span>
 
           {/* Prompt statement */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-medium text-neutral-200">
-              Cinema vicino a <strong className="text-white underline decoration-amber-500/50 underline-offset-4">{cityName}</strong>{' '}
+              {t.bannerCinemasNear} <strong className="text-white underline decoration-amber-500/50 underline-offset-4">{cityName}</strong>{' '}
               {provCode && <span className="text-neutral-400 text-xs font-mono">({provCode})</span>}
             </span>
             <span className="text-neutral-500 hidden xs:inline">—</span>
@@ -122,7 +124,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
                 className="font-semibold text-amber-400 hover:text-amber-300 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1 min-h-[32px] px-1"
                 aria-expanded={isChangingCity}
               >
-                <span>Non sei qui? Cambia città</span>
+                <span>{t.bannerNotHere}</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${isChangingCity ? 'rotate-180' : ''}`} />
               </button>
 
@@ -136,7 +138,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
                       type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Cerca tra i 7.894 comuni..."
+                      placeholder={t.bannerSearchComuni}
                       className="w-full pl-8 pr-7 py-1.5 bg-black/60 border border-white/10 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-amber-500"
                     />
                     {query && (
@@ -153,7 +155,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
                   {/* Suggestions */}
                   <div className="mt-2 max-h-48 overflow-y-auto no-scrollbar divide-y divide-white/5">
                     {isSearching ? (
-                      <div className="p-3 text-center text-xs text-neutral-400">Ricerca in corso...</div>
+                      <div className="p-3 text-center text-xs text-neutral-400">{t.bannerSearching}</div>
                     ) : suggestions.length > 0 ? (
                       suggestions.map((city) => (
                         <button
@@ -173,10 +175,10 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
                         </button>
                       ))
                     ) : query.trim().length >= 2 ? (
-                      <div className="p-3 text-center text-xs text-neutral-500">Nessun comune trovato</div>
+                      <div className="p-3 text-center text-xs text-neutral-500">{t.bannerNoCityFound}</div>
                     ) : (
                       <div className="p-2 text-[11px] text-neutral-400 text-center">
-                        Digita almeno 2 lettere per trovare il tuo comune
+                        {t.bannerTypeMinChars}
                       </div>
                     )}
                   </div>
@@ -198,7 +200,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
             >
               <Navigation className={`w-3.5 h-3.5 text-amber-400 ${isPreciseLocating ? 'animate-spin' : ''}`} />
               <span>
-                {isPreciseLocating ? 'Rilevamento GPS...' : 'Usa la mia posizione precisa'}
+                {isPreciseLocating ? t.bannerLocating : t.bannerPreciseLocate}
               </span>
             </button>
           )}
@@ -207,7 +209,7 @@ export const AutoCityBanner: React.FC<AutoCityBannerProps> = ({
           <button
             type="button"
             onClick={onDismiss}
-            aria-label="Chiudi avviso posizione"
+            aria-label={t.close}
             className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />

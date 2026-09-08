@@ -216,6 +216,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: string;
     backdrop: string;
     tmdb_id: number;
+    title_it?: string;
+    title_en?: string;
+    title_original?: string;
+    synopsis_it?: string;
+    synopsis_en?: string;
     director?: string;
     genres?: string[];
     duration?: number;
@@ -225,6 +230,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
     tmdb_id: 693134,
+    title_it: 'Dune: Parte Due',
+    title_en: 'Dune: Part Two',
+    title_original: 'Dune: Part Two',
+    synopsis_it: 'Il viaggio mitico di Paul Atreides si unisce a Chani e ai Fremen sul sentiero della vendetta contro i cospiratori che hanno distrutto la sua famiglia.',
+    synopsis_en: 'Follow the mythic journey of Paul Atreides as he unites with Chani and the Fremen while on a warpath of revenge against the conspirators who destroyed his family.',
     director: 'Denis Villeneuve',
     genres: ['Fantascienza', 'Avventura'],
     duration: 166
@@ -233,6 +243,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/1F5BPNbhxaWAA83YTnPjcswt7Nc.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/3V4kLQg0kSqPLctI5ziAhOWiT4T.jpg',
     tmdb_id: 1146200,
+    title_it: 'Parthenope',
+    title_en: 'Parthenope',
+    title_original: 'Parthenope',
+    synopsis_it: 'Il lungo viaggio della vita di Parthenope, dalla sua nascita nel 1950 fino a oggi. Un\'epopea al femminile priva di eroismi, ma colma di passione per la libertà.',
+    synopsis_en: 'The life journey of Parthenope, from her birth in 1950 to the present day. A feminine epic without heroism, but brimming with passion for freedom.',
     director: 'Paolo Sorrentino',
     genres: ['Drammatico', 'Fantasy'],
     duration: 136
@@ -241,6 +256,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/qVZ8aoYtUDSi91DR0d54XhQVbgQ.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/lG7yV10N4E7k6Xn2kG8l9U7kQ5n.jpg',
     tmdb_id: 1251398,
+    title_it: 'Vermiglio',
+    title_en: 'Vermiglio: The Mountain Bride',
+    title_original: 'Vermiglio',
+    synopsis_it: 'Nel 1944, in un remoto villaggio di montagna delle Alpi trentine, l\'arrivo di un soldato rifugiato sconvolge la vita della famiglia del maestro elementare.',
+    synopsis_en: 'In 1944, in a remote mountain village in the Italian Alps, the arrival of a refugee soldier alters the quiet routine of the local schoolmaster\'s family.',
     director: 'Maura Delpero',
     genres: ['Drammatico', 'Storico'],
     duration: 119
@@ -249,6 +269,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/euYIwmqkmz95mnXvufEmbL69ovr.jpg',
     tmdb_id: 558449,
+    title_it: 'Il Gladiatore II',
+    title_en: 'Gladiator II',
+    title_original: 'Gladiator II',
+    synopsis_it: 'Anni dopo aver assistito alla morte dell\'eroe Massimo per mano dello zio, Lucio deve entrare nel Colosseo dopo che la sua casa è stata conquistata dai tirannici imperatori.',
+    synopsis_en: 'Years after witnessing the death of Maximus at the hands of his uncle, Lucius must enter the Colosseum after the emperors conquer his home.',
     director: 'Ridley Scott',
     genres: ['Azione', 'Avventura', 'Drammatico'],
     duration: 148
@@ -257,6 +282,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/ptpr0kGAckfQkJeJIt8st5dglvd.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
     tmdb_id: 872585,
+    title_it: 'Oppenheimer',
+    title_en: 'Oppenheimer',
+    title_original: 'Oppenheimer',
+    synopsis_it: 'La storia del fisico statunitense J. Robert Oppenheimer e del suo ruolo fondamentale nello sviluppo della bomba atomica durante il Progetto Manhattan.',
+    synopsis_en: 'The story of J. Robert Oppenheimer\'s role in the development of the atomic bomb during World War II.',
     director: 'Christopher Nolan',
     genres: ['Drammatico', 'Storia'],
     duration: 180
@@ -265,6 +295,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/rDzig50dj7VpLwJ7SThbamETK1G.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/o3r5yO4pnd6P725nff4QyK1z73T.jpg',
     tmdb_id: 1154598,
+    title_it: 'C\'è ancora domani',
+    title_en: 'There\'s Still Tomorrow',
+    title_original: 'C\'è ancora domani',
+    synopsis_it: 'Roma, seconda metà degli anni Quaranta. Delia è la moglie di Ivano e madre di tre figli. La notizia del fidanzamento della primogenita accende una scintilla di speranza.',
+    synopsis_en: 'Rome, second half of the 1940s. Delia is married to Ivano and mother of three. The upcoming engagement of her eldest daughter sparks a desire for change.',
     director: 'Paola Cortellesi',
     genres: ['Drammatico', 'Commedia'],
     duration: 118
@@ -273,6 +308,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/pj1ROuB1AKJCpKV6nD7yt1vKfXy.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/m5x83w114AcLVlos43NG8j4q5i9.jpg',
     tmdb_id: 974950,
+    title_it: 'Conclave',
+    title_en: 'Conclave',
+    title_original: 'Conclave',
+    synopsis_it: 'Dopo la morte inaspettata del Papa, il cardinale Lawrence ha il compito di gestire uno degli eventi più segreti e antichi del mondo: la selezione di un nuovo leader.',
+    synopsis_en: 'After the unexpected death of the Pope, Cardinal Lawrence is tasked with managing one of the world\'s most secretive and ancient events: selecting a new Pontiff.',
     director: 'Edward Berger',
     genres: ['Thriller', 'Drammatico'],
     duration: 120
@@ -281,6 +321,11 @@ const KNOWN_TMDB_POSTERS: Record<
     poster: 'https://image.tmdb.org/t/p/w780/tlwzOOCxcxtE7bXGvs3QlpmM5C0.jpg',
     backdrop: 'https://image.tmdb.org/t/p/w1280/uKb22E5wvUXXPY8AyE0jQ7xQz8w.jpg',
     tmdb_id: 402431,
+    title_it: 'Wicked',
+    title_en: 'Wicked',
+    title_original: 'Wicked',
+    synopsis_it: 'La storia mai raccontata delle streghe di Oz: Elphaba, una giovane donna incompresa per la sua pelle verde, e Glinda, una ragazza baciata dalla popolarità.',
+    synopsis_en: 'The untold story of the witches of Oz: Elphaba, misunderstood because of her green skin, and Glinda, a popular girl gilded by privilege.',
     director: 'Jon M. Chu',
     genres: ['Musical', 'Fantasy'],
     duration: 160
@@ -700,6 +745,9 @@ export class NationwideCinemaScraper {
     poster_url: string;
     backdrop_url: string;
     tmdb_id: number | null;
+    title_it?: string;
+    title_en?: string;
+    title_original?: string;
     synopsis_it?: string;
     synopsis_en?: string;
     director?: string;
@@ -722,6 +770,11 @@ export class NationwideCinemaScraper {
         poster_url: known.poster,
         backdrop_url: known.backdrop,
         tmdb_id: known.tmdb_id,
+        title_it: known.title_it || title,
+        title_en: known.title_en || title,
+        title_original: known.title_original || title,
+        synopsis_it: known.synopsis_it || `Guarda ${title} nei cinema italiani.`,
+        synopsis_en: known.synopsis_en || '',
         director: known.director || 'Denis Villeneuve',
         genres: known.genres || ['Cinema', 'Nuova Uscita'],
         duration: known.duration || 135,
@@ -746,7 +799,7 @@ export class NationwideCinemaScraper {
             const first = searchData.results[0];
             const tmdbId = first.id;
 
-            // Make second call to /3/movie/{id}?append_to_response=credits&language=it-IT for real runtime, director, genres, and cast
+            // Make Italian call for runtime, director, genres, cast and Italian overview
             try {
               const detailUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?append_to_response=credits&api_key=${tmdbKey}&language=it-IT`;
               const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4000) });
@@ -780,6 +833,25 @@ export class NationwideCinemaScraper {
                 const posterPath = detailData.poster_path || first.poster_path;
                 const backdropPath = detailData.backdrop_path || first.backdrop_path;
 
+                // Make second lightweight TMDb detail call with language=en-US to fetch real English metadata
+                let title_en = detailData.title || title;
+                let synopsis_en = '';
+                try {
+                  const enUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}&language=en-US`;
+                  const enRes = await fetch(enUrl, { signal: AbortSignal.timeout(3000) });
+                  if (enRes.ok) {
+                    const enData = await enRes.json();
+                    if (enData.title && typeof enData.title === 'string' && enData.title.trim()) {
+                      title_en = enData.title.trim();
+                    }
+                    if (enData.overview && typeof enData.overview === 'string' && enData.overview.trim()) {
+                      synopsis_en = enData.overview.trim();
+                    }
+                  }
+                } catch (enErr: any) {
+                  // Keep synopsis_en empty if English fetch fails; do not fabricate
+                }
+
                 const result = {
                   poster_url: posterPath
                     ? `https://image.tmdb.org/t/p/w780${posterPath}`
@@ -788,7 +860,11 @@ export class NationwideCinemaScraper {
                     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
                     : 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
                   tmdb_id: tmdbId,
+                  title_it: detailData.title || title,
+                  title_en: title_en,
+                  title_original: detailData.original_title || title,
                   synopsis_it: detailData.overview || first.overview || `Guarda ${title} nei cinema italiani.`,
+                  synopsis_en: synopsis_en,
                   director: realDirector,
                   genres: realGenres,
                   duration: realDuration,
@@ -812,7 +888,11 @@ export class NationwideCinemaScraper {
                 ? `https://image.tmdb.org/t/p/w1280${first.backdrop_path}`
                 : 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
               tmdb_id: first.id,
+              title_it: first.title || title,
+              title_en: first.title || title,
+              title_original: first.original_title || title,
               synopsis_it: first.overview || `Guarda ${title} nelle sale italiane.`,
+              synopsis_en: '',
               director: 'Regista',
               genres: ['Cinema', 'Nuova Uscita'],
               duration: 115,
@@ -833,6 +913,11 @@ export class NationwideCinemaScraper {
       poster_url: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
       backdrop_url: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
       tmdb_id: null,
+      title_it: title,
+      title_en: title,
+      title_original: title,
+      synopsis_it: `Guarda ${title} nelle sale cinema italiane.`,
+      synopsis_en: '',
       director: 'Regista',
       genres: ['Film in Sala'],
       duration: 110,
@@ -1350,18 +1435,21 @@ export class NationwideCinemaScraper {
            SET tmdb_id = COALESCE(EXCLUDED.tmdb_id, movies.tmdb_id),
                poster_url = COALESCE(EXCLUDED.poster_url, movies.poster_url),
                backdrop_url = COALESCE(EXCLUDED.backdrop_url, movies.backdrop_url),
+               title_en = CASE WHEN length(EXCLUDED.title_en) > 0 THEN EXCLUDED.title_en ELSE movies.title_en END,
+               title_original = COALESCE(EXCLUDED.title_original, movies.title_original),
                director = CASE WHEN EXCLUDED.director != 'Regista' THEN EXCLUDED.director ELSE movies.director END,
                duration_minutes = CASE WHEN EXCLUDED.duration_minutes > 0 THEN EXCLUDED.duration_minutes ELSE movies.duration_minutes END,
                rating = CASE WHEN EXCLUDED.rating > 0 THEN EXCLUDED.rating ELSE movies.rating END,
                genres = EXCLUDED.genres,
-               synopsis_it = CASE WHEN length(EXCLUDED.synopsis_it) > 10 THEN EXCLUDED.synopsis_it ELSE movies.synopsis_it END
+               synopsis_it = CASE WHEN length(EXCLUDED.synopsis_it) > 10 THEN EXCLUDED.synopsis_it ELSE movies.synopsis_it END,
+               synopsis_en = CASE WHEN length(EXCLUDED.synopsis_en) > 0 THEN EXCLUDED.synopsis_en ELSE movies.synopsis_en END
            RETURNING (xmax = 0) AS is_inserted`,
           [
             movieId,
             movieSlug,
-            m.title,
-            m.title,
-            m.title,
+            enriched.title_it || m.title,
+            enriched.title_en || m.title,
+            enriched.title_original || m.title,
             enriched.tmdb_id,
             enriched.poster_url,
             enriched.backdrop_url,
@@ -1369,7 +1457,7 @@ export class NationwideCinemaScraper {
             enriched.duration || 115,
             enriched.rating || 7.5,
             enriched.synopsis_it || `Guarda ${m.title} nelle sale cinema italiane.`,
-            `Watch ${m.title} in Italian cinemas with CineVicino.`,
+            enriched.synopsis_en || '',
             enriched.release_year || new Date().getFullYear(),
             enriched.director || 'Regista',
             JSON.stringify(enriched.cast || ['Cast principale', 'Attori']),
