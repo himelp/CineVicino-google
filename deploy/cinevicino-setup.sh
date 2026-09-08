@@ -312,12 +312,14 @@ CANONICAL_CRED="${PROJECT_ROOT}/cloudflared/credentials.json"
 if [ -f "${SRC_CRED}" ]; then
   cp "${SRC_CRED}" "${DEST_CRED}"
   cp "${SRC_CRED}" "${CANONICAL_CRED}"
-  chmod 600 "${DEST_CRED}" "${CANONICAL_CRED}"
-  success "Isolated project credentials inside ./cloudflared/ (mode 600)."
+  # Mode 644 (not 600) is required because the official cloudflared Docker container runs as non-root and cannot read mode-600 files owned by the host user
+  chmod 644 "${DEST_CRED}" "${CANONICAL_CRED}"
+  success "Isolated project credentials inside ./cloudflared/ (mode 644)."
 elif [ -f "${DEST_CRED}" ]; then
   cp "${DEST_CRED}" "${CANONICAL_CRED}"
-  chmod 600 "${CANONICAL_CRED}"
-  success "Reusing existing credentials inside ./cloudflared/ (mode 600)."
+  # Mode 644 (not 600) is required because the official cloudflared Docker container runs as non-root and cannot read mode-600 files owned by the host user
+  chmod 644 "${DEST_CRED}" "${CANONICAL_CRED}"
+  success "Reusing existing credentials inside ./cloudflared/ (mode 644)."
 else
   fatal "Could not locate credentials file for tunnel ${CINE_TUNNEL_ID} at ${SRC_CRED} or ${DEST_CRED}."
 fi
