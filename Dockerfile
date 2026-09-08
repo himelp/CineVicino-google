@@ -5,7 +5,14 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci
+# NOTE: intentionally npm install, not npm ci — package-lock.json is not guaranteed
+# to have been generated on an ARM64/musl machine, and npm ci's strict lockfile
+# matching then fails on ARM64 production hosts with a missing rollup native binary
+# (npm/cli#4828). npm install re-resolves optional platform binaries for whatever
+# machine is actually running the build, so this works correctly on both amd64 and
+# arm64 regardless of which machine last regenerated the lockfile. Do not change
+# this back to `npm ci` — it has broken ARM64 production builds three times already.
+RUN npm install
 
 # Copy source files
 COPY . .

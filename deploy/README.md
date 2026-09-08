@@ -222,21 +222,20 @@ docker compose exec -T app npx tsx scripts/seed-cities.ts
 
 ### 🛡️ Dependency & Lockfile Hygiene Safeguard
 
-To ensure clean, reproducible builds in Docker (`RUN npm ci` in builder and runner stages):
-
 1. **Always Sync `package-lock.json`**:
    Whenever adding, updating, or removing dependencies in `package.json`, regenerate `package-lock.json` in the same commit:
    ```bash
    npm install
    ```
 2. **Verify with `npm ci` Before Pushing**:
-   Never assume `npm install` alone guarantees clean automated CI/Docker builds. Verify locally:
+   Verify runner-stage parity locally:
    ```bash
    npm run check:lockfile
    # or
    npm ci --dry-run
    ```
-   Both the multi-stage `Dockerfile` builder (`npm ci`) and runner (`npm ci --omit=dev`) rely on an in-sync `package-lock.json` for deterministic, zero-tamper container builds without falling back to loose `npm install` workarounds.
+3. **Multi-Architecture Builder Safeguard**:
+   The `Dockerfile` **builder stage intentionally uses `npm install`, not `npm ci`, to stay ARM64-safe regardless of which machine regenerated `package-lock.json` — see Dockerfile comment**. Because `package-lock.json` is typically generated on amd64 machines, strict `npm ci` in the builder stage omits the optional `@rollup/rollup-linux-arm64-musl` native binary and fails on ARM64 (Oracle Ampere A1) production hosts (`npm/cli#4828`). `npm install` dynamically resolves platform-specific binaries for whatever machine is executing the build. The production **runner stage** retains `RUN npm ci --omit=dev` for reproducible, strictly locked runtime dependencies.
 
 ---
 
