@@ -218,4 +218,26 @@ Populate all 7,894 Italian comuni and coordinates into the database:
 docker compose exec -T app npx tsx scripts/seed-cities.ts
 ```
 
+---
+
+### 🛡️ Dependency & Lockfile Hygiene Safeguard
+
+To ensure clean, reproducible builds in Docker (`RUN npm ci` in builder and runner stages):
+
+1. **Always Sync `package-lock.json`**:
+   Whenever adding, updating, or removing dependencies in `package.json`, regenerate `package-lock.json` in the same commit:
+   ```bash
+   npm install
+   ```
+2. **Verify with `npm ci` Before Pushing**:
+   Never assume `npm install` alone guarantees clean automated CI/Docker builds. Verify locally:
+   ```bash
+   npm run check:lockfile
+   # or
+   npm ci --dry-run
+   ```
+   Both the multi-stage `Dockerfile` builder (`npm ci`) and runner (`npm ci --omit=dev`) rely on an in-sync `package-lock.json` for deterministic, zero-tamper container builds without falling back to loose `npm install` workarounds.
+
+---
+
 Your CineVicino instance is now fully operational with automated updates, official ticketing outbound links, visitor city auto-detection, and SSL encryption!
