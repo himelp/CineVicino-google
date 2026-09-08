@@ -235,7 +235,7 @@ docker compose exec -T app npx tsx scripts/seed-cities.ts
    npm ci --dry-run
    ```
 3. **Multi-Architecture Builder Safeguard**:
-   The `Dockerfile` **builder stage intentionally uses `npm install`, not `npm ci`, to stay ARM64-safe regardless of which machine regenerated `package-lock.json` — see Dockerfile comment**. Because `package-lock.json` is typically generated on amd64 machines, strict `npm ci` in the builder stage omits the optional `@rollup/rollup-linux-arm64-musl` native binary and fails on ARM64 (Oracle Ampere A1) production hosts (`npm/cli#4828`). `npm install` dynamically resolves platform-specific binaries for whatever machine is executing the build. The production **runner stage** retains `RUN npm ci --omit=dev` for reproducible, strictly locked runtime dependencies.
+   The `Dockerfile` **builder stage intentionally removes `package-lock.json` before installing (`RUN rm -f package-lock.json && npm install`), not `npm ci` or `npm install` alone, to stay ARM64-safe regardless of which machine regenerated `package-lock.json` — see Dockerfile comment**. Because `package-lock.json` is typically generated on amd64 machines, npm honors the lockfile's resolved optional-dependency tree even under plain `npm install` if the lockfile remains on disk. Only explicitly deleting `package-lock.json` prior to `npm install` forces npm to freshly resolve target-platform optional dependencies (specifically `@rollup/rollup-linux-arm64-musl` per `npm/cli#4828`) on ARM64 (Oracle Ampere A1) production hosts. The production **runner stage** retains `RUN npm ci --omit=dev` for reproducible, strictly locked runtime dependencies.
 
 ---
 
