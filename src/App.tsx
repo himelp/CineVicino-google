@@ -13,7 +13,7 @@ import { PrivacyModal } from './components/PrivacyModal';
 import { LoginModal } from './components/LoginModal';
 import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
-import { Language, translations } from './utils/i18n';
+import { Language, translations, useLanguage } from './utils/i18n';
 import { safeFetchJson, safeReadJson } from './utils/api';
 import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight } from 'lucide-react';
 
@@ -21,11 +21,8 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [lang, setLang] = useState<Language>(() => {
-    return (localStorage.getItem('cinevicino_lang') as Language) || 'it';
-  });
+  const { lang, setLanguage, toggleLanguage, t } = useLanguage();
 
-  const t = translations[lang];
 
   // Core Data
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -88,9 +85,7 @@ export default function App() {
 
   // Toggle language
   const handleToggleLang = () => {
-    const nextLang: Language = lang === 'it' ? 'en' : 'it';
-    setLang(nextLang);
-    localStorage.setItem('cinevicino_lang', nextLang);
+    toggleLanguage();
   };
 
   // Initial Data Fetch & Session Restore
