@@ -15,7 +15,8 @@ import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
 import { Language, translations, useLanguage } from './utils/i18n';
 import { safeFetchJson, safeReadJson } from './utils/api';
-import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight } from 'lucide-react';
+import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight, Calendar } from 'lucide-react';
+import { formatTodayFull } from './utils/date';
 
 export default function App() {
   const location = useLocation();
@@ -591,9 +592,17 @@ export default function App() {
                   <h2 className="text-3xl sm:text-4xl font-serif text-white tracking-tight flex items-center gap-2.5">
                     <span>Nelle sale in <span className="italic text-[#D4AF37]">Italia</span></span>
                   </h2>
-                  <p className="text-xs sm:text-sm text-neutral-400 mt-1 max-w-xl">
-                    Locandine, trame arricchite TMDb e orari verificati per l'acquisto diretto del biglietto.
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 text-xs font-medium capitalize">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {formatTodayFull(lang)}
+                    </span>
+                    <span className="text-xs text-neutral-400">
+                      {lang === 'it'
+                        ? "Orari verificati per l'acquisto diretto del biglietto"
+                        : "Verified showtimes for direct ticket booking"}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Search in movies */}

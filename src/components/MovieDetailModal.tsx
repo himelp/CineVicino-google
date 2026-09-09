@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
 import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
+import { getRomeToday, formatDatePill, formatTodayFull } from '../utils/date';
 
 interface MovieDetailModalProps {
   movie: Movie | null;
@@ -24,9 +25,10 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   onToggleFavorite
 }) => {
   const t = translations[lang];
+  const todayStr = getRomeToday();
   const [showtimes, setShowtimes] = useState<Showtime[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>(activeCity?.slug || 'all');
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -55,16 +57,37 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   const title = getMovieTitle(movie, lang);
   const { text: synopsis, isFallback } = getMovieSynopsis(movie, lang);
 
-  // Available dates
-  const today = new Date();
-  const dateOptions = [
-    { label: t.todayShowtimes, value: today.toISOString().split('T')[0] },
-    { label: t.tomorrow, value: new Date(today.getTime() + 86400000).toISOString().split('T')[0] },
-    { label: t.weekend, value: new Date(today.getTime() + 172800000).toISOString().split('T')[0] }
-  ];
+  // Part 1: Never show past dates — filter only active showtimes today or future
+  const activeShowtimes = useMemo(() => {
+    return showtimes.filter(s => s.active && s.show_date >= todayStr);
+  }, [showtimes, todayStr]);
 
-  // Filter showtimes
-  const filteredShowtimes = showtimes.filter(s => {
+  // Distinct dates actually scraped for this movie (today or future)
+  const scrapedDates = useMemo(() => {
+    const datesSet = new Set<string>();
+    activeShowtimes.forEach(s => {
+      if (s.show_date && s.show_date >= todayStr) {
+        datesSet.add(s.show_date);
+      }
+    });
+    return Array.from(datesSet).sort();
+  }, [activeShowtimes, todayStr]);
+
+  // Date selector options — strictly don't show date options beyond what has been scraped, but always include today
+  const dateOptions = useMemo(() => {
+    const list = scrapedDates.includes(todayStr) ? [...scrapedDates] : [todayStr, ...scrapedDates];
+    return list.map(dStr => formatDatePill(dStr, lang));
+  }, [scrapedDates, todayStr, lang]);
+
+  // Ensure selectedDate is valid and never in the past
+  useEffect(() => {
+    if (selectedDate < todayStr) {
+      setSelectedDate(todayStr);
+    }
+  }, [selectedDate, todayStr]);
+
+  // Filter showtimes for selected date and city
+  const filteredShowtimes = activeShowtimes.filter(s => {
     const matchesDate = s.show_date === selectedDate;
     const matchesCity = selectedCityFilter === 'all' || s.city_slug === selectedCityFilter;
     return matchesDate && matchesCity;
@@ -264,32 +287,50 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
 
           {/* Showtimes & Booking Section */}
           <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
               <div>
                 <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
                   <Ticket className="w-5 h-5 text-[#D4AF37]" />
                   <span>Programmazione e Biglietti Ufficiali</span>
                 </h3>
-                <p className="text-xs text-neutral-400">
-                  Seleziona l'orario desiderato per essere reindirizzato direttamente alla cassa ufficiale del cinema.
-                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400 mt-1">
+                  <span className="text-[#D4AF37] font-medium flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span className="capitalize">{formatTodayFull(lang)}</span>
+                  </span>
+                  <span className="text-neutral-600 hidden sm:inline">·</span>
+                  <span className="hidden sm:inline">
+                    {lang === 'it' 
+                      ? "Seleziona l'orario desiderato per l'acquisto diretto dal circuito ufficiale."
+                      : "Select your screening to purchase tickets directly from the official cinema box office."}
+                  </span>
+                </div>
               </div>
 
-              {/* Date Selector Tabs */}
-              <div className="flex items-center gap-1.5 bg-white/5 p-1 rounded-full border border-white/10 self-start overflow-x-auto max-w-full no-scrollbar">
-                {dateOptions.map(d => (
-                  <button
-                    key={d.value}
-                    onClick={() => setSelectedDate(d.value)}
-                    className={`min-h-[36px] sm:min-h-[38px] px-3.5 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap active:scale-95 cursor-pointer ${
-                      selectedDate === d.value
-                        ? 'bg-[#D4AF37] text-black font-bold shadow-sm'
-                        : 'text-neutral-400 hover:text-white'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              {/* Date Selector Pills — scrollable row of dates scraped for today/future */}
+              <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 no-scrollbar self-start lg:self-auto">
+                {dateOptions.map(d => {
+                  const isSelected = selectedDate === d.dateStr;
+                  return (
+                    <button
+                      key={d.dateStr}
+                      onClick={() => setSelectedDate(d.dateStr)}
+                      aria-label={d.fullAccessibleLabel}
+                      className={`min-h-[44px] px-4 py-1.5 rounded-2xl text-xs transition-all whitespace-nowrap flex flex-col items-center justify-center cursor-pointer border active:scale-95 ${
+                        isSelected
+                          ? 'bg-[#D4AF37] text-black font-bold border-[#D4AF37] shadow-md scale-[1.02]'
+                          : 'bg-white/5 text-neutral-300 border-white/10 hover:border-white/25 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-semibold tracking-tight">{d.mainLabel}</span>
+                      {d.subLabel && (
+                        <span className={`text-[10px] ${isSelected ? 'text-black/80 font-medium' : 'text-neutral-400'}`}>
+                          {d.subLabel}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -329,16 +370,36 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 Caricamento orari dai multiplex e sale d'autore...
               </div>
             ) : cinemasList.length === 0 ? (
-              <div className="py-12 text-center bg-white/[0.03] rounded-2xl border border-white/10 p-6">
-                <p className="text-neutral-400 text-sm">
-                  Nessun orario trovato per la combinazione selezionata in questa data.
+              <div className="py-12 text-center bg-white/[0.03] rounded-3xl border border-white/10 p-8 max-w-lg mx-auto">
+                <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3.5 text-neutral-400">
+                  <Calendar className="w-6 h-6 text-[#D4AF37]" />
+                </div>
+                <h4 className="text-white font-serif font-bold text-base">
+                  {lang === 'it'
+                    ? 'Nessuno spettacolo trovato per questa data'
+                    : 'No showtimes found for this date'}
+                </h4>
+                <p className="text-neutral-400 text-xs mt-2 leading-relaxed">
+                  {activeShowtimes.length === 0
+                    ? (lang === 'it'
+                        ? 'Nessun orario di programmazione attivo rilevato per questo film al momento.'
+                        : 'No active showtimes currently available for this title.')
+                    : selectedCityFilter !== 'all'
+                    ? (lang === 'it'
+                        ? `Non ci sono proiezioni programmate a ${selectedCityFilter.toUpperCase()} per la data selezionata (${formatDatePill(selectedDate, lang).mainLabel}). Prova a visualizzare tutte le città o a scegliere un'altra data.`
+                        : `No screenings scheduled in ${selectedCityFilter.toUpperCase()} for the selected date (${formatDatePill(selectedDate, lang).mainLabel}). Try viewing all cities or selecting another date.`)
+                    : (lang === 'it'
+                        ? `Nessuna sala censita trasmette questo film per la data ${formatDatePill(selectedDate, lang).mainLabel}. Prova a selezionare un'altra data disponibile.`
+                        : `No registered cinemas are screening this film on ${formatDatePill(selectedDate, lang).mainLabel}. Try selecting another available date.`)}
                 </p>
-                <button
-                  onClick={() => setSelectedCityFilter('all')}
-                  className="mt-3 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
-                >
-                  Mostra orari in tutta Italia
-                </button>
+                {selectedCityFilter !== 'all' && activeShowtimes.length > 0 && (
+                  <button
+                    onClick={() => setSelectedCityFilter('all')}
+                    className="mt-5 px-5 py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                  >
+                    {lang === 'it' ? 'Mostra orari in tutta Italia' : 'Show all cities'}
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">

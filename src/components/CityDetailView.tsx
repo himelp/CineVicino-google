@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle, Share2, Check } from 'lucide-react';
+import { MapPin, Navigation, Film, Clock, ExternalLink, Ticket, ArrowLeft, Bookmark, Sparkles, AlertCircle, Share2, Check, Calendar } from 'lucide-react';
 import { City, Cinema, Showtime, Movie } from '../types';
 import { Language, translations, getMovieTitle } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
+import { formatTodayFull } from '../utils/date';
 
 interface CityDetailViewProps {
   city: City;
@@ -146,6 +147,10 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold border border-[#D4AF37]/30">
               Comune d'Italia (ISTAT)
+            </span>
+            <span className="px-3 py-0.5 rounded-full bg-white/5 text-neutral-300 text-xs font-medium border border-white/10 flex items-center gap-1.5 capitalize">
+              <Calendar className="w-3 h-3 text-[#D4AF37]" />
+              {formatTodayFull(lang)}
             </span>
             {city.is_provincial_capital && (
               <span className="px-3 py-0.5 rounded-full bg-white/10 text-neutral-300 text-xs font-semibold">
@@ -401,49 +406,57 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
               <span>Cinema più vicini a {city.name} (ordinati per distanza stradale stimata)</span>
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {data?.nearest_cinemas.map(nearest => (
-                <div 
-                  key={nearest.id}
-                  className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-black text-[#D4AF37] font-mono px-2.5 py-0.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
-                          {nearest.distance_km.toFixed(1)} km da {city.name}
-                        </span>
-                        <h4 className="text-base font-serif font-bold text-white mt-2.5">
-                          {nearest.name}
-                        </h4>
+            {(data?.nearest_cinemas && data.nearest_cinemas.length > 0) ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {data.nearest_cinemas.map(nearest => (
+                  <div 
+                    key={nearest.id}
+                    className="p-6 rounded-3xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-xs font-black text-[#D4AF37] font-mono px-2.5 py-0.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+                            {nearest.distance_km.toFixed(1)} km da {city.name}
+                          </span>
+                          <h4 className="text-base font-serif font-bold text-white mt-2.5">
+                            {nearest.name}
+                          </h4>
+                        </div>
+                        {nearest.chain && (
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                            {nearest.chain}
+                          </span>
+                        )}
                       </div>
-                      {nearest.chain && (
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
-                          {nearest.chain}
-                        </span>
-                      )}
+
+                      <p className="text-xs text-neutral-400 mt-2 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
+                        <span>{nearest.address}</span>
+                      </p>
                     </div>
 
-                    <p className="text-xs text-neutral-400 mt-2 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
-                      <span>{nearest.address}</span>
-                    </p>
+                    <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+                      <a
+                        href={nearest.website_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-sm"
+                      >
+                        <span>Vedi programmazione</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
-
-                  <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
-                    <a
-                      href={nearest.website_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                      <span>Vedi programmazione</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 rounded-3xl bg-white/[0.03] border border-white/10 text-center">
+                <p className="text-sm text-neutral-400">
+                  Nessun cinema con programmazione attiva disponibile nelle vicinanze al momento.
+                </p>
+              </div>
+            )}
           </div>
 
         </div>

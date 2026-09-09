@@ -260,27 +260,38 @@ app.get('/api/cities/:slug', async (req: Request, res: Response) => {
 
     const city = cityRes.rows[0];
 
-    // Local cinemas
+    // Local cinemas with active, current/future showtimes
     const cinemasRes = await executeRawSql(
       `SELECT c.*, ci.name as city_name, ci.slug as city_slug
        FROM cinemas c
        JOIN cities ci ON c.city_id = ci.id
-       WHERE c.city_id = $1`,
+       WHERE c.city_id = $1
+       AND EXISTS (
+         SELECT 1 FROM showtimes s
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+       )
+       ORDER BY c.name ASC`,
       [city.id]
     );
     const cityCinemas = cinemasRes.rows;
 
-    // Find nearest cinemas across Italy using SQL Haversine formula
+    // Find nearest cinemas across Italy that actually have active current/future showtimes
     const nearestRes = await executeRawSql(
       `SELECT
          c.*, ci.name as city_name, ci.slug as city_slug,
          (6371 * acos(
-           cos(radians($1)) * cos(radians(c.lat)) *
-           cos(radians(c.lng) - radians($2)) +
-           sin(radians($1)) * sin(radians(c.lat))
+           least(1.0, greatest(-1.0,
+             cos(radians($1)) * cos(radians(c.lat)) *
+             cos(radians(c.lng) - radians($2)) +
+             sin(radians($1)) * sin(radians(c.lat))
+           ))
          )) AS distance_km
        FROM cinemas c
        JOIN cities ci ON c.city_id = ci.id
+       WHERE EXISTS (
+         SELECT 1 FROM showtimes s
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+       )
        ORDER BY distance_km ASC
        LIMIT 6`,
       [city.lat, city.lng]
@@ -311,17 +322,23 @@ app.get('/api/nearby', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Coordinate lat e lng richieste e valide' });
     }
 
-    // Nearest cinemas using SQL Haversine
+    // Nearest cinemas with active showtimes using SQL Haversine
     const cinemasRes = await executeRawSql(
       `SELECT
          c.*, ci.name as city_name, ci.slug as city_slug,
          (6371 * acos(
-           cos(radians($1)) * cos(radians(c.lat)) *
-           cos(radians(c.lng) - radians($2)) +
-           sin(radians($1)) * sin(radians(c.lat))
+           least(1.0, greatest(-1.0,
+             cos(radians($1)) * cos(radians(c.lat)) *
+             cos(radians(c.lng) - radians($2)) +
+             sin(radians($1)) * sin(radians(c.lat))
+           ))
          )) AS distance_km
        FROM cinemas c
        JOIN cities ci ON c.city_id = ci.id
+       WHERE EXISTS (
+         SELECT 1 FROM showtimes s
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+       )
        ORDER BY distance_km ASC
        LIMIT 10`,
       [lat, lng]
@@ -506,7 +523,7 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
          s.*, m.title_it as movie_title, m.poster_url as movie_poster
        FROM showtimes s
        JOIN movies m ON s.movie_id = m.id
-       WHERE s.cinema_id = $1 AND s.active = TRUE
+       WHERE s.cinema_id = $1 AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
        ORDER BY s.show_date ASC, s.time ASC`,
       [cinema.id]
     );
@@ -521,43 +538,52 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Movies listing & search
+// Movies listing & search — Part 1: only returns movies with active showtimes today or future
 app.get('/api/movies', async (req: Request, res: Response) => {
   try {
     const query = (req.query.q as string || '').trim();
     const genre = req.query.genre as string;
     const featuredOnly = req.query.featured === 'true';
+    const allParam = req.query.all === 'true' || req.query.include_inactive === 'true';
 
     const conditions: string[] = [];
     const params: any[] = [];
     let pIdx = 1;
 
+    // Part 1: Public movie catalog only returns movies with active showtime today or in the future
+    if (!allParam) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM showtimes s
+        WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+      )`);
+    }
+
     if (query) {
-      conditions.push(`(title_it ILIKE $${pIdx} OR title_original ILIKE $${pIdx} OR director ILIKE $${pIdx})`);
+      conditions.push(`(m.title_it ILIKE $${pIdx} OR m.title_original ILIKE $${pIdx} OR m.director ILIKE $${pIdx})`);
       params.push(`%${query}%`);
       pIdx++;
     }
 
     if (genre && genre !== 'all') {
-      conditions.push(`genres @> $${pIdx}::jsonb`);
+      conditions.push(`m.genres @> $${pIdx}::jsonb`);
       params.push(JSON.stringify([genre]));
       pIdx++;
     }
 
     if (featuredOnly) {
-      conditions.push(`is_featured = TRUE`);
+      conditions.push(`m.is_featured = TRUE`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const sql = `
-      SELECT * FROM movies
+      SELECT m.* FROM movies m
       ${whereClause}
-      ORDER BY is_featured DESC, rating DESC, title_it ASC
+      ORDER BY m.is_featured DESC, m.rating DESC, m.title_it ASC
     `;
 
     const result = await executeRawSql(sql, params);
-    res.set('Cache-Control', 'public, max-age=180');
+    res.set('Cache-Control', 'public, max-age=60');
     res.json(result.rows);
   } catch (err: any) {
     logger.error({ err }, 'Error in /api/movies');
@@ -580,6 +606,7 @@ app.get('/api/movies/:slug', async (req: Request, res: Response) => {
 
     const movie = movieRes.rows[0];
 
+    // Part 1: Filter showtimes by active and show_date >= CURRENT_DATE
     const showtimesRes = await executeRawSql(
       `SELECT
          s.*,
@@ -588,7 +615,7 @@ app.get('/api/movies/:slug', async (req: Request, res: Response) => {
        FROM showtimes s
        JOIN cinemas c ON s.cinema_id = c.id
        JOIN cities ci ON c.city_id = ci.id
-       WHERE s.movie_id = $1 AND s.active = TRUE
+       WHERE s.movie_id = $1 AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
        ORDER BY s.show_date ASC, s.time ASC`,
       [movie.id]
     );
@@ -639,6 +666,8 @@ app.get('/api/showtimes', async (req: Request, res: Response) => {
       conditions.push(`s.show_date = $${pIdx}`);
       params.push(date);
       pIdx++;
+    } else {
+      conditions.push(`s.show_date >= CURRENT_DATE::text`);
     }
 
     if (format && format !== 'all') {

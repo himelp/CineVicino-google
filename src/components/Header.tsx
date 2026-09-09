@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, Sparkles, Menu } from 'lucide-react';
+import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, Sparkles, Menu, Calendar } from 'lucide-react';
 import { City } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
+import { formatTodayFull } from '../utils/date';
 
 interface HeaderProps {
   lang: Language;
@@ -224,6 +225,12 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             
+            {/* Today's live date indicator (Desktop) */}
+            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-neutral-300 text-xs font-medium whitespace-nowrap">
+              <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+              <span className="capitalize">{formatTodayFull(lang)}</span>
+            </div>
+
             {/* Mobile Search Button */}
             <button
               onClick={() => setMobileSearchOpen(!mobileSearchOpen)}
@@ -343,6 +350,15 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-white/10 space-y-2 animate-fadeIn bg-[#0a0a0a]/95 pb-safe">
+            {/* Live Today Date Display in Mobile Drawer */}
+            <div className="px-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between text-xs text-neutral-300">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+                <span className="capitalize font-medium">{formatTodayFull(lang)}</span>
+              </div>
+              <span className="text-[10px] text-neutral-500 font-mono font-bold tracking-wider">{lang === 'it' ? 'OGGI' : 'TODAY'}</span>
+            </div>
+
             <button
               onClick={() => {
                 onOpenAllMovies();
