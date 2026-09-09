@@ -1183,6 +1183,7 @@ interface ScrapeBackgroundJob {
     limit?: number;
     offset?: number;
     advanceCursor?: boolean;
+    daysAhead?: number;
   };
   progress: {
     step: string;
@@ -1209,6 +1210,8 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
     const targetOffset = rawOffset !== undefined && rawOffset !== '' ? parseInt(rawOffset as string, 10) : undefined;
     const advanceCursor = req.query.advance_cursor === 'true' || req.body?.advance_cursor === true || req.body?.rotate === true;
     const useFirecrawl = req.body?.useFirecrawl === true;
+    const rawDays = req.query.days_ahead || req.query.days || req.body?.days_ahead || req.body?.days;
+    const daysAhead = rawDays !== undefined && rawDays !== '' ? parseInt(rawDays as string, 10) : undefined;
 
     // Check if an active scrape is already running
     if (activeScrapeJob && activeScrapeJob.status === 'running') {
@@ -1234,9 +1237,10 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
 
     const jobId = `scrape-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
     const initialLog = `[${new Date().toLocaleTimeString()}] Avvio scraping batch CineVicino in background (Job: ${jobId})...`;
+    const daysLabel = daysAhead ? `, range: ${daysAhead} giorni` : '';
     const targetDesc = targetCity
-      ? `Città specifica: ${targetCity}`
-      : `Batch rotazione nazionale (${targetLimit || 25} comuni, offset: ${targetOffset !== undefined ? targetOffset : 'automatico'})`;
+      ? `Città specifica: ${targetCity}${daysLabel}`
+      : `Batch rotazione nazionale (${targetLimit || 25} comuni, offset: ${targetOffset !== undefined ? targetOffset : 'automatico'}${daysLabel})`;
 
     const job: ScrapeBackgroundJob = {
       job_id: jobId,
@@ -1248,7 +1252,8 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
         city: targetCity,
         limit: targetLimit,
         offset: targetOffset,
-        advanceCursor
+        advanceCursor,
+        daysAhead
       },
       progress: {
         step: 'init',

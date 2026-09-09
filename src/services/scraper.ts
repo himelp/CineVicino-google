@@ -42,6 +42,7 @@ export interface ScrapeOptions {
   limit?: number;
   offset?: number;
   advanceCursor?: boolean;
+  daysAhead?: number;
 }
 
 export interface ScraperCursorState {
@@ -84,6 +85,14 @@ export interface ScrapedShowtimeDetail {
   ticket_url?: string | null;
 }
 
+export interface ScrapedMovieSchedule {
+  title: string;
+  date: string; // YYYY-MM-DD
+  showtimes: string[];
+  ticket_url?: string | null;
+  showtime_details?: ScrapedShowtimeDetail[];
+}
+
 export interface ExtractedCinema {
   name: string;
   city_name: string;
@@ -93,12 +102,34 @@ export interface ExtractedCinema {
   chain?: string;
   source_url: string;
   source_name: string;
+  schedules?: ScrapedMovieSchedule[];
   movies: Array<{
     title: string;
     showtimes: string[];
     ticket_url?: string | null;
     showtime_details?: ScrapedShowtimeDetail[];
   }>;
+}
+
+/**
+ * Worker pool helper for bounded concurrency
+ */
+export async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let currentIndex = 0;
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (currentIndex < items.length) {
+      const idx = currentIndex++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 function slugify(text: string): string {
@@ -451,15 +482,18 @@ export class NationwideCinemaScraper {
   async scrapeCinemaTimes(
     targetCities: CityTarget[],
     notify: (step: string, source: string, count: number, msg: string) => void,
-    options?: { useFirecrawl?: boolean }
+    options?: { useFirecrawl?: boolean; daysAhead?: number }
   ): Promise<ExtractedCinema[]> {
     const extractedCinemas: ExtractedCinema[] = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const maxDaysAhead = Math.min(Math.max(options?.daysAhead || 7, 1), 30);
 
     for (const city of targetCities) {
       const listUrl = `https://cinematimes.com/it/${city.slug}/cinemas/`;
       notify('scrape', 'CinemaTimes.com', extractedCinemas.length, `Ricerca sale per ${city.name} (${city.slug})...`);
 
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 250));
       const resp = await this.fetchWithStats(listUrl, options);
       if (resp.creditsUsed) this.totalFirecrawlCreditsUsed += resp.creditsUsed;
       console.log(
@@ -488,32 +522,69 @@ export class NationwideCinemaScraper {
       // Sane upper bound: up to 10 key multiplexes per city per source
       const cityCinemas = cinemaLinks.slice(0, 10);
 
-      for (const c of cityCinemas) {
+      // Concurrency worker pool for cinema detail fetching (concurrency 3)
+      const parsedCityCinemas = await runWithConcurrency(cityCinemas, 3, async (c) => {
         notify('scrape', 'CinemaTimes.com', extractedCinemas.length, `Parsing ${c.name} (${city.name})...`);
-        await new Promise(r => setTimeout(r, 120));
+        await new Promise(r => setTimeout(r, 150));
         const detailResp = await this.fetchWithStats(c.url, options);
         if (detailResp.creditsUsed) this.totalFirecrawlCreditsUsed += detailResp.creditsUsed;
 
-        if (detailResp.ok) {
-          const d$ = cheerio.load(detailResp.html);
-          const movies: Array<{
-            title: string;
-            showtimes: string[];
-            ticket_url?: string | null;
-            showtime_details?: ScrapedShowtimeDetail[];
-          }> = [];
+        if (!detailResp.ok) return null;
 
-          d$('div.movie-card, div.desktop-movie-card, article, section').each((_, el) => {
-            const mLink = d$(el).find('a[href*="/movies/"]').first();
+        const d$ = cheerio.load(detailResp.html);
+
+        // 1. Detect available dates from the cinema's page
+        let availableDates: string[] = [];
+        try {
+          const rawDates = d$('[data-available-dates]').first().attr('data-available-dates');
+          if (rawDates) {
+            const parsed = JSON.parse(rawDates);
+            if (Array.isArray(parsed)) {
+              availableDates = parsed.filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d));
+            }
+          }
+        } catch (e) {}
+
+        if (availableDates.length === 0) {
+          d$('button[data-date], [data-date]').each((_, el) => {
+            const d = d$(el).attr('data-date');
+            if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && !availableDates.includes(d)) {
+              availableDates.push(d);
+            }
+          });
+        }
+
+        // Filter valid dates >= today up to maxDaysAhead
+        const targetDates = availableDates
+          .filter(d => d >= todayStr)
+          .sort()
+          .slice(0, maxDaysAhead);
+
+        if (targetDates.length === 0) {
+          targetDates.push(todayStr);
+        }
+
+        const schedules: ScrapedMovieSchedule[] = [];
+        const uniqueMoviesMap = new Map<string, { title: string; showtimes: string[]; ticket_url?: string | null; showtime_details?: ScrapedShowtimeDetail[] }>();
+
+        // Helper to parse movie cards from a day's HTML
+        const parseMovieCardsFromHtml = (pageHtml: string, dateStr: string) => {
+          const page$ = cheerio.load(pageHtml);
+
+          page$('div.movie-card, div.desktop-movie-card, .rounded-2xl, article, section').each((_, el) => {
+            const mLink = page$(el).find('a[href*="/movies/"]').filter((__, a) => {
+              const t = page$(a).text().trim();
+              return t.length > 2 && t !== 'Movies' && !['12A', '15A', 'PG', '18'].includes(t);
+            }).first();
             const mTitle = mLink.text().replace(/\s+/g, ' ').trim();
-            if (mTitle && mTitle.length > 2 && mTitle !== 'Movies' && !['12A', '15A', 'PG', '18'].includes(mTitle)) {
+            if (mTitle && mTitle.length > 2) {
               const showtimeDetails: ScrapedShowtimeDetail[] = [];
               const times: string[] = [];
 
-              d$(el).find('a.time-button, a[data-time], button[data-time]').each((__, btn) => {
-                const time = (d$(btn).attr('data-time') || d$(btn).text()).trim().replace(/[^0-9:]/g, '');
-                const format = (d$(btn).attr('data-format') || '2D').trim();
-                const rawHref = d$(btn).attr('href') || '';
+              page$(el).find('a.time-button, a[data-time], button[data-time]').each((__, btn) => {
+                const time = (page$(btn).attr('data-time') || page$(btn).text()).trim().replace(/[^0-9:]/g, '');
+                const format = (page$(btn).attr('data-format') || '2D').trim();
+                const rawHref = page$(btn).attr('href') || '';
                 const fullTicketUrl = rawHref.startsWith('http') ? rawHref : null;
                 const finalTicketUrl = fullTicketUrl && isRealTicketingUrl(fullTicketUrl) ? fullTicketUrl : null;
 
@@ -523,50 +594,95 @@ export class NationwideCinemaScraper {
                 }
               });
 
-              // Fallback if no specific time-button selector
+              // Fallback time matcher
               if (times.length === 0) {
-                d$(el).find('*').each((__, tel) => {
-                  const t = d$(tel).clone().children().remove().end().text().trim();
+                page$(el).find('a, button, span').each((__, tel) => {
+                  const t = page$(tel).clone().children().remove().end().text().trim();
+                  const rawHref = page$(tel).attr('href') || '';
+                  const fullTicketUrl = rawHref.startsWith('http') ? rawHref : null;
+                  const finalTicketUrl = fullTicketUrl && isRealTicketingUrl(fullTicketUrl) ? fullTicketUrl : null;
                   if (/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(t) && !times.includes(t)) {
                     times.push(t);
-                    showtimeDetails.push({ time: t, format: '2D', ticket_url: null });
+                    showtimeDetails.push({ time: t, format: '2D', ticket_url: finalTicketUrl });
                   }
                 });
               }
 
-              if (times.length > 0 && !movies.some(m => m.title.toLowerCase() === mTitle.toLowerCase())) {
+              if (times.length > 0) {
                 const bestTicketUrl = showtimeDetails.find(s => s.ticket_url)?.ticket_url || null;
-                movies.push({
-                  title: mTitle,
-                  showtimes: times,
-                  ticket_url: bestTicketUrl,
-                  showtime_details: showtimeDetails
-                });
+
+                // Add real schedule strictly for dateStr
+                if (!schedules.some(s => s.date === dateStr && s.title.toLowerCase() === mTitle.toLowerCase())) {
+                  schedules.push({
+                    title: mTitle,
+                    date: dateStr,
+                    showtimes: times,
+                    ticket_url: bestTicketUrl,
+                    showtime_details: showtimeDetails
+                  });
+                }
+
+                // Add or update unique movie entry
+                const lowerTitle = mTitle.toLowerCase();
+                if (!uniqueMoviesMap.has(lowerTitle)) {
+                  uniqueMoviesMap.set(lowerTitle, {
+                    title: mTitle,
+                    showtimes: times,
+                    ticket_url: bestTicketUrl,
+                    showtime_details: showtimeDetails
+                  });
+                }
               }
             }
           });
+        };
 
-          // Detect chain
-          let chain = 'independent';
-          const nameLower = c.name.toLowerCase();
-          if (nameLower.includes('uci')) chain = 'UCI';
-          else if (nameLower.includes('the space') || nameLower.includes('thespace')) chain = 'The Space Cinema';
-          else if (nameLower.includes('arcadia')) chain = 'Arcadia';
-          else if (nameLower.includes('notorious')) chain = 'Notorious';
-          else if (nameLower.includes('anteo')) chain = 'Anteo';
+        // 2. Fetch and parse each target date published by CinemaTimes
+        for (const dateStr of targetDates) {
+          if (dateStr === todayStr) {
+            parseMovieCardsFromHtml(detailResp.html, todayStr);
+          } else {
+            // Polite delay between date subpages
+            await new Promise(r => setTimeout(r, 150));
+            const subUrl = dateStr === tomorrowStr
+              ? `${c.url.replace(/\/$/, '')}/tomorrow`
+              : `${c.url.replace(/\/$/, '')}/${dateStr}`;
 
-          extractedCinemas.push({
-            name: c.name,
-            city_name: city.name,
-            city_slug: city.slug,
-            city_id: city.id,
-            address: `${c.name}, ${city.name}`,
-            chain,
-            source_url: c.url,
-            source_name: 'CinemaTimes.com',
-            movies
-          });
+            const dateResp = await this.fetchWithStats(subUrl, options);
+            if (dateResp.creditsUsed) this.totalFirecrawlCreditsUsed += dateResp.creditsUsed;
+            if (dateResp.ok) {
+              parseMovieCardsFromHtml(dateResp.html, dateStr);
+            }
+          }
         }
+
+        // Detect chain
+        let chain = 'independent';
+        const nameLower = c.name.toLowerCase();
+        if (nameLower.includes('uci')) chain = 'UCI';
+        else if (nameLower.includes('the space') || nameLower.includes('thespace')) chain = 'The Space Cinema';
+        else if (nameLower.includes('arcadia')) chain = 'Arcadia';
+        else if (nameLower.includes('notorious')) chain = 'Notorious';
+        else if (nameLower.includes('anteo')) chain = 'Anteo';
+
+        const cinemaResult: ExtractedCinema = {
+          name: c.name,
+          city_name: city.name,
+          city_slug: city.slug,
+          city_id: city.id,
+          address: `${c.name}, ${city.name}`,
+          chain,
+          source_url: c.url,
+          source_name: 'CinemaTimes.com',
+          schedules,
+          movies: Array.from(uniqueMoviesMap.values())
+        };
+
+        return cinemaResult;
+      });
+
+      for (const cin of parsedCityCinemas) {
+        if (cin) extractedCinemas.push(cin);
       }
     }
 
@@ -579,15 +695,16 @@ export class NationwideCinemaScraper {
   async scrapeMYmovies(
     targetCities: CityTarget[],
     notify: (step: string, source: string, count: number, msg: string) => void,
-    options?: { useFirecrawl?: boolean }
+    options?: { useFirecrawl?: boolean; daysAhead?: number }
   ): Promise<ExtractedCinema[]> {
     const extractedCinemas: ExtractedCinema[] = [];
+    const todayStr = new Date().toISOString().split('T')[0];
 
     for (const city of targetCities) {
       const cityUrl = `https://www.mymovies.it/cinema/${city.slug}/`;
       notify('scrape', 'MYmovies.it', extractedCinemas.length, `Ricerca cinema per ${city.name} su MYmovies...`);
 
-      await new Promise(r => setTimeout(r, 350));
+      await new Promise(r => setTimeout(r, 250));
       const resp = await this.fetchWithStats(cityUrl, options);
       if (resp.creditsUsed) this.totalFirecrawlCreditsUsed += resp.creditsUsed;
       console.log(
@@ -619,72 +736,88 @@ export class NationwideCinemaScraper {
       // Up to 10 cinemas per city
       const cityCinemas = cinemaLinks.slice(0, 10);
 
-      for (const c of cityCinemas) {
+      const parsedCityCinemas = await runWithConcurrency(cityCinemas, 3, async (c) => {
         notify('scrape', 'MYmovies.it', extractedCinemas.length, `Parsing: ${c.name} (${city.name})...`);
         await new Promise(r => setTimeout(r, 120));
         const detailResp = await this.fetchWithStats(c.url, options);
         if (detailResp.creditsUsed) this.totalFirecrawlCreditsUsed += detailResp.creditsUsed;
 
-        if (detailResp.ok) {
-          const d$ = cheerio.load(detailResp.html);
-          const movies: Array<{
-            title: string;
-            showtimes: string[];
-            ticket_url?: string | null;
-            showtime_details?: ScrapedShowtimeDetail[];
-          }> = [];
+        if (!detailResp.ok) return null;
 
-          d$('div, section, article').each((_, el) => {
-            const mLink = d$(el).find('a[href*="/film/"]').first();
-            const mTitle = mLink.text().replace(/\s+/g, ' ').trim();
-            if (mTitle && mTitle.length > 2 && !movies.some(m => m.title.toLowerCase() === mTitle.toLowerCase())) {
-              const times: string[] = [];
-              const showtimeDetails: ScrapedShowtimeDetail[] = [];
+        const d$ = cheerio.load(detailResp.html);
+        const movies: Array<{
+          title: string;
+          showtimes: string[];
+          ticket_url?: string | null;
+          showtime_details?: ScrapedShowtimeDetail[];
+        }> = [];
 
-              d$(el).find('a, span, div').each((__, tel) => {
-                const t = d$(tel).clone().children().remove().end().text().trim();
-                const rawHref = d$(tel).attr('href') || '';
-                const fullTicketUrl = rawHref.startsWith('http') ? rawHref : null;
-                const finalTicketUrl = fullTicketUrl && isRealTicketingUrl(fullTicketUrl) ? fullTicketUrl : null;
+        d$('div, section, article').each((_, el) => {
+          const mLink = d$(el).find('a[href*="/film/"]').first();
+          const mTitle = mLink.text().replace(/\s+/g, ' ').trim();
+          if (mTitle && mTitle.length > 2 && !movies.some(m => m.title.toLowerCase() === mTitle.toLowerCase())) {
+            const times: string[] = [];
+            const showtimeDetails: ScrapedShowtimeDetail[] = [];
 
-                if (/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(t) && !times.includes(t)) {
-                  times.push(t);
-                  showtimeDetails.push({ time: t, format: '2D', ticket_url: finalTicketUrl });
-                }
-              });
+            d$(el).find('a, span, div').each((__, tel) => {
+              const t = d$(tel).clone().children().remove().end().text().trim();
+              const rawHref = d$(tel).attr('href') || '';
+              const fullTicketUrl = rawHref.startsWith('http') ? rawHref : null;
+              const finalTicketUrl = fullTicketUrl && isRealTicketingUrl(fullTicketUrl) ? fullTicketUrl : null;
 
-              if (times.length > 0) {
-                const bestTicketUrl = showtimeDetails.find(s => s.ticket_url)?.ticket_url || null;
-                movies.push({
-                  title: mTitle,
-                  showtimes: times,
-                  ticket_url: bestTicketUrl,
-                  showtime_details: showtimeDetails
-                });
+              if (/^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/.test(t) && !times.includes(t)) {
+                times.push(t);
+                showtimeDetails.push({ time: t, format: '2D', ticket_url: finalTicketUrl });
               }
+            });
+
+            if (times.length > 0) {
+              const bestTicketUrl = showtimeDetails.find(s => s.ticket_url)?.ticket_url || null;
+              movies.push({
+                title: mTitle,
+                showtimes: times,
+                ticket_url: bestTicketUrl,
+                showtime_details: showtimeDetails
+              });
             }
-          });
+          }
+        });
 
-          let chain = 'independent';
-          const nameLower = c.name.toLowerCase();
-          if (nameLower.includes('anteo')) chain = 'Anteo';
-          else if (nameLower.includes('arcadia')) chain = 'Arcadia';
-          else if (nameLower.includes('uci')) chain = 'UCI';
-          else if (nameLower.includes('the space') || nameLower.includes('thespace')) chain = 'The Space Cinema';
-          else if (nameLower.includes('notorious')) chain = 'Notorious';
+        let chain = 'independent';
+        const nameLower = c.name.toLowerCase();
+        if (nameLower.includes('anteo')) chain = 'Anteo';
+        else if (nameLower.includes('arcadia')) chain = 'Arcadia';
+        else if (nameLower.includes('uci')) chain = 'UCI';
+        else if (nameLower.includes('the space') || nameLower.includes('thespace')) chain = 'The Space Cinema';
+        else if (nameLower.includes('notorious')) chain = 'Notorious';
 
-          extractedCinemas.push({
-            name: c.name,
-            city_name: city.name,
-            city_slug: city.slug,
-            city_id: city.id,
-            address: `${c.name}, ${city.name}`,
-            chain,
-            source_url: c.url,
-            source_name: 'MYmovies.it',
-            movies
-          });
-        }
+        // Only assign real today date for MYmovies (never fake future dates)
+        const schedules: ScrapedMovieSchedule[] = movies.map(m => ({
+          title: m.title,
+          date: todayStr,
+          showtimes: m.showtimes,
+          ticket_url: m.ticket_url,
+          showtime_details: m.showtime_details
+        }));
+
+        const cinemaResult: ExtractedCinema = {
+          name: c.name,
+          city_name: city.name,
+          city_slug: city.slug,
+          city_id: city.id,
+          address: `${c.name}, ${city.name}`,
+          chain,
+          source_url: c.url,
+          source_name: 'MYmovies.it',
+          schedules,
+          movies
+        };
+
+        return cinemaResult;
+      });
+
+      for (const cin of parsedCityCinemas) {
+        if (cin) extractedCinemas.push(cin);
       }
     }
 
@@ -1284,11 +1417,24 @@ export class NationwideCinemaScraper {
       cityMap.set(c.slug, c);
     }
 
+    let daysAhead = options.daysAhead;
+    if (!daysAhead || daysAhead <= 0) {
+      try {
+        const settingsRes = await executeRawSql(`SELECT value FROM site_settings WHERE key = 'scraper_days_ahead' LIMIT 1`);
+        if (settingsRes.rows && settingsRes.rows.length > 0) {
+          const parsed = parseInt(settingsRes.rows[0].value, 10);
+          if (!isNaN(parsed) && parsed > 0) daysAhead = parsed;
+        }
+      } catch (err: any) {}
+    }
+    daysAhead = Math.min(Math.max(daysAhead || 7, 1), 30);
+    const resolvedScrapeOptions = { ...scrapeOptions, daysAhead };
+
     const allDiscoveredCinemas: ExtractedCinema[] = [];
 
-    // Phase 1: Real Scrape of CinemaTimes.com
+    // Phase 1: Real Scrape of CinemaTimes.com with multi-day coverage
     try {
-      const ctCinemas = await this.scrapeCinemaTimes(targetCities, notify, scrapeOptions);
+      const ctCinemas = await this.scrapeCinemaTimes(targetCities, notify, resolvedScrapeOptions);
       allDiscoveredCinemas.push(...ctCinemas);
     } catch (err: any) {
       console.error('[Scraper] CinemaTimes error:', err.message);
@@ -1296,10 +1442,18 @@ export class NationwideCinemaScraper {
 
     // Phase 2: Real Scrape of MYmovies.it
     try {
-      const myCinemas = await this.scrapeMYmovies(targetCities, notify, scrapeOptions);
+      const myCinemas = await this.scrapeMYmovies(targetCities, notify, resolvedScrapeOptions);
       for (const mc of myCinemas) {
         const existing = allDiscoveredCinemas.find(c => c.name.toLowerCase() === mc.name.toLowerCase());
         if (existing) {
+          if (mc.schedules && mc.schedules.length > 0) {
+            if (!existing.schedules) existing.schedules = [];
+            for (const s of mc.schedules) {
+              if (!existing.schedules.some(es => es.date === s.date && es.title.toLowerCase() === s.title.toLowerCase())) {
+                existing.schedules.push(s);
+              }
+            }
+          }
           for (const m of mc.movies) {
             if (!existing.movies.some(em => em.title.toLowerCase() === m.title.toLowerCase())) {
               existing.movies.push(m);
@@ -1342,12 +1496,25 @@ export class NationwideCinemaScraper {
     );
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
-    // Process each cinema and its movies/showtimes
-    let cinemaIndex = 0;
-    for (const cinema of allDiscoveredCinemas) {
-      cinemaIndex++;
+    // Deactivate past showtimes so outdated rows are automatically cleaned up
+    try {
+      const cleanRes = await executeRawSql(
+        `UPDATE showtimes SET active = FALSE WHERE show_date < $1 AND active = TRUE`,
+        [todayStr]
+      );
+      if (cleanRes.rowCount && cleanRes.rowCount > 0) {
+        console.log(`[Scraper] 🧹 Disattivati ${cleanRes.rowCount} orari di programmazione con data passata (< ${todayStr})`);
+        notify('cleanup', 'Database', cleanRes.rowCount, `Disattivati ${cleanRes.rowCount} orari con data trascorsa (< ${todayStr}).`);
+      }
+    } catch (cleanErr: any) {
+      console.warn('[Scraper] Past showtimes cleanup error:', cleanErr?.message);
+    }
+
+    // Process cinemas and their schedules/movies using worker pool for bounded concurrency
+    let cinemaCounter = 0;
+    await runWithConcurrency(allDiscoveredCinemas, 5, async (cinema) => {
+      const cinemaIndex = ++cinemaCounter;
       const cinemaSlug = slugify(cinema.name).slice(0, 50);
       const cinemaId = `cin-${cinemaSlug}`;
 
@@ -1382,7 +1549,6 @@ export class NationwideCinemaScraper {
           [cityTarget.id, cityTarget.slug, cityTarget.name, cityTarget.lat, cityTarget.lng]
         );
       } catch (err: any) {
-        // If conflict occurred on unique slug constraint under a different id, lookup existing city id to prevent FK failure
         if (err?.code === '23505' || err?.message?.includes('slug')) {
           try {
             const existing = await executeRawSql(`SELECT id FROM cities WHERE slug = $1 LIMIT 1`, [cityTarget.slug]);
@@ -1434,13 +1600,30 @@ export class NationwideCinemaScraper {
         cinemasTouched++;
       }
 
-      // Process movies for this cinema
-      for (const m of cinema.movies) {
-        const movieSlug = slugify(m.title).slice(0, 50);
+      // Collect schedules for this cinema (strictly with their published dates)
+      const schedules = cinema.schedules && cinema.schedules.length > 0
+        ? cinema.schedules
+        : cinema.movies.map(m => ({ ...m, date: todayStr }));
+
+      // Map movie title to actualMovieId
+      const movieMap = new Map<string, string>();
+      const uniqueTitles: string[] = [];
+      for (const s of schedules) {
+        const titleTrimmed = s.title.trim();
+        const lower = titleTrimmed.toLowerCase();
+        if (!movieMap.has(lower)) {
+          movieMap.set(lower, '');
+          uniqueTitles.push(titleTrimmed);
+        }
+      }
+
+      // Process and upsert movies for this cinema
+      for (const title of uniqueTitles) {
+        const movieSlug = slugify(title).slice(0, 50);
         const movieId = `mov-${movieSlug}`;
 
-        // Enrich with TMDb (fetches real runtime, director, genres, and cast)
-        const enriched = await this.enrichMovieWithTmdb(m.title, movieSlug);
+        // Enrich with TMDb (cached in memory to avoid duplicate requests)
+        const enriched = await this.enrichMovieWithTmdb(title, movieSlug);
 
         const movieUpsertRes = await executeRawSql(
           `INSERT INTO movies (id, slug, title_it, title_en, title_original, tmdb_id, poster_url, backdrop_url, genres, duration_minutes, rating, synopsis_it, synopsis_en, release_year, director, "cast", age_rating, is_featured)
@@ -1457,20 +1640,20 @@ export class NationwideCinemaScraper {
                genres = EXCLUDED.genres,
                synopsis_it = CASE WHEN length(EXCLUDED.synopsis_it) > 10 THEN EXCLUDED.synopsis_it ELSE movies.synopsis_it END,
                synopsis_en = CASE WHEN length(EXCLUDED.synopsis_en) > 0 THEN EXCLUDED.synopsis_en ELSE movies.synopsis_en END
-           RETURNING (xmax = 0) AS is_inserted`,
+           RETURNING id, (xmax = 0) AS is_inserted`,
           [
             movieId,
             movieSlug,
-            enriched.title_it || m.title,
-            enriched.title_en || m.title,
-            enriched.title_original || m.title,
+            enriched.title_it || title,
+            enriched.title_en || title,
+            enriched.title_original || title,
             enriched.tmdb_id,
             enriched.poster_url,
             enriched.backdrop_url,
             JSON.stringify(enriched.genres || ['Cinema', 'Nuova Uscita']),
             enriched.duration || 115,
             enriched.rating || 7.5,
-            enriched.synopsis_it || `Guarda ${m.title} nelle sale cinema italiane.`,
+            enriched.synopsis_it || `Guarda ${title} nelle sale cinema italiane.`,
             enriched.synopsis_en || '',
             enriched.release_year || new Date().getFullYear(),
             enriched.director || 'Regista',
@@ -1481,48 +1664,97 @@ export class NationwideCinemaScraper {
         );
 
         const actualMovieId = movieUpsertRes.rows[0]?.id || movieId;
+        movieMap.set(title.toLowerCase(), actualMovieId);
         if (movieUpsertRes.rows && movieUpsertRes.rows[0]?.is_inserted) {
           moviesTouched++;
         }
+      }
 
-        // Insert showtimes for today and tomorrow
-        const dates = [todayStr, tomorrowStr];
-        for (const dateStr of dates) {
-          for (let i = 0; i < m.showtimes.length; i++) {
-            const time = m.showtimes[i];
-            const timeClean = time.replace(/[^0-9:]/g, '');
-            if (!timeClean) continue;
+      // Collect showtime rows for this cinema across all schedules
+      interface ShowtimeBatchRow {
+        id: string;
+        movieId: string;
+        cinemaId: string;
+        showDate: string;
+        time: string;
+        format: string;
+        language: string;
+        ticketUrl: string | null;
+        ticketSource: string;
+      }
 
-            const showtimeDetail = m.showtime_details?.[i];
-            const rawTicketUrl = showtimeDetail?.ticket_url || m.ticket_url;
-            const finalTicketUrl = rawTicketUrl && isRealTicketingUrl(rawTicketUrl) ? rawTicketUrl : null;
-            const finalTicketSource = determineTicketSource(cinema.chain, cinema.name, finalTicketUrl);
+      const showtimeBatchRows: ShowtimeBatchRow[] = [];
+      for (const sched of schedules) {
+        const actualMovieId = movieMap.get(sched.title.trim().toLowerCase()) || `mov-${slugify(sched.title).slice(0, 50)}`;
+        for (let i = 0; i < sched.showtimes.length; i++) {
+          const time = sched.showtimes[i];
+          const timeClean = time.replace(/[^0-9:]/g, '');
+          if (!timeClean) continue;
 
-            const hash = crypto
-              .createHash('md5')
-              .update(`${cinemaId}-${actualMovieId}-${dateStr}-${timeClean}`)
-              .digest('hex')
-              .slice(0, 24);
-            const showtimeId = `st-${hash}`;
+          const showtimeDetail = sched.showtime_details?.[i];
+          const rawTicketUrl = showtimeDetail?.ticket_url || sched.ticket_url;
+          const finalTicketUrl = rawTicketUrl && isRealTicketingUrl(rawTicketUrl) ? rawTicketUrl : null;
+          const finalTicketSource = determineTicketSource(cinema.chain, cinema.name, finalTicketUrl);
 
-            const showtimeUpsertRes = await executeRawSql(
-              `INSERT INTO showtimes (id, movie_id, cinema_id, show_date, time, format, language, ticket_url, ticket_source, active, clicks, scraped_at)
-               VALUES ($1, $2, $3, $4, $5, '2D', 'IT', $6, $7, TRUE, 0, NOW())
-               ON CONFLICT (id) DO UPDATE
-               SET active = TRUE,
-                   ticket_url = EXCLUDED.ticket_url,
-                   ticket_source = EXCLUDED.ticket_source
-               RETURNING (xmax = 0) AS is_inserted`,
-              [showtimeId, actualMovieId, cinemaId, dateStr, timeClean, finalTicketUrl, finalTicketSource]
-            );
+          const hash = crypto
+            .createHash('md5')
+            .update(`${cinemaId}-${actualMovieId}-${sched.date}-${timeClean}`)
+            .digest('hex')
+            .slice(0, 24);
+          const showtimeId = `st-${hash}`;
 
-            if (showtimeUpsertRes.rows && showtimeUpsertRes.rows.length > 0) {
-              showtimesTouched++;
-            }
-          }
+          showtimeBatchRows.push({
+            id: showtimeId,
+            movieId: actualMovieId,
+            cinemaId,
+            showDate: sched.date,
+            time: timeClean,
+            format: showtimeDetail?.format || '2D',
+            language: 'IT',
+            ticketUrl: finalTicketUrl,
+            ticketSource: finalTicketSource
+          });
         }
       }
-    }
+
+      // Batch insert in chunks of up to 60 rows for high performance without stack depth or param limit issues
+      const CHUNK_SIZE = 60;
+      for (let offset = 0; offset < showtimeBatchRows.length; offset += CHUNK_SIZE) {
+        const chunk = showtimeBatchRows.slice(offset, offset + CHUNK_SIZE);
+        const placeholders: string[] = [];
+        const params: any[] = [];
+        let pIdx = 1;
+
+        for (const row of chunk) {
+          placeholders.push(`($${pIdx}, $${pIdx + 1}, $${pIdx + 2}, $${pIdx + 3}, $${pIdx + 4}, $${pIdx + 5}, $${pIdx + 6}, $${pIdx + 7}, $${pIdx + 8}, TRUE, 0, NOW())`);
+          params.push(
+            row.id,
+            row.movieId,
+            row.cinemaId,
+            row.showDate,
+            row.time,
+            row.format,
+            row.language,
+            row.ticketUrl,
+            row.ticketSource
+          );
+          pIdx += 9;
+        }
+
+        const sql = `
+          INSERT INTO showtimes (id, movie_id, cinema_id, show_date, time, format, language, ticket_url, ticket_source, active, clicks, scraped_at)
+          VALUES ${placeholders.join(', ')}
+          ON CONFLICT (id) DO UPDATE
+          SET active = TRUE,
+              ticket_url = EXCLUDED.ticket_url,
+              ticket_source = EXCLUDED.ticket_source,
+              scraped_at = NOW()
+        `;
+
+        await executeRawSql(sql, params);
+        showtimesTouched += chunk.length;
+      }
+    });
 
     const logId = `log-${Date.now()}`;
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
