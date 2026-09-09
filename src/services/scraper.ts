@@ -1373,17 +1373,31 @@ export class NationwideCinemaScraper {
         }
       }
 
-      const assignedCityId = cityTarget.id;
       // Ensure city exists in table to avoid FK violation
       try {
         await executeRawSql(
           `INSERT INTO cities (id, slug, name, region, province, province_code, is_provincial_capital, lat, lng, geocode_status)
            VALUES ($1, $2, $3, 'Italia', $3, 'IT', FALSE, $4, $5, 'complete')
-           ON CONFLICT (id) DO NOTHING
-           ON CONFLICT (slug) DO NOTHING`,
+           ON CONFLICT (id) DO NOTHING`,
           [cityTarget.id, cityTarget.slug, cityTarget.name, cityTarget.lat, cityTarget.lng]
         );
-      } catch {}
+      } catch (err: any) {
+        // If conflict occurred on unique slug constraint under a different id, lookup existing city id to prevent FK failure
+        if (err?.code === '23505' || err?.message?.includes('slug')) {
+          try {
+            const existing = await executeRawSql(`SELECT id FROM cities WHERE slug = $1 LIMIT 1`, [cityTarget.slug]);
+            if (existing.rows && existing.rows.length > 0) {
+              cityTarget.id = existing.rows[0].id;
+            }
+          } catch (lookupErr: any) {
+            console.warn(`[SCRAPER] Failed to resolve existing city ID for slug ${cityTarget.slug}:`, lookupErr?.message);
+          }
+        } else {
+          console.warn(`[SCRAPER] City upsert warning for ${cityTarget.name} (${cityTarget.id}):`, err?.message);
+        }
+      }
+
+      const assignedCityId = cityTarget.id;
       citiesTouchedSet.add(assignedCityId);
 
       // Jitter lat/lng slightly so multiple cinemas in same city have distinct map pins

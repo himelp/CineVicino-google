@@ -42,12 +42,28 @@ export async function getDb() {
         console.log('✅ Connected to external PostgreSQL database via DATABASE_URL');
         return db;
       } catch (err: any) {
-        console.warn('⚠️ Could not connect to DATABASE_URL, falling back to local persistent PostgreSQL (PGlite):', err.message);
         if (pool) {
           await pool.end().catch(() => {});
           pool = null;
         }
+
+        // In production, never silently fall back to ephemeral embedded PGlite.
+        // Fail fast and loud so the container supervisor (e.g. docker-compose restart) retries against real Postgres.
+        if (process.env.NODE_ENV === 'production') {
+          console.error('❌ [FATAL] Failed to connect to PostgreSQL at DATABASE_URL in production:', err.message);
+          throw new Error(
+            `[FATAL] Failed to connect to DATABASE_URL in production: ${err.message}. ` +
+            `Ephemeral PGlite fallback is disabled in production to protect data durability.`
+          );
+        }
+
+        console.warn('⚠️ Could not connect to DATABASE_URL, falling back to local persistent PostgreSQL (PGlite):', err.message);
       }
+    } else if (process.env.NODE_ENV === 'production') {
+      console.error('❌ [FATAL] DATABASE_URL is missing or contains placeholder in production.');
+      throw new Error(
+        `[FATAL] DATABASE_URL is required in production. Ephemeral PGlite fallback is disabled in production.`
+      );
     }
 
     // Fallback to embedded persistent PostgreSQL engine (PGlite)
