@@ -777,13 +777,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
             Area riservata per il controllo di scraper, cataloghi cinema/film e impostazioni di sistema.
           </p>
 
-          {process.env.NODE_ENV !== 'production' && (
-            <div className="mb-5 p-2.5 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[11px] text-[#D4AF37] text-left flex items-center justify-between">
-              <span>Dev: <strong>admin@cinevicino.it</strong></span>
-              <span className="font-mono text-[10px] text-neutral-300">AdminCineVicino2026!</span>
-            </div>
-          )}
-
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative text-left">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 ml-1">

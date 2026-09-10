@@ -399,6 +399,8 @@ CUR_TMDB_API_KEY="$(get_env_val "TMDB_API_KEY")"
 CUR_FIRECRAWL_API_KEY="$(get_env_val "FIRECRAWL_API_KEY")"
 CUR_MAXMIND_LICENSE_KEY="$(get_env_val "MAXMIND_LICENSE_KEY")"
 CUR_EMAIL_ALERT_API_KEY="$(get_env_val "EMAIL_ALERT_API_KEY")"
+CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL="$(get_env_val "GOOGLE_SERVICE_ACCOUNT_EMAIL")"
+CUR_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="$(get_env_val "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY")"
 
 NEW_JWT_SECRET="${CUR_JWT_SECRET:-$(generate_secret_hex 32)}"
 NEW_POSTGRES_USER="${CUR_POSTGRES_USER:-cineuser}"
@@ -423,6 +425,16 @@ fi
 if [ -z "${CUR_MAXMIND_LICENSE_KEY}" ] && [ -t 0 ]; then
   read -r -p "Enter MaxMind License Key for GeoIP auto-city detection (free at maxmind.com, press Enter to skip): " INPUT_MM || true
   CUR_MAXMIND_LICENSE_KEY="${INPUT_MM:-}"
+fi
+
+if [ -z "${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}" ] && [ -t 0 ]; then
+  read -r -p "Enter Google Service Account email for Sheets auto-sync (optional, press Enter to skip): " INPUT_GSA_EMAIL || true
+  CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL="${INPUT_GSA_EMAIL:-}"
+fi
+if [ -z "${CUR_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}" ] && [ -t 0 ] && [ -n "${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}" ]; then
+  echo "Paste the Service Account private key (the full 'private_key' field from the JSON key file, with \\n kept as literal \\n — do not convert to real newlines):"
+  read -r -p "> " INPUT_GSA_KEY || true
+  CUR_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="${INPUT_GSA_KEY:-}"
 fi
 
 # Write updated .env idempotently
@@ -453,10 +465,15 @@ TMDB_API_KEY="${CUR_TMDB_API_KEY}"
 FIRECRAWL_API_KEY="${CUR_FIRECRAWL_API_KEY}"
 MAXMIND_LICENSE_KEY="${CUR_MAXMIND_LICENSE_KEY}"
 EMAIL_ALERT_API_KEY="${CUR_EMAIL_ALERT_API_KEY}"
+GOOGLE_SERVICE_ACCOUNT_EMAIL="${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}"
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="${CUR_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY}"
 EOF
 
 chmod 600 "${ENV_FILE}"
 success "Validated and updated configuration at .env (mode 600)."
+if [ -n "${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}" ]; then
+  info "Google Sheets sync note: remember to share your target Google Sheet with '${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}' as Editor."
+fi
 
 # ------------------------------------------------------------------------------
 # 9. FREE LOCAL PORT DETECTION FOR NGINX (Requirement 7)

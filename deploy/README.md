@@ -191,6 +191,39 @@ CineVicino includes built-in visitor city auto-detection powered by a local self
 
 ---
 
+### Step 5b: Configure Google Sheets Auto-Sync (Optional)
+
+CineVicino can automatically export all Italian cinemas, movies, and live showtimes into a Google Spreadsheet every 6 hours (or on demand) for external reporting, partner sharing, and operational audits.
+
+1. **Google Cloud Project & API**:
+   - Open [Google Cloud Console](https://console.cloud.google.com/), create or select a project, and enable the **Google Sheets API**.
+2. **Create a Service Account**:
+   - Navigate to **IAM & Admin** → **Service Accounts** → **Create Service Account**.
+   - Assign a descriptive name (e.g. `cinevicino-sheets-sync`) and click **Create and Continue** (no special IAM roles are required at project level).
+   - Click the newly created Service Account, go to the **Keys** tab, click **Add Key** → **Create new key** → select **JSON**, and download the key file.
+3. **Configure Environment Variables**:
+   - Copy `client_email` and `private_key` from the downloaded JSON file into your `.env` (or supply them interactively during `cinevicino-setup.sh`):
+   ```ini
+   GOOGLE_SERVICE_ACCOUNT_EMAIL="cinevicino-sheets-sync@your-project.iam.gserviceaccount.com"
+   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+   ```
+   *(Note: keep `\n` as literal two-character `\n` in the `.env` value, do not convert to unescaped multi-line breaks).*
+4. **Share Target Spreadsheet with the Service Account**:
+   - In Google Drive / Google Sheets, create a new spreadsheet (or open an existing one).
+   - Click **Share** (top right) and invite your Service Account email (`client_email`) with **Editor** permissions.
+5. **Apply Configuration**:
+   - If setting this up after initial deployment, restart the app container so the new environment variables are loaded:
+   ```bash
+   docker compose up -d
+   ```
+6. **Connect & Test from Admin CMS**:
+   - Log into the Admin CMS at `/admin` (or your secret `ADMIN_SLUG`), navigate to **Impostazioni** → **Google Sheets Auto-Sync**.
+   - Paste the target Google Sheet URL or ID into the field and click **Salva Foglio**.
+   - Click **Verifica Accesso** to test connectivity and permissions.
+   - Click **Sincronizza Ora** to execute an immediate initial sync of Cinemas, Movies, and Showtimes tabs.
+
+---
+
 ### Step 6: Configure Scheduled Cron Jobs (Daily Scraper & Weekly GeoIP Update)
 
 To keep all Italian showtimes fresh and ensure GeoLite2 IP mappings remain accurate (MaxMind releases updates twice weekly), add both jobs to your host crontab:
