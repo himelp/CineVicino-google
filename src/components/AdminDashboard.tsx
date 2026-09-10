@@ -3,9 +3,10 @@ import {
   Shield, Activity, Database, RefreshCw, Play, 
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
-  Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe
+  Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe,
+  FileSpreadsheet, ExternalLink, Copy
 } from 'lucide-react';
-import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings } from '../types';
+import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings, GoogleSheetsStatus } from '../types';
 import { safeReadJson, safeFetchJson, ApiResponse } from '../utils/api';
 
 interface AdminDashboardProps {
@@ -130,6 +131,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Customization state
   const [customSettings, setCustomSettings] = useState<SiteSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Google Sheets integration state
+  const [sheetsStatus, setSheetsStatus] = useState<GoogleSheetsStatus | null>(null);
+  const [sheetsInput, setSheetsInput] = useState<string>('');
+  const [testingSheets, setTestingSheets] = useState(false);
+  const [savingSheetsConfig, setSavingSheetsConfig] = useState(false);
+  const [syncingSheets, setSyncingSheets] = useState(false);
+  const [sheetsActionMessage, setSheetsActionMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   // Handle Login via real POST /api/auth/login with safe JSON handling
   const handleLogin = async (e: React.FormEvent) => {
@@ -273,6 +283,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       const parsed = await authFetchJson<any>('/api/admin/status');
       if (parsed.ok && parsed.data) {
         setStatusData(parsed.data);
+        if (parsed.data.sheets) {
+          setSheetsStatus(parsed.data.sheets);
+          setSheetsInput(prev => prev || parsed.data.sheets.spreadsheet_url || parsed.data.sheets.spreadsheet_id || '');
+        }
       }
     } catch (e) {
       console.error(e);
@@ -486,6 +500,87 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     } finally {
       setUpdatingGeoip(false);
     }
+  };
+
+  // Google Sheets: Test / Refresh Access
+  const handleTestSheets = async () => {
+    try {
+      setTestingSheets(true);
+      setSheetsActionMessage(null);
+      const query = sheetsInput.trim() ? `?spreadsheet_id=${encodeURIComponent(sheetsInput.trim())}` : '';
+      const parsed = await authFetchJson<GoogleSheetsStatus>(`/api/admin/sheets/status${query}`);
+      if (parsed.ok && parsed.data) {
+        setSheetsStatus(parsed.data);
+        if (parsed.data.status === 'healthy') {
+          setSheetsActionMessage({ type: 'success', text: parsed.data.message });
+        } else if (parsed.data.status === 'permission_denied') {
+          setSheetsActionMessage({ type: 'error', text: parsed.data.message });
+        } else {
+          setSheetsActionMessage({ type: 'info', text: parsed.data.message });
+        }
+      } else {
+        setSheetsActionMessage({ type: 'error', text: parsed.error || 'Errore durante la verifica di Google Sheets' });
+      }
+    } catch (err: any) {
+      setSheetsActionMessage({ type: 'error', text: err?.message || 'Errore di connessione' });
+    } finally {
+      setTestingSheets(false);
+    }
+  };
+
+  // Google Sheets: Save Configuration
+  const handleSaveSheetsConfig = async () => {
+    try {
+      setSavingSheetsConfig(true);
+      setSheetsActionMessage(null);
+      const parsed = await authFetchJson<any>('/api/admin/sheets/config', {
+        method: 'POST',
+        body: JSON.stringify({ spreadsheet_input: sheetsInput.trim() })
+      });
+      if (parsed.ok && parsed.data) {
+        if (parsed.data.status) {
+          setSheetsStatus(parsed.data.status);
+        }
+        setSheetsActionMessage({ type: 'success', text: parsed.data.message });
+        loadStatus();
+      } else {
+        setSheetsActionMessage({ type: 'error', text: parsed.error || 'Errore durante il salvataggio' });
+      }
+    } catch (err: any) {
+      setSheetsActionMessage({ type: 'error', text: err?.message || 'Errore durante il salvataggio' });
+    } finally {
+      setSavingSheetsConfig(false);
+    }
+  };
+
+  // Google Sheets: Manual Full Sync
+  const handleSyncSheetsNow = async () => {
+    try {
+      setSyncingSheets(true);
+      setSheetsActionMessage({ type: 'info', text: 'Sincronizzazione in corso verso Google Sheets (Panoramica, Cinemas, Movies, Showtimes, ScrapeLog)...' });
+      const parsed = await authFetchJson<any>('/api/admin/sheets/sync', {
+        method: 'POST',
+        body: JSON.stringify({ spreadsheet_id: sheetsInput.trim() || undefined })
+      });
+      if (parsed.ok && parsed.data?.success) {
+        setSheetsActionMessage({ type: 'success', text: parsed.data.message });
+        handleTestSheets();
+        loadStatus();
+      } else {
+        const errorMsg = parsed.data?.message || parsed.error || 'Errore durante la sincronizzazione con Google Sheets';
+        setSheetsActionMessage({ type: 'error', text: errorMsg });
+      }
+    } catch (err: any) {
+      setSheetsActionMessage({ type: 'error', text: err?.message || 'Errore durante la sincronizzazione' });
+    } finally {
+      setSyncingSheets(false);
+    }
+  };
+
+  const handleCopyEmail = (emailText: string) => {
+    navigator.clipboard.writeText(emailText);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2500);
   };
 
   // Toggle Active Showtime
@@ -939,6 +1034,189 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       <div className="text-xs font-mono text-neutral-300 mt-1">{geoipMessage}</div>
                     )}
                   </div>
+                </div>
+
+                {/* Google Sheets Auto-Sync Panel */}
+                <div className="md:col-span-2 p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                        <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-white">Google Sheets Auto-Sync</span>
+                          <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono">
+                            Service Account
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-400">
+                          Sincronizzazione automatica post-scrape e snapshot su Google Sheets (Panoramica, Cinemas, Movies, Showtimes, ScrapeLog)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                      {sheetsStatus?.status === 'healthy' ? (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Connesso ({sheetsStatus.latency_ms}ms)
+                        </span>
+                      ) : sheetsStatus?.status === 'permission_denied' ? (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Permesso Negato (403)
+                        </span>
+                      ) : sheetsStatus?.status === 'not_found' ? (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Foglio Non Trovato (404)
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Non Configurato
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleTestSheets}
+                        disabled={testingSheets}
+                        title="Verifica accesso e permessi al foglio Google"
+                        className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${testingSheets ? 'animate-spin text-emerald-400' : ''}`} />
+                        <span>{testingSheets ? 'Verifica...' : 'Verifica Accesso'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleSyncSheetsNow}
+                        disabled={syncingSheets || (!sheetsInput.trim() && !sheetsStatus?.spreadsheet_id)}
+                        title="Esegui sincronizzazione manuale istantanea con Google Sheets"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${syncingSheets ? 'animate-spin' : ''}`} />
+                        <span>{syncingSheets ? 'Sincronizzazione...' : 'Sincronizza Ora'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Service Account Email Info & Sharing Helper */}
+                  <div className="p-3 bg-neutral-900/90 rounded-xl border border-neutral-800 text-xs space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="text-neutral-300 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-neutral-400">Email Service Account da abilitare:</span>
+                        {sheetsStatus?.service_account_email ? (
+                          <span className="font-mono text-emerald-400 font-semibold select-all">
+                            {sheetsStatus.service_account_email}
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 font-mono">
+                            GOOGLE_SERVICE_ACCOUNT_EMAIL non impostata in .env
+                          </span>
+                        )}
+                      </div>
+                      {sheetsStatus?.service_account_email && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyEmail(sheetsStatus.service_account_email!)}
+                          className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-[11px] text-neutral-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer self-start sm:self-auto"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>{copiedEmail ? 'Copiato!' : 'Copia Email'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      💡 <strong>Passo fondamentale:</strong> Apri il tuo foglio su Google Fogli, clicca su <strong className="text-white">Condividi</strong> in alto a destra, incolla l'indirizzo email del Service Account e assegna il ruolo <strong className="text-emerald-400">"Editor"</strong>. Non sono necessari token OAuth o login utente.
+                    </p>
+                  </div>
+
+                  {/* Spreadsheet ID / URL Input & Save */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-neutral-300">
+                      Foglio Google di Destinazione (URL Completo o Spreadsheet ID)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={sheetsInput}
+                        onChange={(e) => setSheetsInput(e.target.value)}
+                        placeholder="Es: https://docs.google.com/spreadsheets/d/1BxiMVs0X.../edit oppure l'ID del foglio"
+                        className="flex-1 bg-black/70 border border-neutral-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500 font-mono"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSaveSheetsConfig}
+                          disabled={savingSheetsConfig}
+                          className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                        >
+                          <Save className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{savingSheetsConfig ? 'Salvataggio...' : 'Salva Foglio'}</span>
+                        </button>
+
+                        {(sheetsStatus?.spreadsheet_url || sheetsInput.includes('docs.google.com')) && (
+                          <a
+                            href={sheetsStatus?.spreadsheet_url || (sheetsInput.startsWith('http') ? sheetsInput : `https://docs.google.com/spreadsheets/d/${sheetsInput}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs flex items-center gap-1.5 border border-neutral-700 transition-colors whitespace-nowrap"
+                          >
+                            <span>Apri Foglio</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Feedback Action Banner */}
+                  {sheetsActionMessage && (
+                    <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                      sheetsActionMessage.type === 'success' 
+                        ? 'bg-emerald-950/50 border-emerald-800 text-emerald-300' 
+                        : sheetsActionMessage.type === 'error'
+                        ? 'bg-rose-950/50 border-rose-800 text-rose-300'
+                        : 'bg-blue-950/50 border-blue-800 text-blue-300'
+                    }`}>
+                      {sheetsActionMessage.type === 'success' ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      ) : sheetsActionMessage.type === 'error' ? (
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                      )}
+                      <span className="leading-relaxed">{sheetsActionMessage.text}</span>
+                    </div>
+                  )}
+
+                  {/* Live Sync Status Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <div className="bg-neutral-900 p-2.5 rounded-xl border border-neutral-800/80">
+                      <span className="text-neutral-400 block text-[11px]">Titolo Foglio Verificato:</span>
+                      <span className="font-semibold text-white truncate block">
+                        {sheetsStatus?.spreadsheet_title || (sheetsStatus?.spreadsheet_id ? 'In attesa di verifica' : 'Nessun foglio collegato')}
+                      </span>
+                    </div>
+                    <div className="bg-neutral-900 p-2.5 rounded-xl border border-neutral-800/80">
+                      <span className="text-neutral-400 block text-[11px]">Ultima Sincronizzazione:</span>
+                      <span className="font-mono text-neutral-200 block truncate">
+                        {sheetsStatus?.last_sync_at ? new Date(sheetsStatus.last_sync_at).toLocaleString('it-IT') : 'Mai eseguita'}
+                      </span>
+                    </div>
+                    <div className="bg-neutral-900 p-2.5 rounded-xl border border-neutral-800/80">
+                      <span className="text-neutral-400 block text-[11px]">Schede Gestite:</span>
+                      <span className="font-mono text-emerald-400 block text-[11px] truncate">
+                        Panoramica, Cinemas, Movies, Showtimes, ScrapeLog
+                      </span>
+                    </div>
+                  </div>
+
+                  {sheetsStatus?.last_sync_message && (
+                    <div className="text-[11px] font-mono text-neutral-400 bg-neutral-900/60 px-3 py-1.5 rounded-lg border border-neutral-800/50 flex items-center justify-between flex-wrap gap-2">
+                      <span>Esito ultimo sync: <span className={sheetsStatus.last_sync_status === 'success' ? 'text-emerald-400' : 'text-rose-400'}>{sheetsStatus.last_sync_message}</span></span>
+                      <span className="text-neutral-500">Sovrascrittura atomica attiva</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Database Engine Status */}

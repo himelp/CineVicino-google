@@ -10,6 +10,7 @@ import * as cheerio from 'cheerio';
 import crypto from 'crypto';
 import { executeRawSql } from '../db/index';
 import { MovieFormat, TicketSource } from '../types';
+import { syncAllDataToGoogleSheet } from './googleSheets';
 
 export interface ScrapeProgressUpdate {
   step: string;
@@ -1786,6 +1787,20 @@ export class NationwideCinemaScraper {
     );
 
     notify('complete', 'System', showtimesTouched, details);
+
+    // Phase 4: Non-blocking Google Sheets Auto-Sync (if configured)
+    try {
+      const sheetSyncRes = await syncAllDataToGoogleSheet({
+        triggeredBy: `Scraper Batch [${logId}]`
+      });
+      if (sheetSyncRes.success) {
+        notify('sheets', 'Google Sheets', showtimesTouched, sheetSyncRes.message);
+      } else if (!sheetSyncRes.skipped) {
+        console.warn('[Scraper] Google Sheets sync warning:', sheetSyncRes.message);
+      }
+    } catch (sheetErr: any) {
+      console.warn('[Scraper] Google Sheets sync error (non-fatal):', sheetErr?.message);
+    }
 
     return {
       id: logId,

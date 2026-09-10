@@ -10,6 +10,11 @@ import rateLimit from 'express-rate-limit';
 import { initDb, executeRawSql, closeDb } from './src/db/index';
 import { cinemaScraper } from './src/services/scraper';
 import { checkTmdb, checkFirecrawl, checkScraperSources, getDiagnosticsSummary } from './src/services/diagnostics';
+import {
+  checkGoogleSheetsAccess,
+  syncAllDataToGoogleSheet,
+  extractSpreadsheetId
+} from './src/services/googleSheets';
 import { runBatchGeocoding } from './src/services/geocoder';
 import {
   initGeoIp,
@@ -1099,6 +1104,7 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
       firecrawl: diagnostics.firecrawl,
       scrapers_health: diagnostics.scrapers,
       geoip: getGeoIpStatus(),
+      sheets: await checkGoogleSheetsAccess(),
       database: {
         records: {
           cities: stats.rows[0]?.total_cities || 0,
@@ -1124,7 +1130,8 @@ app.get('/api/admin/diagnostics', requireAdmin, async (req: AuthenticatedRequest
   try {
     const forceRefresh = req.query.refresh === 'true';
     const summary = await getDiagnosticsSummary(forceRefresh);
-    res.json({ success: true, ...summary });
+    const sheets = await checkGoogleSheetsAccess();
+    res.json({ success: true, ...summary, sheets });
   } catch (err: any) {
     logger.error({ err }, 'Error in /api/admin/diagnostics');
     res.status(500).json({ error: 'Errore durante l\'esecuzione della diagnostica', details: err?.message });
@@ -1477,6 +1484,74 @@ app.put('/api/admin/settings', requireAdmin, async (req: AuthenticatedRequest, r
   } catch (err: any) {
     logger.error({ err }, 'Error updating settings');
     res.status(500).json({ error: 'Errore durante il salvataggio delle impostazioni' });
+  }
+});
+
+// Admin: Google Sheets Integration Status
+app.get('/api/admin/sheets/status', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const spreadsheetIdQuery = typeof req.query.spreadsheet_id === 'string' ? req.query.spreadsheet_id : undefined;
+    const status = await checkGoogleSheetsAccess(spreadsheetIdQuery);
+    res.json(status);
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/sheets/status');
+    res.status(500).json({ error: 'Errore durante la verifica di Google Sheets' });
+  }
+});
+
+// Admin: Save Google Sheets Configuration
+app.post('/api/admin/sheets/config', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { spreadsheet_input, auto_sync } = req.body;
+    const cleanId = extractSpreadsheetId(spreadsheet_input || '');
+
+    await executeRawSql(
+      `INSERT INTO site_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      ['google_sheets_spreadsheet_id', cleanId]
+    );
+
+    if (auto_sync !== undefined) {
+      await executeRawSql(
+        `INSERT INTO site_settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        ['google_sheets_auto_sync', String(Boolean(auto_sync))]
+      );
+    }
+
+    const updatedStatus = await checkGoogleSheetsAccess(cleanId);
+    res.json({
+      success: true,
+      message: cleanId ? 'Configurazione Google Sheets salvata con successo' : 'Configurazione Google Sheets rimossa',
+      spreadsheet_id: cleanId,
+      status: updatedStatus
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/sheets/config');
+    res.status(500).json({ error: 'Errore durante il salvataggio della configurazione Google Sheets' });
+  }
+});
+
+// Admin: Trigger Manual Google Sheets Sync
+app.post('/api/admin/sheets/sync', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const spreadsheetIdInput = typeof req.body.spreadsheet_id === 'string' ? req.body.spreadsheet_id : undefined;
+    const result = await syncAllDataToGoogleSheet({
+      spreadsheetId: spreadsheetIdInput,
+      triggeredBy: `Amministratore (${req.user?.email || 'admin'})`
+    });
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(result.skipped ? 400 : 502).json(result);
+    }
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/sheets/sync');
+    res.status(500).json({
+      success: false,
+      error: 'Errore interno durante la sincronizzazione con Google Sheets: ' + (err?.message || String(err))
+    });
   }
 });
 

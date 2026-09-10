@@ -141,4 +141,26 @@ export interface SiteSettings {
   privacy_policy_en: string;
   firecrawl_monthly_limit: number;
   firecrawl_credits_used: number;
+  google_sheets_spreadsheet_id?: string;
+  google_sheets_url?: string;
+  google_sheets_last_sync_at?: string;
+  google_sheets_last_sync_status?: string;
+  google_sheets_last_sync_message?: string;
+  google_sheets_auto_sync?: boolean;
+}
+
+export interface GoogleSheetsStatus {
+  configured: boolean;
+  service_account_email: string | null;
+  spreadsheet_id: string | null;
+  spreadsheet_url: string | null;
+  status: 'healthy' | 'unconfigured' | 'permission_denied' | 'not_found' | 'error';
+  latency_ms: number;
+  spreadsheet_title?: string;
+  sheets_found?: string[];
+  last_sync_at?: string | null;
+  last_sync_status?: string | null;
+  last_sync_message?: string | null;
+  message: string;
+  tested_at: string;
 }
