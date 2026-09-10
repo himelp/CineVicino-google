@@ -141,6 +141,13 @@ export interface SiteSettings {
   privacy_policy_en: string;
   firecrawl_monthly_limit: number;
   firecrawl_credits_used: number;
+  footer_copy?: string;
+  privacy_policy_text?: string;
+  social_instagram_url?: string;
+  social_facebook_url?: string;
+  social_x_url?: string;
+  social_tiktok_url?: string;
+  social_youtube_url?: string;
   google_sheets_spreadsheet_id?: string;
   google_sheets_url?: string;
   google_sheets_last_sync_at?: string;

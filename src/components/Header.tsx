@@ -5,6 +5,13 @@ import { Language, translations } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
 import { formatTodayFull } from '../utils/date';
 
+export interface SocialLinkItem {
+  id: string;
+  name: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
 interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
@@ -20,6 +27,7 @@ interface HeaderProps {
   onOpenHome: () => void;
   user: any;
   onOpenLogin: () => void;
+  socialLinks?: SocialLinkItem[];
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -36,7 +44,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAllMovies,
   onOpenHome,
   user,
-  onOpenLogin
+  onOpenLogin,
+  socialLinks = []
 }) => {
   const t = translations[lang];
   const [searchQuery, setSearchQuery] = useState('');
@@ -267,6 +276,28 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
+            {/* Social Media Links (Desktop - shown only if configured) */}
+            {socialLinks && socialLinks.length > 0 && (
+              <div className="hidden lg:flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.03] border border-white/10">
+                {socialLinks.map((s) => {
+                  const Icon = s.icon;
+                  return (
+                    <a
+                      key={s.id}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`${s.name} - CineVicino`}
+                      aria-label={`${s.name} - CineVicino`}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Language Switcher (Desktop) */}
             <button
               onClick={onToggleLang}
@@ -434,6 +465,31 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Mobile Social Links (only shown if configured) */}
+            {socialLinks && socialLinks.length > 0 && (
+              <div className="pt-3 border-t border-white/10 flex items-center justify-between px-2 text-xs text-neutral-400">
+                <span className="text-[11px] font-medium text-neutral-400">Seguici sui social:</span>
+                <div className="flex items-center gap-2">
+                  {socialLinks.map((s) => {
+                    const Icon = s.icon;
+                    return (
+                      <a
+                        key={s.id}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${s.name} - CineVicino`}
+                        aria-label={`${s.name} - CineVicino`}
+                        className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

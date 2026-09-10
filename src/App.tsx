@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
@@ -15,7 +15,7 @@ import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
 import { Language, translations, useLanguage } from './utils/i18n';
 import { safeFetchJson, safeReadJson } from './utils/api';
-import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight, Calendar } from 'lucide-react';
+import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight, Calendar, Instagram, Facebook, Twitter, Music2, Youtube } from 'lucide-react';
 import { formatTodayFull } from './utils/date';
 
 export default function App() {
@@ -38,7 +38,12 @@ export default function App() {
     footer_copy: '© 2026 CineVicino Italia — Directory indipendente dei cinema italiani.',
     privacy_policy_text: 'La tua privacy è fondamentale per noi. Non archiviamo dati personali di geolocalizzazione.',
     firecrawl_monthly_limit: 1000,
-    firecrawl_credits_used: 0
+    firecrawl_credits_used: 0,
+    social_instagram_url: '',
+    social_facebook_url: '',
+    social_x_url: '',
+    social_tiktok_url: '',
+    social_youtube_url: '',
   });
 
   // Navigation & View State
@@ -109,7 +114,7 @@ export default function App() {
 
         if (movData.ok && Array.isArray(movData.data)) setMovies(movData.data);
         if (cinData.ok && Array.isArray(cinData.data)) setCinemas(cinData.data);
-        if (setVal.ok && setVal.data) setSettings(setVal.data);
+        if (setVal.ok && setVal.data) setSettings(prev => ({ ...prev, ...setVal.data }));
         if (citData.ok && citData.data?.total) setCitiesCount(citData.data.total);
 
         // Restore user session if token exists
@@ -451,6 +456,17 @@ export default function App() {
     }
   }, [location.pathname, movies]);
 
+  // Social media channels (only include those configured by admin)
+  const socialLinks = useMemo(() => [
+    { id: 'instagram', name: 'Instagram', url: settings.social_instagram_url?.trim(), icon: Instagram, color: 'hover:text-pink-400 hover:border-pink-500/40' },
+    { id: 'facebook', name: 'Facebook', url: settings.social_facebook_url?.trim(), icon: Facebook, color: 'hover:text-blue-400 hover:border-blue-500/40' },
+    { id: 'x', name: 'X (Twitter)', url: settings.social_x_url?.trim(), icon: Twitter, color: 'hover:text-white hover:border-white/40' },
+    { id: 'tiktok', name: 'TikTok', url: settings.social_tiktok_url?.trim(), icon: Music2, color: 'hover:text-cyan-400 hover:border-cyan-500/40' },
+    { id: 'youtube', name: 'YouTube', url: settings.social_youtube_url?.trim(), icon: Youtube, color: 'hover:text-red-400 hover:border-red-500/40' },
+  ].filter((s): s is { id: string; name: string; url: string; icon: React.ComponentType<{ className?: string }>; color: string } => 
+    Boolean(s.url && s.url.length > 0)
+  ), [settings]);
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#e0e0e0] flex flex-col font-sans selection:bg-[#D4AF37] selection:text-black">
       
@@ -470,6 +486,7 @@ export default function App() {
         onOpenHome={openHome}
         user={user}
         onOpenLogin={() => setShowLogin(true)}
+        socialLinks={socialLinks}
       />
 
       {/* Auto-Detected Visitor City Pill / Banner */}
@@ -715,6 +732,33 @@ export default function App() {
                   <Ticket className="w-3.5 h-3.5 text-[#D4AF37]" /> Reindirizzamento ufficiale
                 </span>
               </div>
+
+              {/* Official Social Media Channels (only rendered if URL is configured) */}
+              {socialLinks.length > 0 && (
+                <div className="pt-2">
+                  <span className="block text-[10px] uppercase font-bold tracking-widest text-neutral-400 mb-2.5">
+                    {lang === 'en' ? 'Follow us' : 'Seguici sui social'}
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {socialLinks.map((s) => {
+                      const Icon = s.icon;
+                      return (
+                        <a
+                          key={s.id}
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`${s.name} - CineVicino`}
+                          aria-label={`${s.name} - CineVicino`}
+                          className={`w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neutral-300 ${s.color} hover:bg-white/10 transition-all active:scale-95`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick Links */}
@@ -839,7 +883,13 @@ export default function App() {
 
       {showAdmin && (
         <AdminDashboard
-          onClose={() => setShowAdmin(false)}
+          onClose={() => {
+            setShowAdmin(false);
+            safeFetchJson<SiteSettings>('/api/settings').then(res => {
+              if (res.ok && res.data) setSettings(prev => ({ ...prev, ...res.data }));
+            });
+          }}
+          onSettingsUpdated={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
         />
       )}
 

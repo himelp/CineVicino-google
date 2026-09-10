@@ -4,16 +4,18 @@ import {
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
   Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe,
-  FileSpreadsheet, ExternalLink, Copy
+  FileSpreadsheet, ExternalLink, Copy,
+  Instagram, Facebook, Twitter, Music2, Youtube, Share2
 } from 'lucide-react';
 import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings, GoogleSheetsStatus } from '../types';
 import { safeReadJson, safeFetchJson, ApiResponse } from '../utils/api';
 
 interface AdminDashboardProps {
   onClose: () => void;
+  onSettingsUpdated?: (settings: SiteSettings) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSettingsUpdated }) => {
   const [token, setToken] = useState<string>(() => localStorage.getItem('cinevicino_token') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [email, setEmail] = useState('admin@cinevicino.it');
@@ -131,6 +133,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   // Customization state
   const [customSettings, setCustomSettings] = useState<SiteSettings | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [socialValidationError, setSocialValidationError] = useState<string | null>(null);
 
   // Google Sheets integration state
   const [sheetsStatus, setSheetsStatus] = useState<GoogleSheetsStatus | null>(null);
@@ -324,7 +327,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     try {
       const parsed = await authFetchJson<SiteSettings>('/api/admin/settings');
       if (parsed.ok && parsed.data) {
-        setCustomSettings(parsed.data);
+        setCustomSettings({
+          ...parsed.data,
+          social_instagram_url: parsed.data.social_instagram_url || '',
+          social_facebook_url: parsed.data.social_facebook_url || '',
+          social_x_url: parsed.data.social_x_url || '',
+          social_tiktok_url: parsed.data.social_tiktok_url || '',
+          social_youtube_url: parsed.data.social_youtube_url || '',
+        });
       }
     } catch (e) {
       console.error(e);
@@ -603,17 +613,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     e.preventDefault();
     if (!customSettings) return;
 
+    // Validate social URLs (must start with https:// or be blank)
+    const socialUrls = [
+      { name: 'Instagram', url: customSettings.social_instagram_url },
+      { name: 'Facebook', url: customSettings.social_facebook_url },
+      { name: 'X (Twitter)', url: customSettings.social_x_url },
+      { name: 'TikTok', url: customSettings.social_tiktok_url },
+      { name: 'YouTube', url: customSettings.social_youtube_url },
+    ];
+
+    for (const item of socialUrls) {
+      const val = item.url?.trim();
+      if (val && !val.startsWith('https://')) {
+        setSocialValidationError(`L'URL per ${item.name} non è valido: deve iniziare con "https://" oppure essere lasciato vuoto.`);
+        return;
+      }
+    }
+    setSocialValidationError(null);
+
     try {
-      const parsed = await authFetchJson('/api/admin/settings', {
+      const parsed = await authFetchJson<any>('/api/admin/settings', {
         method: 'PUT',
         body: JSON.stringify(customSettings)
       });
       if (parsed.ok) {
         setSaveSuccess(true);
+        if (onSettingsUpdated) {
+          onSettingsUpdated(customSettings);
+        }
         setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        setSocialValidationError(parsed.error || 'Errore durante il salvataggio');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setSocialValidationError(e?.message || 'Errore durante il salvataggio');
     }
   };
 
@@ -1959,6 +1993,147 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                         onChange={e => setCustomSettings({ ...customSettings, privacy_policy_text: e.target.value })}
                         className="w-full px-3 py-2 bg-neutral-950 border border-neutral-700 rounded-xl text-xs text-white font-sans"
                       />
+                    </div>
+
+                    {/* Social Media Section */}
+                    <div className="md:col-span-2 p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                            <Share2 className="w-4 h-4 text-amber-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-white">Canali Social Ufficiali</span>
+                              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-mono">
+                                Footer & Header
+                              </span>
+                            </div>
+                            <p className="text-xs text-neutral-400">
+                              Inserisci i link ai canali social ufficiali di CineVicino. I canali lasciati vuoti non verranno mostrati sul sito. Tutti i link devono iniziare con <code className="text-amber-400">https://</code>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {socialValidationError && (
+                        <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <span>{socialValidationError}</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Instagram */}
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-2">
+                            <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                            <span>Instagram</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://instagram.com/cinevicino"
+                            value={customSettings.social_instagram_url || ''}
+                            onChange={e => setCustomSettings({ ...customSettings, social_instagram_url: e.target.value })}
+                            className={`w-full px-3 py-2 bg-black border ${
+                              customSettings.social_instagram_url && !customSettings.social_instagram_url.startsWith('https://')
+                                ? 'border-rose-500 focus:border-rose-400'
+                                : 'border-neutral-700 focus:border-amber-500'
+                            } rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none font-mono`}
+                          />
+                          {customSettings.social_instagram_url && !customSettings.social_instagram_url.startsWith('https://') && (
+                            <p className="text-[11px] text-rose-400 mt-1">L'URL deve iniziare con https://</p>
+                          )}
+                        </div>
+
+                        {/* Facebook */}
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-2">
+                            <Facebook className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Facebook</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://facebook.com/cinevicino"
+                            value={customSettings.social_facebook_url || ''}
+                            onChange={e => setCustomSettings({ ...customSettings, social_facebook_url: e.target.value })}
+                            className={`w-full px-3 py-2 bg-black border ${
+                              customSettings.social_facebook_url && !customSettings.social_facebook_url.startsWith('https://')
+                                ? 'border-rose-500 focus:border-rose-400'
+                                : 'border-neutral-700 focus:border-amber-500'
+                            } rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none font-mono`}
+                          />
+                          {customSettings.social_facebook_url && !customSettings.social_facebook_url.startsWith('https://') && (
+                            <p className="text-[11px] text-rose-400 mt-1">L'URL deve iniziare con https://</p>
+                          )}
+                        </div>
+
+                        {/* X (Twitter) */}
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-2">
+                            <Twitter className="w-3.5 h-3.5 text-neutral-200" />
+                            <span>X (ex Twitter)</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://x.com/cinevicino"
+                            value={customSettings.social_x_url || ''}
+                            onChange={e => setCustomSettings({ ...customSettings, social_x_url: e.target.value })}
+                            className={`w-full px-3 py-2 bg-black border ${
+                              customSettings.social_x_url && !customSettings.social_x_url.startsWith('https://')
+                                ? 'border-rose-500 focus:border-rose-400'
+                                : 'border-neutral-700 focus:border-amber-500'
+                            } rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none font-mono`}
+                          />
+                          {customSettings.social_x_url && !customSettings.social_x_url.startsWith('https://') && (
+                            <p className="text-[11px] text-rose-400 mt-1">L'URL deve iniziare con https://</p>
+                          )}
+                        </div>
+
+                        {/* TikTok */}
+                        <div>
+                          <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-2">
+                            <Music2 className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>TikTok</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://tiktok.com/@cinevicino"
+                            value={customSettings.social_tiktok_url || ''}
+                            onChange={e => setCustomSettings({ ...customSettings, social_tiktok_url: e.target.value })}
+                            className={`w-full px-3 py-2 bg-black border ${
+                              customSettings.social_tiktok_url && !customSettings.social_tiktok_url.startsWith('https://')
+                                ? 'border-rose-500 focus:border-rose-400'
+                                : 'border-neutral-700 focus:border-amber-500'
+                            } rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none font-mono`}
+                          />
+                          {customSettings.social_tiktok_url && !customSettings.social_tiktok_url.startsWith('https://') && (
+                            <p className="text-[11px] text-rose-400 mt-1">L'URL deve iniziare con https://</p>
+                          )}
+                        </div>
+
+                        {/* YouTube */}
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-2">
+                            <Youtube className="w-3.5 h-3.5 text-red-500" />
+                            <span>YouTube</span>
+                          </label>
+                          <input
+                            type="url"
+                            placeholder="https://youtube.com/@cinevicino"
+                            value={customSettings.social_youtube_url || ''}
+                            onChange={e => setCustomSettings({ ...customSettings, social_youtube_url: e.target.value })}
+                            className={`w-full px-3 py-2 bg-black border ${
+                              customSettings.social_youtube_url && !customSettings.social_youtube_url.startsWith('https://')
+                                ? 'border-rose-500 focus:border-rose-400'
+                                : 'border-neutral-700 focus:border-amber-500'
+                            } rounded-xl text-xs text-white placeholder-neutral-600 focus:outline-none font-mono`}
+                          />
+                          {customSettings.social_youtube_url && !customSettings.social_youtube_url.startsWith('https://') && (
+                            <p className="text-[11px] text-rose-400 mt-1">L'URL deve iniziare con https://</p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 

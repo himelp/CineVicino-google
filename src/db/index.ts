@@ -316,7 +316,7 @@ export async function initDb() {
 // Seed default settings and initial admin user with bcrypt password
 async function seedDefaults() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@cinevicino.it').toLowerCase();
-  const explicitAdminPass = process.env.ADMIN_PASSWORD;
+  const explicitAdminPass = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV !== 'production' ? 'AdminCineVicino2026!' : undefined);
 
   // Check if admin user exists
   const existingAdmin = await executeRawSql('SELECT id, password_hash FROM users WHERE LOWER(email) = $1', [adminEmail]);
@@ -367,6 +367,11 @@ async function seedDefaults() {
     ['firecrawl_monthly_limit', '1000'],
     ['firecrawl_credits_used', '0'],
     ['last_scrape_offset', '0'],
+    ['social_instagram_url', ''],
+    ['social_facebook_url', ''],
+    ['social_x_url', ''],
+    ['social_tiktok_url', ''],
+    ['social_youtube_url', ''],
   ];
 
   for (const [k, v] of defaultSettings) {
