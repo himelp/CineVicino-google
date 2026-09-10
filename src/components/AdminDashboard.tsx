@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Shield, Activity, Database, RefreshCw, Play, 
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
-  Edit3, Save, Plus, ArrowRight, Eye, EyeOff, Zap, Globe,
+  Edit3, Save, Plus, ArrowRight, ArrowLeft, Eye, EyeOff, Zap, Globe,
   FileSpreadsheet, ExternalLink, Copy,
   Instagram, Facebook, Twitter, Music2, Youtube, Share2
 } from 'lucide-react';
@@ -11,17 +12,59 @@ import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings, GoogleSheetsStatus } 
 import { safeReadJson, safeFetchJson, ApiResponse } from '../utils/api';
 
 interface AdminDashboardProps {
-  onClose: () => void;
+  onClose?: () => void;
   onSettingsUpdated?: (settings: SiteSettings) => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSettingsUpdated }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [token, setToken] = useState<string>(() => localStorage.getItem('cinevicino_token') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [email, setEmail] = useState('admin@cinevicino.it');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [activeTab, setActiveTab] = useState<'status' | 'scrape' | 'content' | 'customization'>('status');
+
+  // Map URL route to active CMS tab
+  const getTabFromPath = (pathname: string): 'status' | 'scrape' | 'content' | 'customization' => {
+    if (pathname.startsWith('/admin/scraper') || pathname.startsWith('/admin/scrape')) return 'scrape';
+    if (pathname.startsWith('/admin/content') || pathname.startsWith('/admin/contenuti')) return 'content';
+    if (pathname.startsWith('/admin/settings') || pathname.startsWith('/admin/impostazioni') || pathname.startsWith('/admin/customization')) return 'customization';
+    return 'status';
+  };
+
+  const activeTab = getTabFromPath(location.pathname);
+
+  const handleTabChange = (tab: 'status' | 'scrape' | 'content' | 'customization') => {
+    switch (tab) {
+      case 'status':
+        navigate('/admin/status');
+        break;
+      case 'scrape':
+        navigate('/admin/scraper');
+        break;
+      case 'content':
+        navigate('/admin/content');
+        break;
+      case 'customization':
+        navigate('/admin/settings');
+        break;
+    }
+  };
+
+  const handleGoHome = () => {
+    if (onClose) {
+      onClose();
+    }
+    navigate('/');
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('cinevicino_token');
+    setToken('');
+  };
 
   // Polling ref for background scrape job monitoring
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -710,59 +753,88 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
 
   if (!isAuthenticated) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto min-h-[100dvh]">
-        <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl text-center text-neutral-200 my-auto pb-safe">
-          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-6 h-6" />
+      <div className="min-h-screen w-full bg-[#050505] text-neutral-200 flex flex-col justify-center items-center p-4 relative antialiased selection:bg-[#D4AF37] selection:text-black">
+        {/* Subtle Background Glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#D4AF37]/5 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Top Header Navigation */}
+        <div className="w-full max-w-md mb-4 flex justify-between items-center z-10">
+          <button
+            onClick={handleGoHome}
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4 text-[#D4AF37]" />
+            <span>Torna al sito CineVicino</span>
+          </button>
+        </div>
+
+        <div className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl text-center text-neutral-200 relative z-10">
+          <div className="w-14 h-14 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <Shield className="w-7 h-7" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">Accesso Pannello Admin</h2>
-          <p className="text-xs text-neutral-400 mt-1 mb-6 leading-relaxed">
-            Area riservata protetta da token di sessione JWT e credenziali di amministratore.
+          <h1 className="text-xl sm:text-2xl font-serif font-bold text-white">CineVicino CMS</h1>
+          <p className="text-xs text-neutral-400 mt-1.5 mb-6 leading-relaxed">
+            Area riservata per il controllo di scraper, cataloghi cinema/film e impostazioni di sistema.
           </p>
 
-          <form onSubmit={handleLogin} className="space-y-3.5">
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="mb-5 p-2.5 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 text-[11px] text-[#D4AF37] text-left flex items-center justify-between">
+              <span>Dev: <strong>admin@cinevicino.it</strong></span>
+              <span className="font-mono text-[10px] text-neutral-300">AdminCineVicino2026!</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
             <div className="relative text-left">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 ml-1">
+                Email Amministratore
+              </label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="Email amministratore (es. admin@cinevicino.it)"
-                className="w-full px-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                placeholder="admin@cinevicino.it"
+                className="w-full px-4 py-2.5 bg-black border border-white/20 rounded-xl text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
 
             <div className="relative text-left">
-              <Key className="w-4 h-4 text-neutral-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Inserisci password admin..."
-                className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
-              />
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 ml-1">
+                Password
+              </label>
+              <div className="relative">
+                <Key className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Inserisci password admin..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-black border border-white/20 rounded-xl text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
+                />
+              </div>
             </div>
 
             {loginError && (
-              <p className="text-xs text-rose-400 bg-rose-950/40 p-2.5 rounded-xl border border-rose-800 text-left">
+              <p className="text-xs text-rose-400 bg-rose-950/40 p-3 rounded-xl border border-rose-800 text-left">
                 {loginError}
               </p>
             )}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="flex-1 min-h-[44px] py-2.5 rounded-full bg-white/5 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-white border border-white/10 transition-colors cursor-pointer active:scale-95"
+                onClick={handleGoHome}
+                className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold uppercase tracking-wider text-neutral-400 hover:text-white border border-white/10 transition-colors cursor-pointer active:scale-95"
               >
                 Annulla
               </button>
               <button
                 type="submit"
-                className="flex-1 min-h-[44px] py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-xs font-bold uppercase tracking-wider text-black transition-colors shadow-sm cursor-pointer active:scale-95"
+                className="flex-1 min-h-[44px] py-2.5 rounded-xl bg-[#D4AF37] hover:bg-white text-xs font-bold uppercase tracking-wider text-black transition-colors shadow-sm cursor-pointer active:scale-95"
               >
-                Accedi
+                Accedi al CMS
               </button>
             </div>
           </form>
@@ -772,79 +844,185 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-fadeIn min-h-[100dvh]">
-      <div 
-        className="relative w-full max-w-5xl bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl my-auto text-neutral-200 flex flex-col max-h-[92dvh] pb-safe"
-        onClick={e => e.stopPropagation()}
-      >
-        
-        {/* Admin Header */}
-        <div className="p-3.5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-black/50 gap-2">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center shrink-0">
-              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+    <div className="min-h-screen w-full bg-[#050505] text-neutral-200 flex flex-col md:flex-row antialiased selection:bg-[#D4AF37] selection:text-black">
+      {/* 1. PERSISTENT SIDEBAR (Desktop) */}
+      <aside className="hidden md:flex md:w-64 md:shrink-0 bg-[#0a0a0a] border-r border-white/10 flex-col sticky top-0 h-screen overflow-y-auto z-20">
+        {/* Brand Header */}
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center shrink-0">
+              <Shield className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-serif font-bold text-white truncate">CineVicino Admin</h2>
-                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                  Autenticato
-                </span>
+              <h2 className="text-base font-serif font-bold text-white tracking-wide">CineVicino</h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#D4AF37]">CMS Amministratore</span>
               </div>
-              <p className="text-[11px] sm:text-xs text-neutral-400 truncate hidden xs:block">
-                Controllo Scraper, Stato API, Contenuti & Personalizzazione
-              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Sections */}
+        <div className="flex-1 p-3 space-y-1.5">
+          <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+            Pannelli di Controllo
+          </div>
+
+          {[
+            { id: 'status', label: '1. Stato & Motori', desc: 'Diagnostica, TMDb & GeoIP', icon: Activity },
+            { id: 'scrape', label: '2. Scraper & Rotazione', desc: 'Job live, cursori & log', icon: RefreshCw, badge: isScraping ? 'In corso' : undefined },
+            { id: 'content', label: '3. Gestione Contenuti', desc: 'Film, Cinema & Orari', icon: Database },
+            { id: 'customization', label: '4. Impostazioni & Social', desc: 'Sheets, Copertina & URL', icon: Edit3 }
+          ].map(item => {
+            const Icon = item.icon;
+            const isSel = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id as any)}
+                className={`w-full text-left px-3.5 py-3 rounded-xl text-xs font-semibold transition-all flex items-center gap-3 cursor-pointer group ${
+                  isSel
+                    ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 shadow-sm'
+                    : 'text-neutral-400 hover:text-white hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg ${isSel ? 'bg-[#D4AF37]/20 text-[#D4AF37]' : 'bg-white/5 text-neutral-400 group-hover:text-white group-hover:bg-white/10'} shrink-0`}>
+                  <Icon className={`w-4 h-4 ${item.id === 'scrape' && isScraping ? 'animate-spin' : ''}`} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="truncate">{item.label}</span>
+                    {item.badge && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 animate-pulse">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] block truncate ${isSel ? 'text-[#D4AF37]/70' : 'text-neutral-500'}`}>{item.desc}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-3 border-t border-white/10 space-y-2 bg-black/40">
+          <button
+            onClick={handleGoHome}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            <Globe className="w-4 h-4 text-[#D4AF37]" />
+            <span>Torna al sito pubblico</span>
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-rose-950/40 text-neutral-400 hover:text-rose-300 border border-white/10 hover:border-rose-900 text-xs font-semibold transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Disconnetti</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* 2. MOBILE HEADER & NAVIGATION (Mobile/Tablet) */}
+      <div className="md:hidden bg-[#0a0a0a] border-b border-white/10 sticky top-0 z-30">
+        <div className="p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-serif font-bold text-white text-sm">CineVicino</span>
+              <span className="ml-1.5 text-[9px] uppercase font-bold text-[#D4AF37]">CMS</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsAuthenticated(false)}
-              title="Disconnetti"
-              aria-label="Disconnetti"
-              className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-rose-400 border border-white/10 transition-colors cursor-pointer active:scale-95"
+              onClick={handleGoHome}
+              className="px-2.5 py-1.5 rounded-lg bg-white/5 text-[11px] text-neutral-300 hover:text-white border border-white/10 flex items-center gap-1.5"
             >
-              <LogOut className="w-4 h-4" />
+              <Globe className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Sito</span>
             </button>
             <button
-              onClick={onClose}
-              aria-label="Chiudi"
-              className="min-h-[40px] sm:min-h-[44px] px-3.5 sm:px-4 py-1.5 rounded-full bg-white/5 hover:bg-white text-neutral-300 hover:text-black border border-white/10 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg bg-white/5 text-neutral-400 hover:text-rose-400 border border-white/10"
+              title="Disconnetti"
             >
-              Chiudi
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b border-white/10 bg-black/30 px-2 sm:px-4 gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
+        {/* Mobile Horizontal Section Tabs */}
+        <div className="flex px-2 pb-2 gap-1.5 overflow-x-auto no-scrollbar border-t border-white/5 pt-2">
           {[
-            { id: 'status', label: '1. Stato API', icon: Activity },
+            { id: 'status', label: '1. Stato', icon: Activity },
             { id: 'scrape', label: '2. Scraper', icon: RefreshCw },
             { id: 'content', label: '3. Contenuti', icon: Database },
-            { id: 'customization', label: '4. Personalizzazione', icon: Edit3 }
+            { id: 'customization', label: '4. Impostazioni', icon: Edit3 }
           ].map(tab => {
             const Icon = tab.icon;
             const isSel = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 min-h-[44px] py-2.5 px-3 sm:px-4 border-b-2 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer active:scale-95 ${
+                onClick={() => handleTabChange(tab.id as any)}
+                className={`flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
                   isSel
-                    ? 'border-[#D4AF37] text-[#D4AF37] bg-[#D4AF37]/10'
-                    : 'border-transparent text-neutral-400 hover:text-white'
+                    ? 'bg-[#D4AF37] text-black font-bold'
+                    : 'bg-white/5 text-neutral-400 hover:text-white border border-white/10'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
+                <Icon className={`w-3.5 h-3.5 ${tab.id === 'scrape' && isScraping ? 'animate-spin' : ''}`} />
                 <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* 3. MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col min-w-0 bg-[#070707] min-h-screen">
+        {/* Top Header Bar on Desktop */}
+        <header className="hidden md:flex items-center justify-between px-8 py-4 bg-[#0a0a0a]/60 backdrop-blur-sm border-b border-white/10 sticky top-0 z-10">
+          <div>
+            <h1 className="text-lg font-serif font-bold text-white">
+              {activeTab === 'status' && 'Dashboard & Stato Motori Dati'}
+              {activeTab === 'scrape' && 'Scraper & Rotazione Comuni'}
+              {activeTab === 'content' && 'Gestione Catalogo & Contenuti'}
+              {activeTab === 'customization' && 'Impostazioni Sito, Google Sheets & Social'}
+            </h1>
+            <p className="text-xs text-neutral-400">
+              {activeTab === 'status' && 'Verifica in tempo reale la connettività di TMDb, Firecrawl, GeoLite2 e PostgreSQL'}
+              {activeTab === 'scrape' && 'Monitora il polling della console, lo scraping incrementale dei comuni e la rotazione cursori'}
+              {activeTab === 'content' && 'Ispeziona film, sale multiplex, cinema d\'essai e disponibilità degli orari spettacoli'}
+              {activeTab === 'customization' && 'Configura i testi di copertina, i link social ufficiali e la sincronizzazione con Google Sheets'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {isScraping && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Scraping in corso...</span>
+              </div>
+            )}
+            <button
+              onClick={handleGoHome}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-semibold transition-colors"
+            >
+              <Globe className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Visualizza Sito</span>
+            </button>
+          </div>
+        </header>
 
         {/* Tab Body */}
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 lg:p-8 flex-1 max-w-6xl w-full mx-auto">
           
           {/* TAB 1: STATUS */}
           {activeTab === 'status' && (
@@ -2158,7 +2336,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
 
         </div>
 
-      </div>
+      </main>
     </div>
   );
 };

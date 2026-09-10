@@ -85,7 +85,6 @@ export default function App() {
 
   // Modals
   const [showFavorites, setShowFavorites] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
@@ -467,6 +466,21 @@ export default function App() {
     Boolean(s.url && s.url.length > 0)
   ), [settings]);
 
+  // Dedicated Admin CMS Route (/admin, /admin/scraper, /admin/content, /admin/settings, /admin/status)
+  if (location.pathname.startsWith('/admin')) {
+    return (
+      <AdminDashboard
+        onClose={() => {
+          safeFetchJson<SiteSettings>('/api/settings').then(res => {
+            if (res.ok && res.data) setSettings(prev => ({ ...prev, ...res.data }));
+          });
+          navigate('/');
+        }}
+        onSettingsUpdated={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#e0e0e0] flex flex-col font-sans selection:bg-[#D4AF37] selection:text-black">
       
@@ -480,7 +494,7 @@ export default function App() {
         activeCity={activeCity}
         favoritesCount={favoriteMovieIds.length + favoriteCinemaIds.length}
         onOpenFavorites={() => setShowFavorites(true)}
-        onOpenAdmin={() => setShowAdmin(true)}
+        onOpenAdmin={() => navigate('/admin')}
         onOpenAllCities={openAllCities}
         onOpenAllMovies={openAllMovies}
         onOpenHome={openHome}
@@ -811,13 +825,14 @@ export default function App() {
                     Robots.txt
                   </a>
                 </li>
-                {user?.is_admin && (
-                  <li>
-                    <button onClick={() => setShowAdmin(true)} className="hover:text-[#D4AF37] text-[#D4AF37] transition-colors">
-                      Pannello Amministratore
-                    </button>
-                  </li>
-                )}
+                <li>
+                  <button 
+                    onClick={() => navigate('/admin')} 
+                    className="hover:text-[#D4AF37] text-neutral-400 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-1.5"
+                  >
+                    <span>Pannello Amministratore (CMS)</span>
+                  </button>
+                </li>
               </ul>
             </div>
 
@@ -878,18 +893,6 @@ export default function App() {
             }
           }}
           activeCity={activeCity}
-        />
-      )}
-
-      {showAdmin && (
-        <AdminDashboard
-          onClose={() => {
-            setShowAdmin(false);
-            safeFetchJson<SiteSettings>('/api/settings').then(res => {
-              if (res.ok && res.data) setSettings(prev => ({ ...prev, ...res.data }));
-            });
-          }}
-          onSettingsUpdated={(updated) => setSettings(prev => ({ ...prev, ...updated }))}
         />
       )}
 
