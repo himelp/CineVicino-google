@@ -325,22 +325,29 @@ export async function initDb() {
 // Seed default settings and initial admin user with bcrypt password
 async function seedDefaults() {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@cinevicino.it').toLowerCase();
-  const explicitAdminPass = process.env.ADMIN_PASSWORD || 'AdminPassword123!';
-  const adminHash = await bcrypt.hash(explicitAdminPass, 10);
+  const explicitAdminPass = process.env.ADMIN_PASSWORD;
 
-  // Check if admin user exists
-  const existingAdmin = await executeRawSql('SELECT id, password_hash FROM users WHERE LOWER(email) = $1 OR id = $2', [adminEmail, 'usr-admin-initial']);
+  const existingAdmin = await executeRawSql('SELECT id, password_hash FROM users WHERE LOWER(email) = $1', [adminEmail]);
   if (existingAdmin.rows && existingAdmin.rows.length > 0) {
-    await executeRawSql(
-      'UPDATE users SET password_hash = $1, is_admin = TRUE, email = $2 WHERE id = $3 OR LOWER(email) = $2',
-      [adminHash, adminEmail, existingAdmin.rows[0].id]
-    );
+    // Only touch the password if ADMIN_PASSWORD was explicitly provided this run —
+    // never silently reset an existing admin's password to a fallback value.
+    if (explicitAdminPass) {
+      const adminHash = await bcrypt.hash(explicitAdminPass, 10);
+      await executeRawSql('UPDATE users SET password_hash = $1, is_admin = TRUE WHERE LOWER(email) = $2', [adminHash, adminEmail]);
+    }
   } else {
+    // First-time creation only: use ADMIN_PASSWORD if given, otherwise generate
+    // and log a real random password exactly once — never a hardcoded literal.
+    const adminPassword = explicitAdminPass || crypto.randomBytes(16).toString('hex');
+    const adminHash = await bcrypt.hash(adminPassword, 10);
     await executeRawSql(
       `INSERT INTO users (id, email, name, password_hash, is_admin, created_at)
        VALUES ($1, $2, $3, $4, TRUE, NOW())`,
       ['usr-admin-initial', adminEmail, 'Amministratore CineVicino', adminHash]
     );
+    if (!explicitAdminPass) {
+      console.log(`🔐 Generated random admin password for ${adminEmail}: ${adminPassword}`);
+    }
   }
 
   // Seed default demo user for instant testing in local development only
