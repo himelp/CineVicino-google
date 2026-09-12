@@ -183,6 +183,29 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
 
   const defaultZoom = validCinemas.length === 1 ? 14 : validCinemas.length > 1 ? 11 : 6;
 
+  // CARTO basemap key (optional) - if unset, automatically falls back to OpenStreetMap France mirror
+  const cartoApiKey = (import.meta.env.VITE_CARTO_API_KEY as string | undefined)?.trim();
+  const isCartoActive = Boolean(cartoApiKey);
+
+  const tileConfig = useMemo(() => {
+    if (isCartoActive) {
+      return {
+        url: `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(cartoApiKey!)}`,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20,
+        providerLabel: 'CARTO Dark Matter + OpenStreetMap'
+      };
+    }
+    return {
+      url: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+      subdomains: 'abc',
+      maxZoom: 20,
+      providerLabel: 'OpenStreetMap (OSM France)'
+    };
+  }, [isCartoActive, cartoApiKey]);
+
   // Track click on outbound ticket link
   const handleTicketClick = (showtimeId: string) => {
     fetch(`/api/showtimes/${showtimeId}/click`, { method: 'POST' }).catch(() => {});
@@ -251,11 +274,12 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
         >
           <ZoomControl position="topright" />
 
-          {/* Free OpenStreetMap Tiles with required attribution */}
+          {/* Basemap Tiles: CARTO Dark Matter (Primary) or OpenStreetMap France mirror (Fallback) */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maxZoom={19}
+            attribution={tileConfig.attribution}
+            url={tileConfig.url}
+            subdomains={tileConfig.subdomains}
+            maxZoom={tileConfig.maxZoom}
           />
 
           <MapController cinemas={validCinemas} userLocation={userLocation} />
@@ -344,7 +368,7 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
           </span>
         </div>
         <span className="text-neutral-500 font-mono text-[10px]">
-          Leaflet + OpenStreetMap (Zero-Cost / Open Data)
+          Leaflet + {tileConfig.providerLabel}
         </span>
       </div>
     </div>

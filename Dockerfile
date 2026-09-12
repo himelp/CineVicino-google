@@ -19,6 +19,10 @@ RUN rm -f package-lock.json && npm install
 # Copy source files
 COPY . .
 
+# Optional CARTO API key for Dark Matter map tiles (baked into frontend bundle by Vite at build time)
+ARG CARTO_API_KEY=""
+ENV VITE_CARTO_API_KEY=$CARTO_API_KEY
+
 # Build Vite client & bundle Node backend with esbuild
 RUN npm run build
 

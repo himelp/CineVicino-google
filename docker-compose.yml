@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        CARTO_API_KEY: ${CARTO_API_KEY:-${VITE_CARTO_API_KEY:-}}
     container_name: cinevicino-app
     restart: unless-stopped
     env_file:
@@ -17,6 +19,8 @@ services:
       - EMAIL_ALERT_API_KEY=${EMAIL_ALERT_API_KEY}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}
+      - CARTO_API_KEY=${CARTO_API_KEY:-}
+      - VITE_CARTO_API_KEY=${VITE_CARTO_API_KEY:-${CARTO_API_KEY:-}}
     volumes:
       - ./data/geoip:/app/data/geoip
     depends_on:
