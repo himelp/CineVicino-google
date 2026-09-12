@@ -5,6 +5,8 @@
  */
 
 import * as cheerio from 'cheerio';
+import { getRatingsStatus } from './ratingsFetcher';
+import { RatingsStatus } from '../types';
 
 function slugify(text: string): string {
   return text
@@ -107,6 +109,7 @@ export interface DiagnosticsSummary {
     sources_online: number;
     total_sources: number;
   };
+  ratings: RatingsStatus;
   tested_at: string;
 }
 
@@ -554,9 +557,10 @@ export async function getDiagnosticsSummary(forceRefresh = false): Promise<Diagn
     return cachedSummary;
   }
 
-  const [tmdbResult, firecrawlResult] = await Promise.all([
+  const [tmdbResult, firecrawlResult, ratingsResult] = await Promise.all([
     checkTmdb({ testQuery: 'Dune' }),
-    checkFirecrawl({ testScrape: false })
+    checkFirecrawl({ testScrape: false }),
+    getRatingsStatus()
   ]);
 
   const summary: DiagnosticsSummary = {
@@ -582,6 +586,7 @@ export async function getDiagnosticsSummary(forceRefresh = false): Promise<Diagn
       sources_online: 3,
       total_sources: 3
     },
+    ratings: ratingsResult,
     tested_at: new Date().toISOString()
   };
 

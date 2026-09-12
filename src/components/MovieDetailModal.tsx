@@ -193,8 +193,29 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                   {movie.duration_minutes} min
                 </span>
                 {movie.rating > 0 && (
-                  <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-[10px] sm:text-xs font-bold flex items-center gap-1 font-mono">
+                  <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-white/10 text-[#D4AF37] text-[10px] sm:text-xs font-bold flex items-center gap-1 font-mono" title="Valutazione TMDb">
                     <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-[#D4AF37]" /> {movie.rating.toFixed(1)}
+                  </span>
+                )}
+                {/* Letterboxd Rating Badge — ONLY rendered if real rating is present */}
+                {movie.letterboxd_rating != null && Number(movie.letterboxd_rating) > 0 && (
+                  <span
+                    className="px-2 sm:px-2.5 py-0.5 rounded-full bg-[#00e054]/15 text-[#00e054] border border-[#00e054]/30 text-[10px] sm:text-xs font-bold flex items-center gap-1 font-mono"
+                    title={`Letterboxd: ${Number(movie.letterboxd_rating).toFixed(1)}/5${movie.letterboxd_rating_count ? ` (${Number(movie.letterboxd_rating_count).toLocaleString('it-IT')} voti)` : ''}`}
+                  >
+                    <span className="text-[9px] font-black tracking-tighter">LB</span>
+                    <span className="text-[11px] leading-none">★</span>
+                    <span>{Number(movie.letterboxd_rating).toFixed(1)}</span>
+                  </span>
+                )}
+                {/* Rotten Tomatoes Score Badge — ONLY rendered if real score is present */}
+                {movie.rotten_tomatoes_score != null && Number(movie.rotten_tomatoes_score) >= 0 && (
+                  <span
+                    className="px-2 sm:px-2.5 py-0.5 rounded-full bg-[#fa320a]/15 text-[#ff4f38] border border-[#fa320a]/30 text-[10px] sm:text-xs font-bold flex items-center gap-1 font-mono"
+                    title={`Rotten Tomatoes Tomatometer: ${Number(movie.rotten_tomatoes_score)}%`}
+                  >
+                    <span className="text-[12px] leading-none" role="img" aria-label="Rotten Tomatoes">🍅</span>
+                    <span>{Number(movie.rotten_tomatoes_score)}%</span>
                   </span>
                 )}
                 {movie.age_rating && (
@@ -280,6 +301,38 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-neutral-400">
                   <span>ID TMDb: #{movie.tmdb_id}</span>
                   <span className="text-[#D4AF37] font-mono">Dati ufficiali</span>
+                </div>
+              )}
+              {/* External ratings breakdown */}
+              {(movie.letterboxd_rating != null || movie.rotten_tomatoes_score != null) && (
+                <div className="pt-2 border-t border-white/10 space-y-1.5 text-[11px]">
+                  <span className="text-neutral-400 block font-medium uppercase tracking-wider text-[9px]">Valutazioni critiche e pubblico</span>
+                  <div className="space-y-1 text-neutral-300">
+                    {movie.letterboxd_rating != null && Number(movie.letterboxd_rating) > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-neutral-400">
+                          <span className="text-[#00e054] font-bold">Letterboxd</span>
+                          {movie.letterboxd_rating_count ? (
+                            <span className="text-[10px] text-neutral-500">({Number(movie.letterboxd_rating_count).toLocaleString('it-IT')} voti)</span>
+                          ) : null}
+                        </span>
+                        <span className="text-[#00e054] font-mono font-bold">
+                          ★ {Number(movie.letterboxd_rating).toFixed(1)} / 5
+                        </span>
+                      </div>
+                    )}
+                    {movie.rotten_tomatoes_score != null && Number(movie.rotten_tomatoes_score) >= 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 text-neutral-400">
+                          <span className="text-[#ff4f38] font-bold">Rotten Tomatoes</span>
+                          <span className="text-[10px] text-neutral-500">Tomatometer</span>
+                        </span>
+                        <span className="text-[#ff4f38] font-mono font-bold">
+                          🍅 {Number(movie.rotten_tomatoes_score)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

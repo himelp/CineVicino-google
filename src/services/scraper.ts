@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { executeRawSql } from '../db/index';
 import { MovieFormat, TicketSource } from '../types';
 import { syncAllDataToGoogleSheet } from './googleSheets';
+import { enrichMoviesWithExternalRatings } from './ratingsFetcher';
 
 export interface ScrapeProgressUpdate {
   step: string;
@@ -1800,6 +1801,16 @@ export class NationwideCinemaScraper {
       }
     } catch (sheetErr: any) {
       console.warn('[Scraper] Google Sheets sync error (non-fatal):', sheetErr?.message);
+    }
+
+    // Phase 5: Non-blocking Letterboxd & Rotten Tomatoes ratings enrichment (batch of 5-10 movies)
+    try {
+      const ratingsRes = await enrichMoviesWithExternalRatings({ batchSize: 5 });
+      if (ratingsRes.moviesProcessed > 0) {
+        notify('ratings', 'Letterboxd / RT', ratingsRes.ratingsUpdated, ratingsRes.details);
+      }
+    } catch (ratingsErr: any) {
+      console.warn('[Scraper] Ratings enrichment error (non-fatal):', ratingsErr?.message);
     }
 
     return {

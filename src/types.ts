@@ -55,6 +55,23 @@ export interface Movie {
   cast: string[];
   age_rating?: string; // e.g. 'T', 'VM14', 'VM18'
   is_featured?: boolean;
+  letterboxd_rating?: number | null;
+  letterboxd_rating_count?: number | null;
+  rotten_tomatoes_score?: number | null;
+  ratings_fetched_at?: string | null;
+}
+
+export interface RatingsStatus {
+  total_movies: number;
+  letterboxd_populated: number;
+  letterboxd_percentage: number;
+  rotten_tomatoes_populated: number;
+  rotten_tomatoes_percentage: number;
+  both_populated: number;
+  ratings_fetched_count: number;
+  pending_enrichment: number;
+  last_batch_run_at: string | null;
+  status: 'healthy' | 'pending' | 'idle';
 }
 
 export interface Showtime {

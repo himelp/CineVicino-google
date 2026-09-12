@@ -5,7 +5,7 @@ import {
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
   Edit3, Save, Plus, ArrowRight, ArrowLeft, Eye, EyeOff, Zap, Globe,
-  FileSpreadsheet, ExternalLink, Copy,
+  FileSpreadsheet, ExternalLink, Copy, Star,
   Instagram, Facebook, Twitter, Music2, Youtube, Share2
 } from 'lucide-react';
 import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings, GoogleSheetsStatus } from '../types';
@@ -131,6 +131,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
   const [firecrawlTestResult, setFirecrawlTestResult] = useState<any>(null);
   const [testingScrapers, setTestingScrapers] = useState(false);
   const [scrapersTestResult, setScrapersTestResult] = useState<any>(null);
+
+  // External Ratings states
+  const [fetchingRatings, setFetchingRatings] = useState(false);
+  const [ratingsResult, setRatingsResult] = useState<any>(null);
+  const [ratingsBatchSize, setRatingsBatchSize] = useState<number>(5);
 
   // Scrape state
   const [logs, setLogs] = useState<ScrapeLog[]>([]);
@@ -530,6 +535,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
       console.error(e);
     } finally {
       setTestingScrapers(false);
+    }
+  };
+
+  // Fetch External Ratings (Letterboxd & Rotten Tomatoes)
+  const handleFetchRatings = async () => {
+    try {
+      setFetchingRatings(true);
+      setRatingsResult(null);
+      const parsed = await authFetchJson<any>('/api/admin/ratings/fetch', {
+        method: 'POST',
+        body: JSON.stringify({ batch_size: ratingsBatchSize, delay_ms: 1500 })
+      });
+      if (parsed.ok && parsed.data) {
+        setRatingsResult(parsed.data.result);
+        loadStatus();
+      } else {
+        alert(parsed.error || 'Errore nel recupero delle valutazioni');
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || 'Errore durante il recupero delle valutazioni');
+    } finally {
+      setFetchingRatings(false);
     }
   };
 
@@ -1644,6 +1672,146 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                       Strategia: Scraper primario HTTP Cheerio a costo zero + fallback Firecrawl per bypass JS/anti-bot.
                     </span>
                     <span className="text-emerald-400 font-mono text-[10px]">Anti-Bot Politeness: 300ms</span>
+                  </div>
+                </div>
+
+                {/* Letterboxd & Rotten Tomatoes Ratings Diagnostic Card (spans 2 cols) */}
+                <div className="col-span-1 md:col-span-2 p-5 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                        <Star className="w-4 h-4 text-[#D4AF37]" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-white">Valutazioni Esterne (Letterboxd & Rotten Tomatoes)</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            Fase 5 Post-Scrape
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                          Arricchimento non bloccante dei punteggi della community e della critica tramite parsing JSON-LD schema.org con delay di cortesia anti-ban.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                      {statusData?.ratings?.status === 'complete' || (statusData?.ratings?.letterboxd_populated > 0 && statusData?.ratings?.rotten_tomatoes_populated > 0) ? (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 font-mono">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Popolamento Attivo
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1 font-mono">
+                          <AlertTriangle className="w-3.5 h-3.5" /> In attesa di arricchimento
+                        </span>
+                      )}
+
+                      <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 px-2 py-1 rounded-lg">
+                        <span className="text-[11px] text-neutral-400">Batch:</span>
+                        <select
+                          value={ratingsBatchSize}
+                          onChange={(e) => setRatingsBatchSize(Number(e.target.value))}
+                          aria-label="Dimensione batch recupero valutazioni"
+                          className="bg-transparent text-white text-xs font-mono font-bold focus:outline-none cursor-pointer"
+                        >
+                          <option value={3} className="bg-neutral-900 text-white">3 film</option>
+                          <option value={5} className="bg-neutral-900 text-white">5 film</option>
+                          <option value={10} className="bg-neutral-900 text-white">10 film</option>
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={handleFetchRatings}
+                        disabled={fetchingRatings}
+                        title="Recupera valutazioni per i prossimi film in attesa con delay di sicurezza"
+                        className="px-3.5 py-1.5 rounded-lg bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${fetchingRatings ? 'animate-spin' : ''}`} />
+                        <span>{fetchingRatings ? 'Recupero in corso...' : 'Recupera Valutazioni Ora'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Counters */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
+                      <span className="text-neutral-400 block text-[11px]">Film Totali a Catalogo:</span>
+                      <span className="font-bold text-white text-base font-mono">
+                        {statusData?.ratings?.total_movies ?? 0}
+                      </span>
+                    </div>
+                    <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-400 block text-[11px]">Letterboxd Popolati:</span>
+                        <span className="text-[#00e054] font-bold text-[10px]">★ LB</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-bold text-emerald-400 text-base font-mono">
+                          {statusData?.ratings?.letterboxd_populated ?? 0}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-mono">
+                          ({statusData?.ratings?.letterboxd_percentage ?? 0}%)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-400 block text-[11px]">Rotten Tomatoes Popolati:</span>
+                        <span className="text-[12px]">🍅 RT</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-bold text-[#ff4f38] text-base font-mono">
+                          {statusData?.ratings?.rotten_tomatoes_populated ?? 0}
+                        </span>
+                        <span className="text-[11px] text-neutral-500 font-mono">
+                          ({statusData?.ratings?.rotten_tomatoes_percentage ?? 0}%)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
+                      <span className="text-neutral-400 block text-[11px]">Entrambi i Voti Disponibili:</span>
+                      <span className="font-bold text-[#D4AF37] text-base font-mono">
+                        {statusData?.ratings?.both_populated ?? 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Secondary info bar */}
+                  <div className="p-3 bg-neutral-900/70 rounded-xl border border-neutral-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="text-neutral-300 flex items-center gap-2">
+                      <span className="text-neutral-400">In attesa di arricchimento:</span>
+                      <span className="font-mono text-amber-400 font-semibold">
+                        {statusData?.ratings?.pending_enrichment ?? 0} film
+                      </span>
+                    </div>
+                    <div className="text-neutral-400 flex items-center gap-2 text-[11px] font-mono">
+                      <span>Ultima esecuzione batch:</span>
+                      <span className="text-neutral-200">
+                        {statusData?.ratings?.last_batch_run_at 
+                          ? new Date(statusData.ratings.last_batch_run_at).toLocaleString('it-IT')
+                          : 'Mai eseguita'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Test / Manual Fetch Result Notice */}
+                  {ratingsResult && (
+                    <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-300 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{ratingsResult.details}</span>
+                      </div>
+                      <span className="font-mono text-[11px] text-emerald-400/80">
+                        {ratingsResult.durationMs}ms ({ratingsResult.ratingsUpdated} aggiornati)
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-neutral-400 bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-800/60 flex items-center justify-between flex-wrap gap-2">
+                    <span>
+                      Regole di visualizzazione: Se un film non ha valutazione o non viene trovato con certezza, i badge non vengono mai mostrati (nessun placeholder "0.0" o "N/A").
+                    </span>
+                    <span className="text-amber-400 font-mono text-[10px]">Safe Matching + Delay 2.5s</span>
                   </div>
                 </div>
 

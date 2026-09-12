@@ -11,6 +11,12 @@ import { initDb, executeRawSql, closeDb } from './src/db/index';
 import { cinemaScraper } from './src/services/scraper';
 import { checkTmdb, checkFirecrawl, checkScraperSources, getDiagnosticsSummary } from './src/services/diagnostics';
 import {
+  enrichMoviesWithExternalRatings,
+  getRatingsStatus,
+  fetchLetterboxdRating,
+  fetchRottenTomatoesScore
+} from './src/services/ratingsFetcher';
+import {
   checkGoogleSheetsAccess,
   syncAllDataToGoogleSheet,
   extractSpreadsheetId
@@ -1103,6 +1109,7 @@ app.get('/api/admin/status', requireAdmin, async (req: AuthenticatedRequest, res
       tmdb: diagnostics.tmdb,
       firecrawl: diagnostics.firecrawl,
       scrapers_health: diagnostics.scrapers,
+      ratings: diagnostics.ratings,
       geoip: getGeoIpStatus(),
       sheets: await checkGoogleSheetsAccess(),
       database: {
@@ -1171,6 +1178,38 @@ app.post(['/api/admin/diagnostics/scraper/test', '/api/admin/diagnostics/scraper
   } catch (err: any) {
     logger.error({ err }, 'Error testing Scrapers');
     res.status(500).json({ error: 'Errore nel test Scrapers', details: err?.message });
+  }
+});
+
+// Admin: Fetch External Ratings (Letterboxd & Rotten Tomatoes) on demand
+app.post('/api/admin/ratings/fetch', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const batchSize = req.body?.batch_size ? parseInt(req.body.batch_size, 10) : 5;
+    const delayMs = req.body?.delay_ms !== undefined ? parseInt(req.body.delay_ms, 10) : 1500;
+    const movieId = req.body?.movie_id as string | undefined;
+
+    const result = await enrichMoviesWithExternalRatings({ batchSize, delayMs, movieId });
+    const status = await getRatingsStatus();
+
+    res.json({
+      success: true,
+      result,
+      status
+    });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/ratings/fetch');
+    res.status(500).json({ error: 'Errore nel recupero delle valutazioni', details: err?.message });
+  }
+});
+
+// Admin: Get External Ratings Status
+app.get('/api/admin/ratings/status', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const status = await getRatingsStatus();
+    res.json({ success: true, status });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/admin/ratings/status');
+    res.status(500).json({ error: 'Errore nel recupero dello stato delle valutazioni', details: err?.message });
   }
 });
 

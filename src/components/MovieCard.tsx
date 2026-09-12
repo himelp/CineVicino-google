@@ -45,13 +45,33 @@ export const MovieCard: React.FC<MovieCardProps> = ({
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-black/30 opacity-80 group-hover:opacity-60 transition-opacity" />
 
-        {/* Rating badge */}
-        {movie.rating > 0 && (
-          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10 flex items-center gap-1.5 shadow-md">
-            <Star className="w-3.5 h-3.5 fill-[#D4AF37] text-[#D4AF37]" />
-            <span className="text-xs font-bold text-white font-mono">{movie.rating.toFixed(1)}</span>
-          </div>
-        )}
+        {/* Rating badges row */}
+        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-10">
+          {movie.rating > 0 && (
+            <div className="px-2 py-0.5 rounded-full bg-black/85 backdrop-blur-md border border-white/15 flex items-center gap-1 shadow-md">
+              <Star className="w-3 h-3 fill-[#D4AF37] text-[#D4AF37]" />
+              <span className="text-[11px] font-bold text-white font-mono">{movie.rating.toFixed(1)}</span>
+            </div>
+          )}
+          {movie.letterboxd_rating != null && Number(movie.letterboxd_rating) > 0 && (
+            <div
+              className="px-2 py-0.5 rounded-full bg-black/85 backdrop-blur-md border border-[#00e054]/40 flex items-center gap-1 shadow-md"
+              title={`Letterboxd: ${Number(movie.letterboxd_rating).toFixed(1)}/5`}
+            >
+              <span className="text-[9px] font-black text-[#00e054] tracking-tighter">LB</span>
+              <span className="text-[11px] font-bold text-[#00e054] font-mono">{Number(movie.letterboxd_rating).toFixed(1)}</span>
+            </div>
+          )}
+          {movie.rotten_tomatoes_score != null && Number(movie.rotten_tomatoes_score) >= 0 && (
+            <div
+              className="px-2 py-0.5 rounded-full bg-black/85 backdrop-blur-md border border-[#fa320a]/40 flex items-center gap-1 shadow-md"
+              title={`Rotten Tomatoes Tomatometer: ${Number(movie.rotten_tomatoes_score)}%`}
+            >
+              <span className="text-[11px] leading-none" role="img" aria-label="Rotten Tomatoes">🍅</span>
+              <span className="text-[11px] font-bold text-[#ff4f38] font-mono">{Number(movie.rotten_tomatoes_score)}%</span>
+            </div>
+          )}
+        </div>
 
         {/* Age Rating pill */}
         {movie.age_rating && (
