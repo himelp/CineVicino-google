@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film, Map } from 'lucide-react';
+import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film, Map as MapIcon } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
 import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
@@ -398,7 +398,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                         : 'text-neutral-400 hover:text-white'
                     }`}
                   >
-                    <Map className="w-3.5 h-3.5" />
+                    <MapIcon className="w-3.5 h-3.5" />
                     <span>{lang === 'it' ? 'Mappa' : 'Map'}</span>
                   </button>
                 </div>
