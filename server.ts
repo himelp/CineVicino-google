@@ -622,6 +622,7 @@ app.get('/api/movies/:slug', async (req: Request, res: Response) => {
       `SELECT
          s.*,
          c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
+         c.lat as cinema_lat, c.lng as cinema_lng,
          ci.name as city_name, ci.slug as city_slug
        FROM showtimes s
        JOIN cinemas c ON s.cinema_id = c.id
@@ -698,6 +699,7 @@ app.get('/api/showtimes', async (req: Request, res: Response) => {
         s.*,
         m.title_it as movie_title, m.poster_url as movie_poster,
         c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
+        c.lat as cinema_lat, c.lng as cinema_lng,
         ci.name as city_name, ci.slug as city_slug
       FROM showtimes s
       JOIN movies m ON s.movie_id = m.id

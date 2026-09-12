@@ -1,9 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film } from 'lucide-react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film, Map } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
 import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
 import { getRomeToday, formatDatePill, formatTodayFull } from '../utils/date';
+
+// Lazy-load Leaflet map component to prevent loading Leaflet JS/CSS unless user toggles Map view
+const MovieCinemaMap = lazy(() => import('./MovieCinemaMap'));
+
+interface CinemaGroup {
+  cinema_name: string;
+  chain: string | null;
+  address: string;
+  city_name: string;
+  city_slug: string;
+  slots: Showtime[];
+}
 
 interface MovieDetailModalProps {
   movie: Movie | null;
@@ -30,6 +42,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>(activeCity?.slug || 'all');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
@@ -94,7 +107,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   });
 
   // Group showtimes by cinema
-  const cinemasMap = new Map<string, { cinema_name: string; chain: string | null; address: string; city_name: string; city_slug: string; slots: Showtime[] }>();
+  const cinemasMap = new Map<string, CinemaGroup>();
 
   filteredShowtimes.forEach(s => {
     const key = s.cinema_id;
@@ -111,7 +124,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
     cinemasMap.get(key)!.slots.push(s);
   });
 
-  const cinemasList = Array.from(cinemasMap.values());
+  const cinemasList: CinemaGroup[] = Array.from(cinemasMap.values());
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/film/${movie.slug}`;
@@ -360,30 +373,61 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Date Selector Pills — scrollable row of dates scraped for today/future */}
-              <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 no-scrollbar self-start lg:self-auto">
-                {dateOptions.map(d => {
-                  const isSelected = selectedDate === d.dateStr;
-                  return (
-                    <button
-                      key={d.dateStr}
-                      onClick={() => setSelectedDate(d.dateStr)}
-                      aria-label={d.fullAccessibleLabel}
-                      className={`min-h-[44px] px-4 py-1.5 rounded-2xl text-xs transition-all whitespace-nowrap flex flex-col items-center justify-center cursor-pointer border active:scale-95 ${
-                        isSelected
-                          ? 'bg-[#D4AF37] text-black font-bold border-[#D4AF37] shadow-md scale-[1.02]'
-                          : 'bg-white/5 text-neutral-300 border-white/10 hover:border-white/25 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-semibold tracking-tight">{d.mainLabel}</span>
-                      {d.subLabel && (
-                        <span className={`text-[10px] ${isSelected ? 'text-black/80 font-medium' : 'text-neutral-400'}`}>
-                          {d.subLabel}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              {/* Right Controls: List / Map Toggle + Date Selector Pills */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start lg:self-auto max-w-full">
+                {/* List / Map View Toggle */}
+                <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0 self-start sm:self-auto">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    aria-label={lang === 'it' ? 'Visualizza come elenco' : 'View as list'}
+                    className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      viewMode === 'list'
+                        ? 'bg-[#D4AF37] text-black shadow-sm font-bold'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    <Film className="w-3.5 h-3.5" />
+                    <span>{lang === 'it' ? 'Lista' : 'List'}</span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('map')}
+                    aria-label={lang === 'it' ? 'Visualizza sulla mappa' : 'View on map'}
+                    className={`min-h-[36px] px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      viewMode === 'map'
+                        ? 'bg-[#D4AF37] text-black shadow-sm font-bold'
+                        : 'text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    <Map className="w-3.5 h-3.5" />
+                    <span>{lang === 'it' ? 'Mappa' : 'Map'}</span>
+                  </button>
+                </div>
+
+                {/* Date Selector Pills — scrollable row of dates scraped for today/future */}
+                <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 no-scrollbar">
+                  {dateOptions.map(d => {
+                    const isSelected = selectedDate === d.dateStr;
+                    return (
+                      <button
+                        key={d.dateStr}
+                        onClick={() => setSelectedDate(d.dateStr)}
+                        aria-label={d.fullAccessibleLabel}
+                        className={`min-h-[44px] px-4 py-1.5 rounded-2xl text-xs transition-all whitespace-nowrap flex flex-col items-center justify-center cursor-pointer border active:scale-95 ${
+                          isSelected
+                            ? 'bg-[#D4AF37] text-black font-bold border-[#D4AF37] shadow-md scale-[1.02]'
+                            : 'bg-white/5 text-neutral-300 border-white/10 hover:border-white/25 hover:text-white'
+                        }`}
+                      >
+                        <span className="font-semibold tracking-tight">{d.mainLabel}</span>
+                        {d.subLabel && (
+                          <span className={`text-[10px] ${isSelected ? 'text-black/80 font-medium' : 'text-neutral-400'}`}>
+                            {d.subLabel}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -417,11 +461,29 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
               ))}
             </div>
 
-            {/* Cinemas & Showtimes List */}
+            {/* Cinemas & Showtimes: Map View or List View */}
             {loading ? (
               <div className="py-12 text-center text-neutral-500 text-sm">
                 Caricamento orari dai multiplex e sale d'autore...
               </div>
+            ) : viewMode === 'map' ? (
+              <Suspense
+                fallback={
+                  <div className="h-[480px] w-full rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col items-center justify-center gap-3 text-neutral-400 animate-pulse">
+                    <MapPin className="w-8 h-8 text-[#D4AF37] animate-bounce" />
+                    <span className="text-xs font-medium">Caricamento mappa Leaflet dei cinema vicini...</span>
+                  </div>
+                }
+              >
+                <MovieCinemaMap
+                  showtimes={filteredShowtimes}
+                  lang={lang}
+                  userLocation={activeCity ? { lat: activeCity.lat, lng: activeCity.lng } : null}
+                  onResetCityFilter={() => setSelectedCityFilter('all')}
+                  selectedCityFilter={selectedCityFilter}
+                  selectedDateLabel={formatDatePill(selectedDate, lang).mainLabel}
+                />
+              </Suspense>
             ) : cinemasList.length === 0 ? (
               <div className="py-12 text-center bg-white/[0.03] rounded-3xl border border-white/10 p-8 max-w-lg mx-auto">
                 <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3.5 text-neutral-400">
