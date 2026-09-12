@@ -190,7 +190,7 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
   const tileConfig = useMemo(() => {
     if (isCartoActive) {
       return {
-        url: `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(cartoApiKey!)}`,
+        url: `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoApiKey!)}`,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 20,
