@@ -35,6 +35,10 @@ export default function App() {
     homepage_subtext_it: 'Directory cinematografica completa per tutta Italia. Orari aggiornati, sale multiplex, cinema d\'essai e link diretti alle biglietterie ufficiali.',
     homepage_subtext_en: 'Comprehensive Italian cinema directory. Updated showtimes, multiplexes, arthouse theaters and direct official ticket links.',
     featured_movie_ids: [],
+    footer_text_it: '© 2026 CineVicino Italia — Directory indipendente dei cinema italiani.',
+    footer_text_en: '© 2026 CineVicino Italy — Independent Italian cinema directory.',
+    privacy_policy_it: 'La tua privacy è fondamentale per noi. Non archiviamo dati personali di geolocalizzazione.',
+    privacy_policy_en: 'Your privacy is paramount. We do not store personal geolocation data.',
     footer_copy: '© 2026 CineVicino Italia — Directory indipendente dei cinema italiani.',
     privacy_policy_text: 'La tua privacy è fondamentale per noi. Non archiviamo dati personali di geolocalizzazione.',
     firecrawl_monthly_limit: 1000,
@@ -462,15 +466,16 @@ export default function App() {
   }, [location.pathname, movies]);
 
   // Social media channels (only include those configured by admin)
-  const socialLinks = useMemo(() => [
-    { id: 'instagram', name: 'Instagram', url: settings.social_instagram_url?.trim(), icon: Instagram, color: 'hover:text-pink-400 hover:border-pink-500/40' },
-    { id: 'facebook', name: 'Facebook', url: settings.social_facebook_url?.trim(), icon: Facebook, color: 'hover:text-blue-400 hover:border-blue-500/40' },
-    { id: 'x', name: 'X (Twitter)', url: settings.social_x_url?.trim(), icon: Twitter, color: 'hover:text-white hover:border-white/40' },
-    { id: 'tiktok', name: 'TikTok', url: settings.social_tiktok_url?.trim(), icon: Music2, color: 'hover:text-cyan-400 hover:border-cyan-500/40' },
-    { id: 'youtube', name: 'YouTube', url: settings.social_youtube_url?.trim(), icon: Youtube, color: 'hover:text-red-400 hover:border-red-500/40' },
-  ].filter((s): s is { id: string; name: string; url: string; icon: React.ComponentType<{ className?: string }>; color: string } => 
-    Boolean(s.url && s.url.length > 0)
-  ), [settings]);
+  const socialLinks = useMemo(() => {
+    const raw = [
+      { id: 'instagram', name: 'Instagram', url: settings.social_instagram_url?.trim(), icon: Instagram, color: 'hover:text-pink-400 hover:border-pink-500/40' },
+      { id: 'facebook', name: 'Facebook', url: settings.social_facebook_url?.trim(), icon: Facebook, color: 'hover:text-blue-400 hover:border-blue-500/40' },
+      { id: 'x', name: 'X (Twitter)', url: settings.social_x_url?.trim(), icon: Twitter, color: 'hover:text-white hover:border-white/40' },
+      { id: 'tiktok', name: 'TikTok', url: settings.social_tiktok_url?.trim(), icon: Music2, color: 'hover:text-cyan-400 hover:border-cyan-500/40' },
+      { id: 'youtube', name: 'YouTube', url: settings.social_youtube_url?.trim(), icon: Youtube, color: 'hover:text-red-400 hover:border-red-500/40' },
+    ];
+    return raw.filter((s): s is typeof s & { url: string } => Boolean(s.url && s.url.length > 0));
+  }, [settings]);
 
   // Dedicated Admin CMS Route (/admin, /admin/scraper, /admin/content, /admin/settings, /admin/status)
   if (location.pathname.startsWith('/admin')) {

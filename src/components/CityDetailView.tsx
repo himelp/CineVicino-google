@@ -115,7 +115,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
   // Filtered showtimes
   const filteredShowtimes = cityShowtimes.filter(s => {
     if (selectedFormat !== 'all' && s.format !== selectedFormat) return false;
-    if (onlyVose && s.language !== 'VOSE' && s.language !== 'Inglese') return false;
+    if (onlyVose && s.language !== 'VOSE' && s.language !== 'OV' && s.language !== 'EN') return false;
     return true;
   });
 
@@ -200,7 +200,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <div className="w-px h-10 bg-white/10" />
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-              {data?.has_local_cinemas ? filteredShowtimes.length : (data?.nearby_cinemas?.length || 0)}
+              {data?.has_local_cinemas ? filteredShowtimes.length : (data?.nearest_cinemas?.length || 0)}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
               {data?.has_local_cinemas ? 'Spettacoli oggi' : 'Cinema nei dintorni'}
