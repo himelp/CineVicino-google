@@ -990,15 +990,15 @@ export class NationwideCinemaScraper {
                 const result = {
                   poster_url: posterPath
                     ? `https://image.tmdb.org/t/p/w780${posterPath}`
-                    : 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
+                    : '',
                   backdrop_url: backdropPath
                     ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
-                    : 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
+                    : '',
                   tmdb_id: tmdbId,
                   title_it: detailData.title || title,
                   title_en: title_en,
                   title_original: detailData.original_title || title,
-                  synopsis_it: detailData.overview || first.overview || `Guarda ${title} nei cinema italiani.`,
+                  synopsis_it: detailData.overview || first.overview || '',
                   synopsis_en: synopsis_en,
                   director: realDirector,
                   genres: realGenres,
@@ -1018,20 +1018,21 @@ export class NationwideCinemaScraper {
             const result = {
               poster_url: first.poster_path
                 ? `https://image.tmdb.org/t/p/w780${first.poster_path}`
-                : 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
+                : '',
               backdrop_url: first.backdrop_path
                 ? `https://image.tmdb.org/t/p/w1280${first.backdrop_path}`
-                : 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
+                : '',
               tmdb_id: first.id,
               title_it: first.title || title,
               title_en: first.title || title,
               title_original: first.original_title || title,
-              synopsis_it: first.overview || `Guarda ${title} nelle sale italiane.`,
+              synopsis_it: first.overview || '',
               synopsis_en: '',
-              director: 'Regista',
+              director: '',
               genres: ['Cinema', 'Nuova Uscita'],
               duration: 115,
               rating: first.vote_average ? Number(first.vote_average.toFixed(1)) : 7.5,
+              cast: [],
               release_year: first.release_date ? new Date(first.release_date).getFullYear() : new Date().getFullYear()
             };
             this.tmdbCache.set(normalizedSlug, result);
@@ -1043,20 +1044,21 @@ export class NationwideCinemaScraper {
       }
     }
 
-    // 3. Default clean TMDb poster fallback (guaranteed official CDN, never Unsplash)
+    // 3. Fallback when TMDb returns no match
     const fallback = {
-      poster_url: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
-      backdrop_url: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
+      poster_url: '',
+      backdrop_url: '',
       tmdb_id: null,
       title_it: title,
       title_en: title,
       title_original: title,
-      synopsis_it: `Guarda ${title} nelle sale cinema italiane.`,
+      synopsis_it: '',
       synopsis_en: '',
-      director: 'Regista',
+      director: '',
       genres: ['Film in Sala'],
       duration: 110,
       rating: 7.5,
+      cast: [],
       release_year: new Date().getFullYear()
     };
     this.tmdbCache.set(normalizedSlug, fallback);
@@ -1655,15 +1657,33 @@ export class NationwideCinemaScraper {
             JSON.stringify(enriched.genres || ['Cinema', 'Nuova Uscita']),
             enriched.duration || 115,
             enriched.rating || 7.5,
-            enriched.synopsis_it || `Guarda ${title} nelle sale cinema italiane.`,
+            enriched.synopsis_it || '',
             enriched.synopsis_en || '',
             enriched.release_year || new Date().getFullYear(),
-            enriched.director || 'Regista',
-            JSON.stringify(enriched.cast || ['Cast principale', 'Attori']),
+            enriched.director || '',
+            JSON.stringify(enriched.cast || []),
             'T',
             true
           ]
         );
+
+        const isMetadataComplete = Boolean(
+          enriched.synopsis_it &&
+          enriched.synopsis_it.trim().length >= 25 &&
+          !/^Guarda .* nei cinema italiani/i.test(enriched.synopsis_it) &&
+          !/^Guarda .* nelle sale/i.test(enriched.synopsis_it) &&
+          enriched.poster_url &&
+          enriched.poster_url.trim().length > 0 &&
+          (enriched.poster_url.indexOf('8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg') === -1 || movieSlug === 'dune-parte-due') &&
+          Array.isArray(enriched.cast) &&
+          enriched.cast.length > 0 &&
+          !enriched.cast.includes('Cast Ufficiale') &&
+          !enriched.cast.includes('Cast principale')
+        );
+
+        if (!isMetadataComplete) {
+          console.log(`[scraper] Movie "${title}" is pending enrichment (incomplete metadata) — held back from public listings.`);
+        }
 
         const actualMovieId = movieUpsertRes.rows[0]?.id || movieId;
         movieMap.set(title.toLowerCase(), actualMovieId);

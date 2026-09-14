@@ -194,16 +194,16 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
               {activeCinemas.length}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
-              Sale censite
+              {data?.has_local_cinemas ? 'Sale nel comune' : 'Sale in comune'}
             </span>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-              {filteredShowtimes.length}
+              {data?.has_local_cinemas ? filteredShowtimes.length : (data?.nearby_cinemas?.length || 0)}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
-              Spettacoli oggi
+              {data?.has_local_cinemas ? 'Spettacoli oggi' : 'Cinema nei dintorni'}
             </span>
           </div>
         </div>

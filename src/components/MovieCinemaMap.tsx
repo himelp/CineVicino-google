@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Showtime } from '../types';
 import { Language } from '../utils/i18n';
-import { MapPin, ExternalLink, Ticket, Navigation, AlertCircle } from 'lucide-react';
+import { MapPin, ExternalLink, Ticket, Navigation, AlertCircle, Globe } from 'lucide-react';
 
 interface MovieCinemaMapProps {
   showtimes: Showtime[];
@@ -20,6 +20,7 @@ interface CinemaWithShowtimes {
   cinema_name: string;
   cinema_chain?: string | null;
   cinema_address: string;
+  cinema_website?: string | null;
   lat: number;
   lng: number;
   city_name?: string;
@@ -158,6 +159,7 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
           cinema_name: s.cinema_name || 'Cinema',
           cinema_chain: s.cinema_chain || null,
           cinema_address: s.cinema_address || '',
+          cinema_website: s.cinema_website || null,
           lat,
           lng,
           city_name: s.city_name,
@@ -315,23 +317,63 @@ export const MovieCinemaMap: React.FC<MovieCinemaMapProps> = ({
                       {lang === 'it' ? 'Orari programmati:' : 'Scheduled showtimes:'}
                     </span>
                     <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-0.5">
-                      {cinema.slots.map(s => (
-                        <a
-                          key={s.id}
-                          href={s.ticket_url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => handleTicketClick(s.id)}
-                          title={s.ticket_url ? 'Acquista biglietto ufficiale' : 'Consulta sito cinema'}
-                          className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-[#D4AF37] text-white hover:text-black transition-colors flex items-center gap-1.5 text-xs font-mono font-bold shadow-sm"
-                        >
-                          <span>{s.time}</span>
-                          <span className="text-[9px] opacity-75 font-sans font-normal">
-                            {s.format}
-                          </span>
-                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
-                        </a>
-                      ))}
+                      {cinema.slots.map(s => {
+                        const hasTicketUrl = Boolean(s.ticket_url && s.ticket_url.trim() && s.ticket_url.trim() !== '#' && !s.ticket_url.trim().startsWith('javascript:'));
+                        const cinemaWeb = (cinema.cinema_website || s.cinema_website || '').trim();
+                        const hasCinemaWeb = Boolean(cinemaWeb && cinemaWeb !== '#' && !cinemaWeb.startsWith('javascript:'));
+
+                        if (hasTicketUrl) {
+                          return (
+                            <a
+                              key={s.id}
+                              href={s.ticket_url!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleTicketClick(s.id)}
+                              title={lang === 'it' ? 'Acquista biglietto ufficiale' : 'Buy official ticket'}
+                              className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-[#D4AF37] text-white hover:text-black transition-colors flex items-center gap-1.5 text-xs font-mono font-bold shadow-sm"
+                            >
+                              <span>{s.time}</span>
+                              <span className="text-[9px] opacity-75 font-sans font-normal">
+                                {s.format}
+                              </span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            </a>
+                          );
+                        }
+
+                        if (hasCinemaWeb) {
+                          return (
+                            <a
+                              key={s.id}
+                              href={cinemaWeb}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={lang === 'it' ? 'Consulta sito cinema' : 'Visit cinema website'}
+                              className="px-2.5 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-neutral-800 transition-colors flex items-center gap-1.5 text-xs font-mono font-medium border border-neutral-300"
+                            >
+                              <span>{s.time}</span>
+                              <span className="text-[9px] text-neutral-500 font-sans">
+                                {lang === 'it' ? 'Sito' : 'Web'}
+                              </span>
+                              <Globe className="w-2.5 h-2.5 shrink-0 text-neutral-500" />
+                            </a>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={s.id}
+                            title={lang === 'it' ? 'Biglietti in cassa' : 'Tickets at box office'}
+                            className="px-2 py-1 rounded-md bg-neutral-100 text-neutral-400 flex items-center gap-1 text-xs font-mono select-none"
+                          >
+                            <span>{s.time}</span>
+                            <span className="text-[9px] font-sans text-neutral-400">
+                              {lang === 'it' ? 'Cassa' : 'Box office'}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 

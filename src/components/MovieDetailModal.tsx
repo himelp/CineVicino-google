@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film, Map as MapIcon } from 'lucide-react';
+import { X, Star, Clock, Calendar, MapPin, ExternalLink, Ticket, Share2, Bookmark, Check, ShieldCheck, Film, Map as MapIcon, Globe } from 'lucide-react';
 import { Movie, Showtime, City } from '../types';
 import { Language, translations, getMovieTitle, getMovieSynopsis } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
@@ -12,6 +12,7 @@ interface CinemaGroup {
   cinema_name: string;
   chain: string | null;
   address: string;
+  website: string | null;
   city_name: string;
   city_slug: string;
   slots: Showtime[];
@@ -116,6 +117,7 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
         cinema_name: s.cinema_name || 'Cinema',
         chain: s.cinema_chain || null,
         address: s.cinema_address || '',
+        website: s.cinema_website || null,
         city_name: s.city_name || '',
         city_slug: s.city_slug || '',
         slots: []
@@ -542,29 +544,81 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
 
                     {/* Showtimes slots with Outbound Ticket Target */}
                     <div className="flex flex-wrap items-center gap-2">
-                      {cinema.slots.map(s => (
-                        <a
-                          key={s.id}
-                          href={s.ticket_url || '#'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => fetch(`/api/showtimes/${s.id}/click`, { method: 'POST' }).catch(() => {})}
-                          title={s.ticket_url ? `Acquista su ${getTicketSourceLabel(s.ticket_source)} (Apre sito ufficiale)` : 'Acquista in cassa o consulta il sito del cinema'}
-                          className="group/slot flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-[#D4AF37] border border-white/10 hover:border-[#D4AF37] transition-all shadow-sm active:scale-95"
-                        >
-                          <div className="text-left">
-                            <span className="font-mono font-bold text-sm text-white group-hover/slot:text-black transition-colors">
-                              {s.time}
-                            </span>
-                            <div className="flex items-center gap-1 text-[10px] text-neutral-400 group-hover/slot:text-black/80 transition-colors">
-                              <span className="font-semibold">{s.format}</span>
-                              <span>·</span>
-                              <span>{s.language}</span>
+                      {cinema.slots.map(s => {
+                        const hasTicketUrl = Boolean(s.ticket_url && s.ticket_url.trim() && s.ticket_url.trim() !== '#' && !s.ticket_url.trim().startsWith('javascript:'));
+                        const cinemaWeb = (cinema.website || s.cinema_website || '').trim();
+                        const hasCinemaWeb = Boolean(cinemaWeb && cinemaWeb !== '#' && !cinemaWeb.startsWith('javascript:'));
+
+                        if (hasTicketUrl) {
+                          return (
+                            <a
+                              key={s.id}
+                              href={s.ticket_url!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => fetch(`/api/showtimes/${s.id}/click`, { method: 'POST' }).catch(() => {})}
+                              title={`Acquista su ${getTicketSourceLabel(s.ticket_source)} (Apre sito ufficiale)`}
+                              className="group/slot flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-[#D4AF37] border border-white/10 hover:border-[#D4AF37] transition-all shadow-sm active:scale-95"
+                            >
+                              <div className="text-left">
+                                <span className="font-mono font-bold text-sm text-white group-hover/slot:text-black transition-colors">
+                                  {s.time}
+                                </span>
+                                <div className="flex items-center gap-1 text-[10px] text-neutral-400 group-hover/slot:text-black/80 transition-colors">
+                                  <span className="font-semibold">{s.format}</span>
+                                  <span>·</span>
+                                  <span>{s.language}</span>
+                                </div>
+                              </div>
+                              <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover/slot:text-black transition-colors ml-1" />
+                            </a>
+                          );
+                        }
+
+                        if (hasCinemaWeb) {
+                          return (
+                            <a
+                              key={s.id}
+                              href={cinemaWeb}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={lang === 'it' ? `Consulta il sito ufficiale di ${cinema.cinema_name}` : `Visit official website of ${cinema.cinema_name}`}
+                              className="group/slot flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] hover:bg-white/15 border border-white/10 hover:border-white/25 transition-all shadow-sm active:scale-95"
+                            >
+                              <div className="text-left">
+                                <span className="font-mono font-bold text-sm text-neutral-200 group-hover/slot:text-white transition-colors">
+                                  {s.time}
+                                </span>
+                                <div className="flex items-center gap-1 text-[10px] text-neutral-400 group-hover/slot:text-neutral-300 transition-colors">
+                                  <span className="font-semibold">{s.format}</span>
+                                  <span>·</span>
+                                  <span>{lang === 'it' ? 'Sito cinema' : 'Cinema site'}</span>
+                                </div>
+                              </div>
+                              <Globe className="w-3.5 h-3.5 text-neutral-400 group-hover/slot:text-white transition-colors ml-1" />
+                            </a>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={s.id}
+                            title={lang === 'it' ? 'Biglietti acquistabili in cassa presso il cinema' : 'Tickets available at the box office'}
+                            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-neutral-400 shadow-none cursor-default select-none"
+                          >
+                            <div className="text-left">
+                              <span className="font-mono font-bold text-sm text-neutral-400">
+                                {s.time}
+                              </span>
+                              <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+                                <span className="font-semibold">{s.format}</span>
+                                <span>·</span>
+                                <span>{lang === 'it' ? 'In cassa' : 'Box office'}</span>
+                              </div>
                             </div>
                           </div>
-                          <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover/slot:text-black transition-colors ml-1" />
-                        </a>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

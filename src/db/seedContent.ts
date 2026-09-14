@@ -457,6 +457,21 @@ export async function seedContentIfEmpty(): Promise<void> {
       WHERE id IN ('log-init-1', 'log-init-2')
     `);
 
+    // Purge any corrupted movie entries from prior scraper fallbacks (e.g. Serpentis with Dune poster or template synopsis)
+    await executeRawSql(`
+      DELETE FROM showtimes 
+      WHERE movie_id IN (
+        SELECT id FROM movies 
+        WHERE (slug = 'serpentis' OR title_it ILIKE '%serpentis%')
+           OR (synopsis_it ILIKE 'Guarda % nei cinema italiani%' AND slug != 'dune-parte-due')
+           OR (poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' AND slug != 'dune-parte-due')
+      );
+      DELETE FROM movies 
+      WHERE (slug = 'serpentis' OR title_it ILIKE '%serpentis%')
+         OR (synopsis_it ILIKE 'Guarda % nei cinema italiani%' AND slug != 'dune-parte-due')
+         OR (poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' AND slug != 'dune-parte-due');
+    `);
+
     const cinemaCountRes = await executeRawSql('SELECT COUNT(*) as cnt FROM cinemas');
     const cinemaCount = parseInt(cinemaCountRes.rows[0]?.cnt || '0', 10);
 

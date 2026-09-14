@@ -92,6 +92,7 @@ export interface Showtime {
   cinema_name?: string;
   cinema_chain?: CinemaChain | null;
   cinema_address?: string;
+  cinema_website?: string | null;
   cinema_lat?: number;
   cinema_lng?: number;
   city_name?: string;

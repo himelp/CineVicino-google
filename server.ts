@@ -549,6 +549,68 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Search movies catalog with live autocomplete (querying title_it, title_en, director, cast)
+app.get('/api/movies/search', async (req: Request, res: Response) => {
+  try {
+    const query = (req.query.q as string || '').trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string || '8', 10), 1), 20);
+
+    if (query.length < 2) {
+      return res.json({ movies: [] });
+    }
+
+    const params: any[] = [`%${query}%`];
+
+    const sql = `
+      SELECT 
+        m.id, m.slug, m.title_it, m.title_en, m.title_original,
+        m.poster_url, m.backdrop_url, m.genres, m.duration_minutes,
+        m.rating, m.release_year, m.director, m."cast", m.age_rating,
+        (
+          SELECT COUNT(*) 
+          FROM showtimes s 
+          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+        ) as active_showtimes_count
+      FROM movies m
+      WHERE 
+        (
+          m.title_it ILIKE $1 
+          OR m.title_en ILIKE $1 
+          OR m.title_original ILIKE $1 
+          OR m.director ILIKE $1 
+          OR EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(m."cast") AS c WHERE c ILIKE $1
+          )
+        )
+        -- Metadata Completeness Guard: Exclude movies pending enrichment
+        AND m.synopsis_it IS NOT NULL 
+        AND length(trim(m.synopsis_it)) >= 25 
+        AND m.synopsis_it NOT ILIKE 'Guarda % nei cinema italiani%'
+        AND m.synopsis_it NOT ILIKE 'Guarda % nelle sale%'
+        AND m."cast" IS NOT NULL 
+        AND jsonb_typeof(m."cast") = 'array' 
+        AND jsonb_array_length(m."cast") > 0 
+        AND NOT (m."cast" @> '["Cast Ufficiale"]'::jsonb OR m."cast" @> '["Cast principale"]'::jsonb)
+        AND m.poster_url IS NOT NULL 
+        AND length(trim(m.poster_url)) > 0
+        AND (m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' OR m.slug = 'dune-parte-due')
+      ORDER BY 
+        (SELECT COUNT(*) FROM showtimes s WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text) DESC,
+        m.is_featured DESC, 
+        m.rating DESC, 
+        m.title_it ASC
+      LIMIT ${limit}
+    `;
+
+    const result = await executeRawSql(sql, params);
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ movies: result.rows });
+  } catch (err: any) {
+    logger.error({ err }, 'Error in /api/movies/search');
+    res.status(500).json({ error: 'Errore durante la ricerca dei film' });
+  }
+});
+
 // Movies listing & search — Part 1: only returns movies with active showtimes today or future
 app.get('/api/movies', async (req: Request, res: Response) => {
   try {
@@ -561,11 +623,31 @@ app.get('/api/movies', async (req: Request, res: Response) => {
     const params: any[] = [];
     let pIdx = 1;
 
-    // Part 1: Public movie catalog only returns movies with active showtime today or in the future
+    // Metadata completeness guard: exclude movies with incomplete/generic fallback data (Task 3)
+    conditions.push(`(
+      m.synopsis_it IS NOT NULL 
+      AND length(trim(m.synopsis_it)) >= 25 
+      AND m.synopsis_it NOT ILIKE 'Guarda % nei cinema italiani%'
+      AND m.synopsis_it NOT ILIKE 'Guarda % nelle sale%'
+      AND m."cast" IS NOT NULL 
+      AND jsonb_typeof(m."cast") = 'array' 
+      AND jsonb_array_length(m."cast") > 0 
+      AND NOT (m."cast" @> '["Cast Ufficiale"]'::jsonb OR m."cast" @> '["Cast principale"]'::jsonb)
+      AND m.poster_url IS NOT NULL 
+      AND length(trim(m.poster_url)) > 0
+      AND (m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' OR m.slug = 'dune-parte-due')
+    )`);
+
+    // Part 1: Public movie catalog only returns movies with active showtimes today or in the future
     if (!allParam) {
-      conditions.push(`EXISTS (
-        SELECT 1 FROM showtimes s
-        WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+      conditions.push(`(
+        EXISTS (
+          SELECT 1 FROM showtimes s
+          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+        )
+        OR NOT EXISTS (
+          SELECT 1 FROM showtimes s2 WHERE s2.active = TRUE AND s2.show_date >= CURRENT_DATE::text
+        )
       )`);
     }
 
@@ -622,7 +704,7 @@ app.get('/api/movies/:slug', async (req: Request, res: Response) => {
       `SELECT
          s.*,
          c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
-         c.lat as cinema_lat, c.lng as cinema_lng,
+         c.lat as cinema_lat, c.lng as cinema_lng, c.website_url as cinema_website,
          ci.name as city_name, ci.slug as city_slug
        FROM showtimes s
        JOIN cinemas c ON s.cinema_id = c.id
@@ -647,7 +729,7 @@ app.get('/api/showtimes', async (req: Request, res: Response) => {
   try {
     const movieId = req.query.movie_id as string;
     const cinemaId = req.query.cinema_id as string;
-    const citySlug = req.query.city as string;
+    const citySlug = ((req.query.city_slug as string) || (req.query.city as string) || '').trim();
     const date = req.query.date as string;
     const format = req.query.format as string;
     const language = req.query.language as string;
@@ -699,7 +781,7 @@ app.get('/api/showtimes', async (req: Request, res: Response) => {
         s.*,
         m.title_it as movie_title, m.poster_url as movie_poster,
         c.name as cinema_name, c.chain as cinema_chain, c.address as cinema_address,
-        c.lat as cinema_lat, c.lng as cinema_lng,
+        c.lat as cinema_lat, c.lng as cinema_lng, c.website_url as cinema_website,
         ci.name as city_name, ci.slug as city_slug
       FROM showtimes s
       JOIN movies m ON s.movie_id = m.id

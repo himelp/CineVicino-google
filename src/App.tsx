@@ -15,7 +15,7 @@ import { AutoCityBanner, AutoDetectInfo } from './components/AutoCityBanner';
 import { City, Cinema, Movie, CinemaChain, SiteSettings } from './types';
 import { Language, translations, useLanguage } from './utils/i18n';
 import { safeFetchJson, safeReadJson } from './utils/api';
-import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight, Calendar, Instagram, Facebook, Twitter, Music2, Youtube } from 'lucide-react';
+import { MapPin, Film, Compass, ExternalLink, Ticket, ShieldCheck, Heart, Sparkles, AlertCircle, ArrowRight, ChevronRight, Calendar, Instagram, Facebook, Twitter, Music2, Youtube, Search, X } from 'lucide-react';
 import { formatTodayFull } from './utils/date';
 
 export default function App() {
@@ -310,6 +310,12 @@ export default function App() {
     return true;
   });
 
+  const availableGenres = useMemo(() => {
+    const s = new Set<string>();
+    movies.forEach(m => m.genres?.forEach(g => s.add(g)));
+    return ['all', ...Array.from(s).sort()];
+  }, [movies]);
+
   // Top popular Italian cities shortcut pills
   const popularCities = [
     { name: 'Roma', slug: 'roma', prov: 'RM' },
@@ -489,6 +495,7 @@ export default function App() {
         lang={lang}
         onToggleLang={handleToggleLang}
         onSelectCity={selectCity}
+        onSelectMovie={openMovie}
         onLocateMe={handleLocateMe}
         isLocating={isLocating}
         activeCity={activeCity}
@@ -703,18 +710,80 @@ export default function App() {
                 Consulta le schede dei film attualmente distribuiti nelle sale italiane, con orari e link diretti alle biglietterie ufficiali.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {movies.map(movie => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  lang={lang}
-                  onSelect={openMovie}
-                  isFavorite={favoriteMovieIds.includes(movie.id)}
-                  onToggleFavorite={handleToggleFavoriteMovie}
+
+            {/* Search and Genre Filters on /film */}
+            <div className="mb-8 space-y-4">
+              <div className="relative max-w-xl">
+                <input
+                  type="text"
+                  value={movieSearchQuery}
+                  onChange={(e) => setMovieSearchQuery(e.target.value)}
+                  placeholder="Cerca per titolo, regista o attore..."
+                  className="w-full bg-white/5 border border-white/15 rounded-full px-5 py-3 pl-12 pr-10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
                 />
-              ))}
+                <Search className="w-4 h-4 text-neutral-400 absolute left-4.5 top-1/2 -translate-y-1/2" />
+                {movieSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setMovieSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Genre Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar text-xs">
+                {availableGenres.map(g => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setSelectedGenre(g)}
+                    className={`px-3.5 py-1.5 rounded-full font-medium transition-all whitespace-nowrap cursor-pointer ${
+                      selectedGenre === g
+                        ? 'bg-[#D4AF37] text-black font-bold shadow-md'
+                        : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10 border border-white/10'
+                    }`}
+                  >
+                    {g === 'all' ? 'Tutti i Generi' : g}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {filteredMovies.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {filteredMovies.map(movie => (
+                  <MovieCard
+                    key={movie.id}
+                    movie={movie}
+                    lang={lang}
+                    onSelect={openMovie}
+                    isFavorite={favoriteMovieIds.includes(movie.id)}
+                    onToggleFavorite={handleToggleFavoriteMovie}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-white/[0.02] border border-white/10 rounded-2xl p-8">
+                <Film className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+                <h3 className="text-lg font-serif text-white mb-1">Nessun film trovato</h3>
+                <p className="text-xs text-neutral-400 mb-4 max-w-sm mx-auto">
+                  Non abbiamo trovato film che corrispondano ai criteri di ricerca selezionati.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMovieSearchQuery('');
+                    setSelectedGenre('all');
+                  }}
+                  className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Azzera filtri
+                </button>
+              </div>
+            )}
           </div>
         )}
 

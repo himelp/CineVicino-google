@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, Sparkles, Menu, Calendar } from 'lucide-react';
-import { City } from '../types';
+import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, Sparkles, Menu, Calendar, Star, Clock } from 'lucide-react';
+import { City, Movie } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
 import { formatTodayFull } from '../utils/date';
@@ -12,10 +12,13 @@ export interface SocialLinkItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
+export type SearchTab = 'cities' | 'movies';
+
 interface HeaderProps {
   lang: Language;
   onToggleLang: () => void;
   onSelectCity: (city: City) => void;
+  onSelectMovie?: (movie: Movie) => void;
   onLocateMe: () => void;
   isLocating: boolean;
   activeCity: City | null;
@@ -34,6 +37,7 @@ export const Header: React.FC<HeaderProps> = ({
   lang,
   onToggleLang,
   onSelectCity,
+  onSelectMovie,
   onLocateMe,
   isLocating,
   activeCity,
@@ -48,14 +52,34 @@ export const Header: React.FC<HeaderProps> = ({
   socialLinks = []
 }) => {
   const t = translations[lang];
+  const [searchTab, setSearchTab] = useState<SearchTab>(() => {
+    try {
+      const saved = localStorage.getItem('cinevicino_search_tab');
+      if (saved === 'movies' || saved === 'cities') return saved;
+    } catch {}
+    return 'cities';
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<City[]>([]);
+  const [movieSuggestions, setMovieSuggestions] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const mobileSearchRef = useRef<HTMLInputElement>(null);
+
+  const handleSearchTabChange = (tab: SearchTab) => {
+    setSearchTab(tab);
+    try {
+      localStorage.setItem('cinevicino_search_tab', tab);
+    } catch {}
+    setSearchQuery('');
+    setSuggestions([]);
+    setMovieSuggestions([]);
+    setShowDropdown(false);
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -75,20 +99,30 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [mobileSearchOpen]);
 
-  // Fetch search suggestions
+  // Fetch search suggestions based on active tab
   useEffect(() => {
-    if (searchQuery.trim().length < 2) {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
       setSuggestions([]);
+      setMovieSuggestions([]);
       return;
     }
 
     const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const parsed = await safeFetchJson<any>(`/api/cities?q=${encodeURIComponent(searchQuery.trim())}&limit=8`);
-        if (parsed.ok && parsed.data?.cities) {
-          setSuggestions(parsed.data.cities);
-          setShowDropdown(true);
+        if (searchTab === 'cities') {
+          const parsed = await safeFetchJson<any>(`/api/cities?q=${encodeURIComponent(trimmed)}&limit=8`);
+          if (parsed.ok && parsed.data?.cities) {
+            setSuggestions(parsed.data.cities);
+            setShowDropdown(true);
+          }
+        } else {
+          const parsed = await safeFetchJson<{ movies: Movie[] }>(`/api/movies/search?q=${encodeURIComponent(trimmed)}&limit=8`);
+          if (parsed.ok && Array.isArray(parsed.data?.movies)) {
+            setMovieSuggestions(parsed.data.movies);
+            setShowDropdown(true);
+          }
         }
       } catch (err) {
         console.error('Search error', err);
@@ -98,10 +132,20 @@ export const Header: React.FC<HeaderProps> = ({
     }, 200);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, searchTab]);
 
   const handleSelectCity = (c: City) => {
     onSelectCity(c);
+    setSearchQuery('');
+    setShowDropdown(false);
+    setMobileSearchOpen(false);
+    setMobileMenuOpen(false);
+  };
+
+  const handleSelectMovie = (m: Movie) => {
+    if (onSelectMovie) {
+      onSelectMovie(m);
+    }
     setSearchQuery('');
     setShowDropdown(false);
     setMobileSearchOpen(false);
@@ -168,14 +212,46 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Desktop Search bar with instant autocomplete */}
-          <div ref={searchRef} className="relative flex-1 max-w-sm hidden sm:block">
+          <div ref={searchRef} className="relative flex-1 max-w-md hidden sm:block">
+            {/* Search Tab Switcher (Città vs Film) */}
+            <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
+              <button
+                type="button"
+                onClick={() => handleSearchTabChange('cities')}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide transition-all cursor-pointer flex items-center gap-1 ${
+                  searchTab === 'cities'
+                    ? 'bg-[#D4AF37] text-black shadow-sm font-bold'
+                    : 'text-neutral-400 hover:text-white bg-white/[0.05] hover:bg-white/10'
+                }`}
+              >
+                <MapPin className="w-3 h-3" />
+                <span>{lang === 'it' ? 'Città' : 'Cities'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSearchTabChange('movies')}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide transition-all cursor-pointer flex items-center gap-1 ${
+                  searchTab === 'movies'
+                    ? 'bg-[#D4AF37] text-black shadow-sm font-bold'
+                    : 'text-neutral-400 hover:text-white bg-white/[0.05] hover:bg-white/10'
+                }`}
+              >
+                <Film className="w-3 h-3" />
+                <span>{lang === 'it' ? 'Film & Cast' : 'Movies'}</span>
+              </button>
+            </div>
+
             <div className="relative">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.length >= 2 && setShowDropdown(true)}
-                placeholder={activeCity ? `${activeCity.name} (${activeCity.province_code})` : 'Cerca la tua città...'}
+                placeholder={
+                  searchTab === 'cities'
+                    ? (activeCity ? `${activeCity.name} (${activeCity.province_code})` : (lang === 'it' ? 'Cerca la tua città o comune...' : 'Search Italian city...'))
+                    : (lang === 'it' ? 'Cerca film, regista o attore...' : 'Search movie, director or cast...')
+                }
                 className="w-full bg-white/5 border border-white/20 rounded-full px-4 py-2 pl-4 pr-10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
@@ -187,6 +263,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-9 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
                 >
@@ -196,37 +273,104 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Autocomplete Dropdown */}
-            {showDropdown && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-white/5 backdrop-blur-xl max-h-80 overflow-y-auto">
-                <div className="p-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold bg-white/[0.02] flex items-center justify-between">
-                  <span>Comuni italiani ({suggestions.length})</span>
-                  <span className="text-[#D4AF37]">Archivio Nazionale</span>
-                </div>
-                {suggestions.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleSelectCity(c)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex items-center justify-between text-sm group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
-                      <div>
-                        <span className="font-medium text-white">{c.name}</span>
-                        <span className="text-neutral-400 text-xs ml-1.5 font-mono">({c.province_code})</span>
-                        <span className="text-neutral-500 text-xs ml-2">· {c.region}</span>
+            {showDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-white/5 backdrop-blur-xl max-h-96 overflow-y-auto">
+                {searchTab === 'cities' ? (
+                  suggestions.length > 0 ? (
+                    <>
+                      <div className="p-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold bg-white/[0.02] flex items-center justify-between">
+                        <span>Comuni italiani ({suggestions.length})</span>
+                        <span className="text-[#D4AF37]">Archivio Nazionale ISTAT</span>
                       </div>
-                    </div>
-                    {(c.cinema_count || 0) > 0 ? (
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 font-bold">
-                        {c.cinema_count} cinema
-                      </span>
-                    ) : (
-                      <span className="text-xs text-neutral-400 flex items-center gap-1">
-                        Vicino <ChevronRight className="w-3 h-3" />
-                      </span>
-                    )}
-                  </button>
-                ))}
+                      {suggestions.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => handleSelectCity(c)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex items-center justify-between text-sm group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <MapPin className="w-3.5 h-3.5 text-[#D4AF37] flex-shrink-0" />
+                            <div>
+                              <span className="font-medium text-white">{c.name}</span>
+                              <span className="text-neutral-400 text-xs ml-1.5 font-mono">({c.province_code})</span>
+                              <span className="text-neutral-500 text-xs ml-2">· {c.region}</span>
+                            </div>
+                          </div>
+                          {(c.cinema_count || 0) > 0 ? (
+                            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 font-bold">
+                              {c.cinema_count} cinema
+                            </span>
+                          ) : (
+                            <span className="text-xs text-neutral-400 flex items-center gap-1">
+                              Vicino <ChevronRight className="w-3 h-3" />
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    !isSearching && searchQuery.trim().length >= 2 && (
+                      <div className="p-4 text-center text-xs text-neutral-400">
+                        Nessun comune trovato per &quot;<span className="text-white">{searchQuery}</span>&quot;
+                      </div>
+                    )
+                  )
+                ) : (
+                  movieSuggestions.length > 0 ? (
+                    <>
+                      <div className="p-3 text-[10px] uppercase tracking-widest text-neutral-400 font-semibold bg-white/[0.02] flex items-center justify-between">
+                        <span>Film in sala ({movieSuggestions.length})</span>
+                        <span className="text-[#D4AF37]">Nelle sale in Italia</span>
+                      </div>
+                      {movieSuggestions.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => handleSelectMovie(m)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex items-center justify-between text-sm group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {m.poster_url ? (
+                              <img
+                                src={m.poster_url}
+                                alt={m.title_it}
+                                className="w-9 h-13 object-cover rounded-md flex-shrink-0 border border-white/10 bg-neutral-900"
+                              />
+                            ) : (
+                              <div className="w-9 h-13 rounded-md bg-neutral-800 border border-white/10 flex items-center justify-center flex-shrink-0">
+                                <Film className="w-4 h-4 text-neutral-500" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors">
+                                {m.title_it}
+                              </p>
+                              <div className="flex items-center gap-1.5 text-xs text-neutral-400 mt-0.5">
+                                {m.release_year && <span>{m.release_year}</span>}
+                                {m.duration_minutes && <span>· {m.duration_minutes}m</span>}
+                                {m.director && <span className="truncate">· {m.director}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                            {m.rating ? (
+                              <span className="flex items-center gap-1 text-xs font-mono font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-md border border-[#D4AF37]/20">
+                                <Star className="w-3 h-3 fill-[#D4AF37]" />
+                                {m.rating}
+                              </span>
+                            ) : null}
+                            <ChevronRight className="w-4 h-4 text-neutral-500 group-hover:text-white transition-colors" />
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  ) : (
+                    !isSearching && searchQuery.trim().length >= 2 && (
+                      <div className="p-4 text-center text-xs text-neutral-400">
+                        Nessun film trovato per &quot;<span className="text-white">{searchQuery}</span>&quot;
+                      </div>
+                    )
+                  )
+                )}
               </div>
             )}
           </div>
@@ -333,47 +477,132 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Mobile Search Row (when toggled on) */}
         {mobileSearchOpen && (
-          <div className="sm:hidden pb-3 pt-1 border-t border-white/10 animate-fadeIn">
+          <div className="sm:hidden pb-3 pt-2 border-t border-white/10 animate-fadeIn">
+            {/* Search Tab Switcher */}
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => handleSearchTabChange('cities')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  searchTab === 'cities'
+                    ? 'bg-[#D4AF37] text-black font-bold shadow-sm'
+                    : 'bg-white/5 text-neutral-400 hover:text-white'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{lang === 'it' ? 'Cerca Città' : 'Search City'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSearchTabChange('movies')}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  searchTab === 'movies'
+                    ? 'bg-[#D4AF37] text-black font-bold shadow-sm'
+                    : 'bg-white/5 text-neutral-400 hover:text-white'
+                }`}
+              >
+                <Film className="w-3.5 h-3.5" />
+                <span>{lang === 'it' ? 'Cerca Film' : 'Search Movie'}</span>
+              </button>
+            </div>
+
             <div className="relative">
               <input
                 ref={mobileSearchRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cerca un comune italiano..."
+                placeholder={
+                  searchTab === 'cities'
+                    ? (activeCity ? `${activeCity.name} (${activeCity.province_code})` : (lang === 'it' ? 'Cerca un comune italiano...' : 'Search Italian city...'))
+                    : (lang === 'it' ? 'Cerca film, regista o attore...' : 'Search movie, director or cast...')
+                }
                 className="w-full bg-white/5 border border-white/20 rounded-full px-4 py-2.5 pl-4 pr-10 text-base text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37]"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                 {isSearching ? <Sparkles className="w-4 h-4 text-[#D4AF37] animate-spin" /> : <Search className="w-4 h-4" />}
               </span>
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-9 top-1/2 -translate-y-1/2 text-neutral-400">
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-9 top-1/2 -translate-y-1/2 text-neutral-400"
+                >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
             {/* Mobile search suggestions */}
-            {suggestions.length > 0 && (
-              <div className="mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/5 max-h-60 overflow-y-auto">
-                {suggestions.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleSelectCity(c)}
-                    className="w-full text-left px-4 py-2.5 hover:bg-white/5 flex items-center justify-between text-sm active:bg-white/10"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
-                      <span className="font-medium text-white">{c.name} ({c.province_code})</span>
-                    </div>
-                    {(c.cinema_count || 0) > 0 && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">
-                        {c.cinema_count} cinema
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+            {searchTab === 'cities' ? (
+              suggestions.length > 0 ? (
+                <div className="mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/5 max-h-60 overflow-y-auto">
+                  {suggestions.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelectCity(c)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-white/5 flex items-center justify-between text-sm active:bg-white/10 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-[#D4AF37] flex-shrink-0" />
+                        <span className="font-medium text-white">{c.name} ({c.province_code})</span>
+                      </div>
+                      {(c.cinema_count || 0) > 0 && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] font-bold">
+                          {c.cinema_count} cinema
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                !isSearching && searchQuery.trim().length >= 2 && (
+                  <div className="mt-2 p-3 text-center text-xs text-neutral-400 bg-[#0a0a0a] border border-white/10 rounded-xl">
+                    Nessun comune trovato per &quot;<span className="text-white">{searchQuery}</span>&quot;
+                  </div>
+                )
+              )
+            ) : (
+              movieSuggestions.length > 0 ? (
+                <div className="mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden divide-y divide-white/5 max-h-72 overflow-y-auto">
+                  {movieSuggestions.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => handleSelectMovie(m)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-white/5 flex items-center justify-between text-sm active:bg-white/10 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {m.poster_url ? (
+                          <img
+                            src={m.poster_url}
+                            alt={m.title_it}
+                            className="w-8 h-12 object-cover rounded-md flex-shrink-0 border border-white/10 bg-neutral-900"
+                          />
+                        ) : (
+                          <div className="w-8 h-12 rounded-md bg-neutral-800 border border-white/10 flex items-center justify-center flex-shrink-0">
+                            <Film className="w-3.5 h-3.5 text-neutral-500" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-white truncate text-xs sm:text-sm">
+                            {m.title_it}
+                          </p>
+                          <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                            {[m.release_year, m.duration_minutes ? `${m.duration_minutes}m` : null, m.director].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-neutral-500 flex-shrink-0 ml-2" />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                !isSearching && searchQuery.trim().length >= 2 && (
+                  <div className="mt-2 p-3 text-center text-xs text-neutral-400 bg-[#0a0a0a] border border-white/10 rounded-xl">
+                    Nessun film trovato per &quot;<span className="text-white">{searchQuery}</span>&quot;
+                  </div>
+                )
+              )
             )}
           </div>
         )}
