@@ -212,12 +212,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <div className="w-px h-10 bg-white/10" />
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-              {data?.has_local_cinemas 
-                ? (lang === 'it' ? 'Spettacoli oggi' : 'Screenings today')
-                : (lang === 'it' ? 'Cinema nei dintorni' : 'Nearby cinemas')}
+              {data?.has_local_cinemas ? filteredShowtimes.length : (data?.nearest_cinemas?.length || 0)}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
-              {data?.has_local_cinemas ? (lang === 'it' ? 'Spettacoli oggi' : 'Screenings today') : (lang === 'it' ? 'Cinema nei dintorni' : 'Nearby cinemas')}
+              {data?.has_local_cinemas 
+                ? (lang === 'it' ? 'Spettacoli oggi' : 'Screenings today') 
+                : (lang === 'it' ? 'Cinema nei dintorni' : 'Nearby cinemas')}
             </span>
           </div>
         </div>
