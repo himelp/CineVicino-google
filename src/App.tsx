@@ -553,7 +553,7 @@ export default function App() {
               <div className="max-w-7xl mx-auto flex items-center gap-2.5 overflow-x-auto text-xs no-scrollbar">
                 <span className="text-neutral-400 font-medium whitespace-nowrap flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
                   <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  Città principali:
+                  {lang === 'it' ? 'Città principali:' : 'Key cities:'}
                 </span>
                 {popularCities.map(c => (
                   <button
@@ -568,7 +568,7 @@ export default function App() {
                   onClick={() => setView('directory')}
                   className="px-4 py-1 rounded-full bg-[#D4AF37]/15 hover:bg-[#D4AF37]/25 text-[#D4AF37] border border-[#D4AF37]/30 transition-colors whitespace-nowrap font-bold flex items-center gap-1 ml-auto text-xs"
                 >
-                  <span>Tutti i 7.894 Comuni</span>
+                  <span>{lang === 'it' ? 'Tutti i 7.894 Comuni' : 'All 7,894 Municipalities'}</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -582,12 +582,16 @@ export default function App() {
                     <div className="flex items-center gap-2.5">
                       <Compass className="w-5 h-5 text-[#D4AF37] animate-spin-slow" />
                       <h2 className="text-xl font-serif text-white font-bold">
-                        Cinema nelle <span className="italic text-[#D4AF37]">vicinanze</span>
+                        {lang === 'it' ? (
+                          <>Cinema nelle <span className="italic text-[#D4AF37]">vicinanze</span></>
+                        ) : (
+                          <>Cinemas <span className="italic text-[#D4AF37]">nearby</span></>
+                        )}
                       </h2>
                     </div>
                     {activeCity && (
                       <span className="text-xs px-3 py-1 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 font-bold uppercase tracking-wider">
-                        Vicino a {activeCity.name}
+                        {lang === 'it' ? `Vicino a ${activeCity.name}` : `Near ${activeCity.name}`}
                       </span>
                     )}
                   </div>
@@ -618,7 +622,7 @@ export default function App() {
                           rel="noopener noreferrer"
                           className="mt-5 pt-3 border-t border-white/10 text-[10px] uppercase tracking-widest text-[#D4AF37] hover:text-white flex items-center justify-between transition-colors"
                         >
-                          <span>Sito Ufficiale</span>
+                          <span>{lang === 'it' ? 'Sito Ufficiale' : 'Official Website'}</span>
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </div>
@@ -633,7 +637,11 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
                 <div>
                   <h2 className="text-3xl sm:text-4xl font-serif text-white tracking-tight flex items-center gap-2.5">
-                    <span>Nelle sale in <span className="italic text-[#D4AF37]">Italia</span></span>
+                    {lang === 'it' ? (
+                      <span>Nelle sale in <span className="italic text-[#D4AF37]">Italia</span></span>
+                    ) : (
+                      <span>Now Playing in <span className="italic text-[#D4AF37]">Italy</span></span>
+                    )}
                   </h2>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 text-xs font-medium capitalize">
@@ -653,7 +661,7 @@ export default function App() {
                   type="text"
                   value={movieSearchQuery}
                   onChange={e => setMovieSearchQuery(e.target.value)}
-                  placeholder="Cerca film, regista o attore..."
+                  placeholder={lang === 'it' ? 'Cerca film, regista o attore...' : 'Search movies, director or actor...'}
                   className="px-4 py-2 bg-white/5 border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] w-full sm:w-64 transition-colors"
                 />
               </div>
@@ -662,7 +670,9 @@ export default function App() {
               {filteredMovies.length === 0 ? (
                 <div className="py-16 text-center bg-[#0a0a0a] rounded-3xl border border-white/10 p-8">
                   <p className="text-neutral-400 text-sm">
-                    Nessun film trovato corrispondente ai criteri di ricerca.
+                    {lang === 'it' 
+                      ? 'Nessun film trovato corrispondente ai criteri di ricerca.' 
+                      : 'No movies found matching the search criteria.'}
                   </p>
                 </div>
               ) : (
@@ -710,9 +720,17 @@ export default function App() {
         {view === 'all-movies' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fadeIn">
             <div className="mb-8">
-              <h1 className="text-3xl sm:text-4xl font-serif text-white">Tutti i Film in <span className="italic text-[#D4AF37]">Programmazione</span></h1>
+              <h1 className="text-3xl sm:text-4xl font-serif text-white">
+                {lang === 'it' ? (
+                  <>Tutti i Film in <span className="italic text-[#D4AF37]">Programmazione</span></>
+                ) : (
+                  <>All Currently <span className="italic text-[#D4AF37]">Playing Movies</span></>
+                )}
+              </h1>
               <p className="text-sm text-neutral-400 mt-1">
-                Consulta le schede dei film attualmente distribuiti nelle sale italiane, con orari e link diretti alle biglietterie ufficiali.
+                {lang === 'it'
+                  ? 'Consulta le schede dei film attualmente distribuiti nelle sale italiane, con orari e link diretti alle biglietterie ufficiali.'
+                  : 'Browse all movies currently playing in Italian theaters, with showtimes and direct links to official box offices.'}
               </p>
             </div>
 
@@ -723,7 +741,7 @@ export default function App() {
                   type="text"
                   value={movieSearchQuery}
                   onChange={(e) => setMovieSearchQuery(e.target.value)}
-                  placeholder="Cerca per titolo, regista o attore..."
+                  placeholder={lang === 'it' ? 'Cerca per titolo, regista o attore...' : 'Search by title, director or actor...'}
                   className="w-full bg-white/5 border border-white/15 rounded-full px-5 py-3 pl-12 pr-10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
                 />
                 <Search className="w-4 h-4 text-neutral-400 absolute left-4.5 top-1/2 -translate-y-1/2" />
@@ -751,7 +769,7 @@ export default function App() {
                         : 'bg-white/5 text-neutral-400 hover:text-white hover:bg-white/10 border border-white/10'
                     }`}
                   >
-                    {g === 'all' ? 'Tutti i Generi' : g}
+                    {g === 'all' ? (lang === 'it' ? 'Tutti i Generi' : 'All Genres') : g}
                   </button>
                 ))}
               </div>
@@ -773,9 +791,13 @@ export default function App() {
             ) : (
               <div className="text-center py-16 bg-white/[0.02] border border-white/10 rounded-2xl p-8">
                 <Film className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
-                <h3 className="text-lg font-serif text-white mb-1">Nessun film trovato</h3>
+                <h3 className="text-lg font-serif text-white mb-1">
+                  {lang === 'it' ? 'Nessun film trovato' : 'No movies found'}
+                </h3>
                 <p className="text-xs text-neutral-400 mb-4 max-w-sm mx-auto">
-                  Non abbiamo trovato film che corrispondano ai criteri di ricerca selezionati.
+                  {lang === 'it'
+                    ? 'Non abbiamo trovato film che corrispondano ai criteri di ricerca selezionati.'
+                    : 'We could not find any movies matching the selected filters.'}
                 </p>
                 <button
                   type="button"
@@ -785,7 +807,7 @@ export default function App() {
                   }}
                   className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  Azzera filtri
+                  {lang === 'it' ? 'Azzera filtri' : 'Reset filters'}
                 </button>
               </div>
             )}
@@ -806,18 +828,20 @@ export default function App() {
                 <div className="w-8 h-8 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center font-bold">
                   <Film className="w-4 h-4" />
                 </div>
-                <span className="font-serif italic text-lg text-white">CineVicino Italia</span>
+                <span className="font-serif italic text-lg text-white">CineVicino {lang === 'it' ? 'Italia' : 'Italy'}</span>
               </div>
               <p className="text-neutral-400 text-xs leading-relaxed max-w-md">
-                CineVicino è la directory indipendente che copre tutti i 7.894 comuni d'Italia. Mostra orari aggiornati e reindirizza gli spettatori direttamente alle biglietterie autorizzate delle sale cinematografiche (UCI Cinemas, The Space Cinema, 18Tickets, Vivaticket, Liveticket).
+                {lang === 'it'
+                  ? "CineVicino è la directory indipendente che copre tutti i 7.894 comuni d'Italia. Mostra orari aggiornati e reindirizza gli spettatori direttamente alle biglietterie autorizzate delle sale cinematografiche (UCI Cinemas, The Space Cinema, 18Tickets, Vivaticket, Liveticket)."
+                  : "CineVicino is an independent directory covering all 7,894 municipalities in Italy. It provides verified showtimes and redirects moviegoers directly to authorized cinema ticketing partners."}
               </p>
               <div className="flex items-center gap-3 pt-1 text-[11px] text-neutral-400">
                 <span className="flex items-center gap-1 text-neutral-300">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Nessuna commissione aggiunta
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> {lang === 'it' ? 'Nessuna commissione aggiunta' : 'Zero added booking fees'}
                 </span>
                 <span>·</span>
                 <span className="flex items-center gap-1 text-neutral-300">
-                  <Ticket className="w-3.5 h-3.5 text-[#D4AF37]" /> Reindirizzamento ufficiale
+                  <Ticket className="w-3.5 h-3.5 text-[#D4AF37]" /> {lang === 'it' ? 'Reindirizzamento ufficiale' : 'Official direct ticketing'}
                 </span>
               </div>
 
@@ -852,27 +876,27 @@ export default function App() {
             {/* Quick Links */}
             <div>
               <h4 className="font-bold text-white uppercase tracking-[0.2em] text-[10px] mb-3">
-                Esplora
+                {lang === 'it' ? 'Esplora' : 'Explore'}
               </h4>
               <ul className="space-y-2">
                 <li>
                   <button onClick={openHome} className="hover:text-white transition-colors">
-                    Home & Film in Sala
+                    {lang === 'it' ? 'Home & Film in Sala' : 'Home & Now Playing'}
                   </button>
                 </li>
                 <li>
                   <button onClick={openAllCities} className="hover:text-white transition-colors">
-                    Tutti i 7.894 Comuni
+                    {lang === 'it' ? 'Tutti i 7.894 Comuni' : 'All 7,894 Municipalities'}
                   </button>
                 </li>
                 <li>
                   <button onClick={handleLocateMe} className="hover:text-white transition-colors">
-                    Trova Cinema Vicino a Me
+                    {lang === 'it' ? 'Trova Cinema Vicino a Me' : 'Find Cinemas Near Me'}
                   </button>
                 </li>
                 <li>
                   <button onClick={() => setShowFavorites(true)} className="hover:text-white transition-colors">
-                    Cinema & Film Preferiti
+                    {lang === 'it' ? 'Cinema & Film Preferiti' : 'Saved Cinemas & Movies'}
                   </button>
                 </li>
               </ul>
@@ -881,12 +905,12 @@ export default function App() {
             {/* Compliance & Attributions */}
             <div>
               <h4 className="font-bold text-white uppercase tracking-[0.2em] text-[10px] mb-3">
-                Normativa & TMDb
+                {lang === 'it' ? 'Normativa & TMDb' : 'Legal & TMDb'}
               </h4>
               <ul className="space-y-2">
                 <li>
                   <button onClick={() => setShowPrivacy(true)} className="hover:text-white transition-colors">
-                    Informativa Privacy & GDPR
+                    {lang === 'it' ? 'Informativa Privacy & GDPR' : 'Privacy Policy & GDPR'}
                   </button>
                 </li>
                 <li>
@@ -904,7 +928,7 @@ export default function App() {
                     onClick={() => navigate('/admin')} 
                     className="hover:text-[#D4AF37] text-neutral-400 hover:text-white transition-colors cursor-pointer text-left flex items-center gap-1.5"
                   >
-                    <span>Pannello Amministratore (CMS)</span>
+                    <span>{lang === 'it' ? 'Pannello Amministratore (CMS)' : 'Admin Dashboard (CMS)'}</span>
                   </button>
                 </li>
               </ul>
@@ -916,7 +940,7 @@ export default function App() {
           <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-neutral-500 uppercase tracking-widest">
             <div className="flex items-center gap-3">
               <span className="font-medium text-neutral-400">
-                {settings.footer_copy}
+                {lang === 'en' ? (settings.footer_text_en || settings.footer_copy) : (settings.footer_text_it || settings.footer_copy)}
               </span>
             </div>
 

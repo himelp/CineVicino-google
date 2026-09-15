@@ -593,7 +593,7 @@ app.get('/api/movies/search', async (req: Request, res: Response) => {
         AND NOT (m."cast" @> '["Cast Ufficiale"]'::jsonb OR m."cast" @> '["Cast principale"]'::jsonb)
         AND m.poster_url IS NOT NULL 
         AND length(trim(m.poster_url)) > 0
-        AND (m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' OR m.slug = 'dune-parte-due')
+        AND m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
       ORDER BY 
         (SELECT COUNT(*) FROM showtimes s WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text) DESC,
         m.is_featured DESC, 
@@ -635,7 +635,7 @@ app.get('/api/movies', async (req: Request, res: Response) => {
       AND NOT (m."cast" @> '["Cast Ufficiale"]'::jsonb OR m."cast" @> '["Cast principale"]'::jsonb)
       AND m.poster_url IS NOT NULL 
       AND length(trim(m.poster_url)) > 0
-      AND (m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' OR m.slug = 'dune-parte-due')
+      AND m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
     )`);
 
     // Part 1: Public movie catalog only returns movies with active showtimes today or in the future

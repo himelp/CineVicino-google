@@ -34,7 +34,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       });
 
       if (!parsed.ok) {
-        setErrorMsg(parsed.error || 'Credenziali non valide');
+        setErrorMsg(parsed.error || (lang === 'it' ? 'Credenziali non valide' : 'Invalid credentials'));
         return;
       }
 
@@ -42,13 +42,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       if (data?.token) {
         localStorage.setItem('cinevicino_token', data.token);
       }
-      setSuccessMsg('Accesso effettuato con successo!');
+      setSuccessMsg(lang === 'it' ? 'Accesso effettuato con successo!' : 'Logged in successfully!');
       setTimeout(() => {
         onLoginSuccess(data?.user);
         onClose();
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message || err}`);
+      setErrorMsg(lang === 'it' ? `Errore di rete: ${err.message || err}` : `Network error: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       });
 
       if (!parsed.ok) {
-        setErrorMsg(parsed.error || 'Errore durante la registrazione');
+        setErrorMsg(parsed.error || (lang === 'it' ? 'Errore durante la registrazione' : 'Registration error'));
         return;
       }
 
@@ -76,13 +76,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       if (data?.token) {
         localStorage.setItem('cinevicino_token', data.token);
       }
-      setSuccessMsg('Account creato con successo!');
+      setSuccessMsg(lang === 'it' ? 'Account creato con successo!' : 'Account created successfully!');
       setTimeout(() => {
         onLoginSuccess(data?.user);
         onClose();
       }, 1000);
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message || err}`);
+      setErrorMsg(lang === 'it' ? `Errore di rete: ${err.message || err}` : `Network error: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -102,14 +102,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       });
 
       if (!parsed.ok) {
-        setErrorMsg(parsed.error || 'Impossibile inviare la richiesta di ripristino');
+        setErrorMsg(parsed.error || (lang === 'it' ? 'Impossibile inviare la richiesta di ripristino' : 'Unable to send password reset request'));
         return;
       }
 
       const data = parsed.data;
-      setSuccessMsg(data?.message || 'Se l\'email è registrata riceverai un link di ripristino.');
+      setSuccessMsg(data?.message || (lang === 'it' ? "Se l'email è registrata riceverai un link di ripristino." : 'If the email is registered, you will receive a reset link.'));
     } catch (err: any) {
-      setErrorMsg(`Errore di rete: ${err.message || err}`);
+      setErrorMsg(lang === 'it' ? `Errore di rete: ${err.message || err}` : `Network error: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
       >
         <button
           onClick={onClose}
-          aria-label="Chiudi"
+          aria-label={t.close}
           className="absolute top-3 right-3 sm:top-4 sm:right-4 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer active:scale-95"
         >
           <X className="w-5 h-5" />
@@ -134,10 +134,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
         </div>
 
         <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
-          {tab === 'login' ? 'Accedi a CineVicino' : tab === 'register' ? 'Crea il tuo Profilo' : 'Recupero Password'}
+          {tab === 'login' 
+            ? (lang === 'it' ? 'Accedi a CineVicino' : 'Sign in to CineVicino') 
+            : tab === 'register' 
+              ? (lang === 'it' ? 'Crea il tuo Profilo' : 'Create your Profile') 
+              : (lang === 'it' ? 'Recupero Password' : 'Password Recovery')}
         </h2>
         <p className="text-xs text-neutral-400 mt-1 mb-6">
-          Salva i tuoi cinema del cuore, sincronizza i tuoi film e ricevi notifiche sulle novità in sala.
+          {lang === 'it'
+            ? 'Salva i tuoi cinema del cuore, sincronizza i tuoi film e ricevi notifiche sulle novità in sala.'
+            : 'Bookmark favorite cinemas, sync saved movies, and receive updates on new theater releases.'}
         </p>
 
         {/* Tab switch */}
@@ -149,7 +155,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               tab === 'login' ? 'bg-[#D4AF37] text-black font-bold' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Accedi
+            {lang === 'it' ? 'Accedi' : 'Sign In'}
           </button>
           <button
             type="button"
@@ -158,7 +164,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               tab === 'register' ? 'bg-[#D4AF37] text-black font-bold' : 'text-neutral-400 hover:text-white'
             }`}
           >
-            Registrati
+            {lang === 'it' ? 'Registrati' : 'Register'}
           </button>
         </div>
 
@@ -185,7 +191,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="nome@esempio.it"
+                placeholder={lang === 'it' ? 'nome@esempio.it' : 'name@example.com'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -197,7 +203,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Password (min. 6 caratteri)"
+                placeholder={lang === 'it' ? 'Password (min. 6 caratteri)' : 'Password (min. 6 characters)'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-base sm:text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -208,7 +214,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 onClick={() => { setTab('forgot'); setErrorMsg(''); setSuccessMsg(''); }}
                 className="text-xs text-neutral-400 hover:text-[#D4AF37] transition-colors py-1 cursor-pointer"
               >
-                Password dimenticata?
+                {lang === 'it' ? 'Password dimenticata?' : 'Forgot password?'}
               </button>
             </div>
 
@@ -217,7 +223,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               disabled={loading}
               className="w-full min-h-[44px] py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer active:scale-95"
             >
-              {loading ? 'Accesso in corso...' : 'Accedi'}
+              {loading ? (lang === 'it' ? 'Accesso in corso...' : 'Signing in...') : (lang === 'it' ? 'Accedi' : 'Sign In')}
             </button>
           </form>
         )}
@@ -231,7 +237,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="Il tuo nome o nickname"
+                placeholder={lang === 'it' ? 'Il tuo nome o nickname' : 'Your name or nickname'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -243,7 +249,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="nome@esempio.it"
+                placeholder={lang === 'it' ? 'nome@esempio.it' : 'name@example.com'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -255,7 +261,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="Crea password (min. 8 caratteri)"
+                placeholder={lang === 'it' ? 'Crea password (min. 8 caratteri)' : 'Create password (min. 8 characters)'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -265,7 +271,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               disabled={loading}
               className="w-full py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
             >
-              {loading ? 'Creazione in corso...' : 'Registrati Gratuitamente'}
+              {loading ? (lang === 'it' ? 'Creazione in corso...' : 'Creating account...') : (lang === 'it' ? 'Registrati Gratuitamente' : 'Register Free')}
             </button>
           </form>
         )}
@@ -279,7 +285,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="nome@esempio.it"
+                placeholder={lang === 'it' ? 'nome@esempio.it' : 'name@example.com'}
                 className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
               />
             </div>
@@ -289,7 +295,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
               disabled={loading}
               className="w-full py-2.5 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
             >
-              {loading ? 'Invio in corso...' : 'Invia Link di Recupero'}
+              {loading ? (lang === 'it' ? 'Invio in corso...' : 'Sending...') : (lang === 'it' ? 'Invia Link di Recupero' : 'Send Recovery Link')}
             </button>
 
             <div className="pt-2">
@@ -298,7 +304,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ lang, onClose, onLoginSu
                 onClick={() => { setTab('login'); setErrorMsg(''); setSuccessMsg(''); }}
                 className="text-xs text-neutral-400 hover:text-white transition-colors"
               >
-                Torna al Login
+                {lang === 'it' ? 'Torna al Login' : 'Back to Sign In'}
               </button>
             </div>
           </form>

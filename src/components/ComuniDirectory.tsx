@@ -71,24 +71,26 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 hover:bg-white text-neutral-300 hover:text-black border border-white/10 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Torna alla home</span>
+          <span>{lang === 'it' ? 'Torna alla home' : 'Back to home'}</span>
         </button>
 
         <span className="text-xs text-neutral-400 font-mono">
-          Totale Comuni trovati: <strong className="text-[#D4AF37] font-bold">{totalCount}</strong>
+          {lang === 'it' ? 'Totale Comuni trovati:' : 'Total municipalities found:'} <strong className="text-[#D4AF37] font-bold">{totalCount}</strong>
         </span>
       </div>
 
       {/* Directory Title */}
       <div className="mb-8">
         <span className="text-[10px] uppercase font-bold tracking-[0.25em] text-[#D4AF37] block mb-2 font-mono">
-          Elenco Territoriale Nazionale
+          {lang === 'it' ? 'Elenco Territoriale Nazionale' : 'National Territorial Directory'}
         </span>
         <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-tight">
-          Elenco Nazionale Comuni d'Italia (ISTAT 2026)
+          {lang === 'it' ? "Elenco Nazionale Comuni d'Italia (ISTAT 2026)" : "National Directory of Italian Municipalities (ISTAT 2026)"}
         </h1>
         <p className="text-sm text-neutral-400 mt-2 max-w-3xl leading-relaxed">
-          Trova la programmazione cinematografica per qualunque comune d'Italia. Per i comuni privi di sale cinematografiche, calcoliamo automaticamente il cinema più vicino con relativa distanza chilometrica.
+          {lang === 'it'
+            ? "Trova la programmazione cinematografica per qualunque comune d'Italia. Per i comuni privi di sale cinematografiche, calcoliamo automaticamente il cinema più vicino con relativa distanza chilometrica."
+            : "Find movie schedules for any Italian municipality. For towns without local cinemas, we automatically calculate the nearest active theater with driving distance."}
         </p>
       </div>
 
@@ -103,7 +105,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filtra per nome comune, provincia (es. Roma, MI, Napoli, Cortina)..."
+              placeholder={lang === 'it' ? "Filtra per nome comune, provincia (es. Roma, MI, Napoli, Cortina)..." : "Filter by city or province (e.g. Rome, MI, Naples, Cortina)..."}
               className="w-full pl-11 pr-4 py-2.5 bg-black border border-white/20 rounded-full text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-[#D4AF37] transition-colors"
             />
           </div>
@@ -116,7 +118,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
               onChange={e => setOnlyWithCinemas(e.target.checked)}
               className="w-4 h-4 rounded accent-[#D4AF37] text-[#D4AF37] focus:ring-[#D4AF37] bg-black border-white/20"
             />
-            <span className="font-medium">Mostra solo comuni con cinema</span>
+            <span className="font-medium">{lang === 'it' ? 'Mostra solo comuni con cinema' : 'Show only towns with cinemas'}</span>
           </label>
         </div>
 
@@ -124,6 +126,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
         <div className="flex flex-wrap gap-1.5 pt-3 border-t border-white/10">
           {regions.map(r => {
             const isSelected = selectedRegion === r || (selectedRegion === 'all' && r === 'Tutte le Regioni');
+            const displayRegion = r === 'Tutte le Regioni' ? (lang === 'it' ? 'Tutte le Regioni' : 'All Regions') : r;
             return (
               <button
                 key={r}
@@ -134,7 +137,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
                     : 'bg-white/5 text-neutral-400 hover:text-white border border-white/10 hover:border-white/20'
                 }`}
               >
-                {r}
+                {displayRegion}
               </button>
             );
           })}
@@ -144,12 +147,12 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
       {/* Comuni Grid */}
       {loading ? (
         <div className="py-16 text-center text-neutral-500 text-sm">
-          Caricamento comuni italiani dal catalogo ISTAT...
+          {lang === 'it' ? 'Caricamento comuni italiani dal catalogo ISTAT...' : 'Loading Italian municipalities from ISTAT catalog...'}
         </div>
       ) : cities.length === 0 ? (
         <div className="py-16 text-center bg-[#0a0a0a] rounded-3xl border border-white/10 p-8">
           <p className="text-neutral-400 text-sm">
-            Nessun comune trovato con i filtri selezionati.
+            {lang === 'it' ? 'Nessun comune trovato con i filtri selezionati.' : 'No municipalities found with the selected filters.'}
           </p>
           <button
             onClick={() => {
@@ -159,7 +162,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
             }}
             className="mt-4 px-5 py-2 rounded-full bg-white/10 hover:bg-white text-neutral-300 hover:text-black text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
           >
-            Reimposta tutti i filtri
+            {lang === 'it' ? 'Reimposta tutti i filtri' : 'Reset all filters'}
           </button>
         </div>
       ) : (
@@ -186,7 +189,7 @@ export const ComuniDirectory: React.FC<ComuniDirectoryProps> = ({
 
               {(c.cinema_count || 0) > 0 ? (
                 <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 whitespace-nowrap">
-                  {c.cinema_count} cinema
+                  {c.cinema_count} {lang === 'it' ? (c.cinema_count === 1 ? 'cinema' : 'cinema') : (c.cinema_count === 1 ? 'cinema' : 'cinemas')}
                 </span>
               ) : (
                 <ChevronRight className="w-4 h-4 text-neutral-600 group-hover:text-[#D4AF37] group-hover:translate-x-0.5 transition-all" />

@@ -27,12 +27,15 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ lang, onClose, priva
                 {t.privacyPolicy} & GDPR
               </h2>
               <p className="text-xs text-neutral-400">
-                Tutela dei dati, geolocalizzazione locale e trasparenza
+                {lang === 'it' 
+                  ? 'Tutela dei dati, geolocalizzazione locale e trasparenza'
+                  : 'Data protection, local geolocation and transparency'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label={t.close}
             className="p-2 rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -44,36 +47,44 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ lang, onClose, priva
           <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
             <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-bold text-sm">
               <MapPin className="w-4 h-4" />
-              <span>1. Geolocalizzazione Esclusivamente Locale</span>
+              <span>{lang === 'it' ? '1. Geolocalizzazione Esclusivamente Locale' : '1. Strictly Local Geolocation'}</span>
             </div>
             <p className="text-neutral-300 leading-relaxed">
-              Quando fai clic su "Cinema vicino a me", le coordinate GPS fornite dal tuo browser vengono elaborate temporaneamente per calcolare la distanza in linea d'aria dai cinema italiani. Le tue coordinate non vengono salvate, storicizzate né associate ad alcun profilo pubblicitario sui nostri server.
+              {lang === 'it'
+                ? 'Quando fai clic su "Cinema vicino a me", le coordinate GPS fornite dal tuo browser vengono elaborate temporaneamente per calcolare la distanza in linea d\'aria dai cinema italiani. Le tue coordinate non vengono salvate, storicizzate né associate ad alcun profilo pubblicitario sui nostri server.'
+                : 'When you click "Find Nearby", GPS coordinates provided by your browser are processed temporarily to compute distances to Italian movie theaters. Your coordinates are never saved, stored, or linked to any advertising profile on our servers.'}
             </p>
           </div>
 
           <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
             <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-bold text-sm">
               <Database className="w-4 h-4" />
-              <span>2. Attribuzione The Movie Database (TMDb)</span>
+              <span>{lang === 'it' ? '2. Attribuzione The Movie Database (TMDb)' : '2. The Movie Database (TMDb) Attribution'}</span>
             </div>
             <p className="text-neutral-300 leading-relaxed">
-              {t.tmdbAttribution} I metadati relativi a locandine, trame e cast cinematografico sono reperiti per finalità puramente informative e culturali nel rispetto dei termini di servizio di TMDb.
+              {t.tmdbAttribution} {lang === 'it' 
+                ? 'I metadati relativi a locandine, trame e cast cinematografico sono reperiti per finalità puramente informative e culturali nel rispetto dei termini di servizio di TMDb.'
+                : 'Metadata including posters, synopses and movie cast are retrieved for informational and cultural purposes in compliance with TMDb terms of service.'}
             </p>
           </div>
 
           <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
             <div className="flex items-center gap-2 text-[#D4AF37] font-serif font-bold text-sm">
               <Lock className="w-4 h-4" />
-              <span>3. Cookie e Archiviazione Locale</span>
+              <span>{lang === 'it' ? '3. Cookie e Archiviazione Locale' : '3. Cookies & Local Storage'}</span>
             </div>
             <p className="text-neutral-300 leading-relaxed">
-              Utilizziamo esclusivamente <code className="bg-white/10 px-1.5 py-0.5 rounded text-[#D4AF37] font-mono">localStorage</code> per salvare i tuoi cinema e film preferiti sul tuo dispositivo e memorizzare la tua scelta relativa ai cookie. Nessun cookie di terze parti per tracciamento comportamentale o profilazione pubblicitaria viene installato.
+              {lang === 'it'
+                ? <>Utilizziamo esclusivamente <code className="bg-white/10 px-1.5 py-0.5 rounded text-[#D4AF37] font-mono">localStorage</code> per salvare i tuoi cinema e film preferiti sul tuo dispositivo e memorizzare la tua scelta relativa ai cookie. Nessun cookie di terze parti per tracciamento comportamentale o profilazione pubblicitaria viene installato.</>
+                : <>We only use <code className="bg-white/10 px-1.5 py-0.5 rounded text-[#D4AF37] font-mono">localStorage</code> to save your favorite cinemas and movies on your device and remember your cookie preferences. No third-party tracking or behavioral advertising cookies are installed.</>}
             </p>
           </div>
 
           {privacyText && (
             <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/10">
-              <span className="font-bold text-white block mb-1">Dichiarazione personalizzata dall'amministratore:</span>
+              <span className="font-bold text-white block mb-1">
+                {lang === 'it' ? "Dichiarazione personalizzata dall'amministratore:" : "Custom statement from administrator:"}
+              </span>
               <p className="whitespace-pre-line text-neutral-300 leading-relaxed">
                 {privacyText}
               </p>
@@ -87,7 +98,7 @@ export const PrivacyModal: React.FC<PrivacyModalProps> = ({ lang, onClose, priva
             onClick={onClose}
             className="px-6 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
           >
-            Ho capito
+            {lang === 'it' ? 'Ho capito' : 'Understood'}
           </button>
         </div>
       </div>

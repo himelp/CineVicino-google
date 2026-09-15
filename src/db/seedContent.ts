@@ -287,8 +287,8 @@ const INITIAL_MOVIES: Movie[] = [
     title_en: 'Dune: Part Two',
     title_original: 'Dune: Part Two',
     tmdb_id: 693134,
-    poster_url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?q=80&w=1600&auto=format&fit=crop',
+    poster_url: 'https://image.tmdb.org/t/p/w780/nhdQxDCI64rMgypYZpsF7UvbdJA.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/eZ239CUp1d6OryZEBPnO2n87gMG.jpg',
     genres: ['Fantascienza', 'Avventura', 'Azione', 'Dramma'],
     duration_minutes: 166,
     rating: 8.7,
@@ -306,9 +306,9 @@ const INITIAL_MOVIES: Movie[] = [
     title_it: 'Parthenope',
     title_en: 'Parthenope',
     title_original: 'Parthenope',
-    tmdb_id: 1146200,
-    poster_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?q=80&w=1600&auto=format&fit=crop',
+    tmdb_id: 1109255,
+    poster_url: 'https://image.tmdb.org/t/p/w780/1PrYlFquzqEEZOvBYGwnGXB8mti.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/fBUaeRfD2mu6T9vNZ1IR3yhccdP.jpg',
     genres: ['Dramma', 'Fantastico'],
     duration_minutes: 136,
     rating: 7.6,
@@ -326,9 +326,9 @@ const INITIAL_MOVIES: Movie[] = [
     title_it: 'Vermiglio',
     title_en: 'Vermiglio: The Mountain Bride',
     title_original: 'Vermiglio',
-    tmdb_id: 1251398,
-    poster_url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop',
+    tmdb_id: 1151244,
+    poster_url: 'https://image.tmdb.org/t/p/w780/6buo5I8pAEIXIa8r9oPna9viNZ3.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/fYepNPcgAYHQRMNZW95oOykLRgQ.jpg',
     genres: ['Dramma', 'Storico'],
     duration_minutes: 119,
     rating: 8.2,
@@ -347,8 +347,8 @@ const INITIAL_MOVIES: Movie[] = [
     title_en: 'Gladiator II',
     title_original: 'Gladiator II',
     tmdb_id: 558449,
-    poster_url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?q=80&w=1600&auto=format&fit=crop',
+    poster_url: 'https://image.tmdb.org/t/p/w780/tVBCG6qHQQaq2doZsOvpGNcwMuP.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/tOqIwliWMovSIZ9DyvHcHI7p2im.jpg',
     genres: ['Azione', 'Avventura', 'Dramma', 'Storico'],
     duration_minutes: 148,
     rating: 7.9,
@@ -367,8 +367,8 @@ const INITIAL_MOVIES: Movie[] = [
     title_en: 'The Substance',
     title_original: 'The Substance',
     tmdb_id: 933260,
-    poster_url: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1600&auto=format&fit=crop',
+    poster_url: 'https://image.tmdb.org/t/p/w780/cWuloBih4I1Odambw67TQRuPmFl.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/wMEhptvj6pcp2QSzHYcl4DFA5Pz.jpg',
     genres: ['Horror', 'Fantascienza', 'Dramma'],
     duration_minutes: 141,
     rating: 8.1,
@@ -387,8 +387,8 @@ const INITIAL_MOVIES: Movie[] = [
     title_en: 'Anora',
     title_original: 'Anora',
     tmdb_id: 1064213,
-    poster_url: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1600&auto=format&fit=crop',
+    poster_url: 'https://image.tmdb.org/t/p/w780/fjUmU6DEt75a535pSBLUdRAmK6t.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/qvyOfwTC3qdbzkqdXWSSEMHtjBZ.jpg',
     genres: ['Commedia', 'Dramma', 'Romance'],
     duration_minutes: 139,
     rating: 8.3,
@@ -407,8 +407,8 @@ const INITIAL_MOVIES: Movie[] = [
     title_en: 'The Boy and the Heron',
     title_original: 'Kimitachi wa Dō Ikiru ka',
     tmdb_id: 508883,
-    poster_url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1600&auto=format&fit=crop',
+    poster_url: 'https://image.tmdb.org/t/p/w780/p9tHvoXaIUapKWygs1DKKkvVjCY.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/75nSb1fbWooipwcSU5bUttiOriI.jpg',
     genres: ['Animazione', 'Avventura', 'Fantastico'],
     duration_minutes: 124,
     rating: 8.4,
@@ -426,9 +426,9 @@ const INITIAL_MOVIES: Movie[] = [
     title_it: 'C\'è ancora domani',
     title_en: 'There\'s Still Tomorrow',
     title_original: 'C\'è ancora domani',
-    tmdb_id: 1151534,
-    poster_url: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop',
-    backdrop_url: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?q=80&w=1600&auto=format&fit=crop',
+    tmdb_id: 1026227,
+    poster_url: 'https://image.tmdb.org/t/p/w780/hc9SHN0vB6iyr6MBYI6bKrpDHvJ.jpg',
+    backdrop_url: 'https://image.tmdb.org/t/p/w1280/fNXUCk54vGcoKr34olN14ohUSFY.jpg',
     genres: ['Dramma', 'Commedia', 'Storico'],
     duration_minutes: 118,
     rating: 8.8,
@@ -446,7 +446,6 @@ export async function seedContentIfEmpty(): Promise<void> {
   try {
     // 0. Safety cleanup: Purge any legacy synthetic showtimes or synthetic scrape logs
     // generated by prior versions of this bootstrap script.
-    // Real scraper showtime IDs are 'st-' followed by a 24-character hexadecimal hash (no date/time components).
     await executeRawSql(`
       DELETE FROM showtimes 
       WHERE id LIKE 'st-init-%' 
@@ -457,20 +456,173 @@ export async function seedContentIfEmpty(): Promise<void> {
       WHERE id IN ('log-init-1', 'log-init-2')
     `);
 
-    // Purge any corrupted movie entries from prior scraper fallbacks (e.g. Serpentis with Dune poster or template synopsis)
+    // Purge corrupted movie entries from prior scraper fallbacks (executed as individual statements)
     await executeRawSql(`
       DELETE FROM showtimes 
       WHERE movie_id IN (
         SELECT id FROM movies 
         WHERE (slug = 'serpentis' OR title_it ILIKE '%serpentis%')
            OR (synopsis_it ILIKE 'Guarda % nei cinema italiani%' AND slug != 'dune-parte-due')
-           OR (poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' AND slug != 'dune-parte-due')
-      );
+           OR poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
+      )
+    `);
+    await executeRawSql(`
       DELETE FROM movies 
       WHERE (slug = 'serpentis' OR title_it ILIKE '%serpentis%')
          OR (synopsis_it ILIKE 'Guarda % nei cinema italiani%' AND slug != 'dune-parte-due')
-         OR (poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%' AND slug != 'dune-parte-due');
+         OR poster_url LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
     `);
+
+    // 1. One-time correction migration for Dune: Parte Due images
+    // If a movie with slug = 'dune-parte-due' exists and has wrong/placeholder images,
+    // update poster_url and backdrop_url with official TMDb images (using TMDb API if configured, else verified CDN fallback)
+    try {
+      const duneRes = await executeRawSql(`
+        SELECT id, slug, poster_url, backdrop_url, tmdb_id 
+        FROM movies 
+        WHERE slug = 'dune-parte-due' OR id = 'mov-dune-2'
+        LIMIT 1
+      `);
+      if (duneRes.rows && duneRes.rows.length > 0) {
+        const dune = duneRes.rows[0];
+        const isBroken =
+          !dune.poster_url ||
+          dune.poster_url.includes('8b8R8l88Qje9dn9OE8PY05Nxl1X') ||
+          dune.poster_url.includes('unsplash.com') ||
+          !dune.backdrop_url ||
+          dune.backdrop_url.includes('xOMo8BRK7PfcJv9JCnx7s520DRq') ||
+          dune.backdrop_url.includes('unsplash.com') ||
+          dune.backdrop_url.includes('photo-1509198397868');
+
+        if (isBroken) {
+          let posterUrl = 'https://image.tmdb.org/t/p/w780/nhdQxDCI64rMgypYZpsF7UvbdJA.jpg';
+          let backdropUrl = 'https://image.tmdb.org/t/p/w1280/eZ239CUp1d6OryZEBPnO2n87gMG.jpg';
+
+          const tmdbKey = process.env.TMDB_API_KEY;
+          if (tmdbKey) {
+            try {
+              const tmdbRes = await fetch(
+                `https://api.themoviedb.org/3/movie/693134?api_key=${tmdbKey}&language=it-IT`,
+                { signal: AbortSignal.timeout(4000) }
+              );
+              if (tmdbRes.ok) {
+                const tmdbData = await tmdbRes.json();
+                if (tmdbData.poster_path) {
+                  posterUrl = `https://image.tmdb.org/t/p/w780${tmdbData.poster_path}`;
+                }
+                if (tmdbData.backdrop_path) {
+                  backdropUrl = `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}`;
+                }
+              }
+            } catch (e: any) {
+              console.warn('[SeedContent] Live TMDb lookup for Dune 2 skipped, using verified fallback:', e?.message);
+            }
+          }
+
+          await executeRawSql(`
+            UPDATE movies 
+            SET poster_url = $1, backdrop_url = $2, tmdb_id = 693134
+            WHERE id = $3
+          `, [posterUrl, backdropUrl, dune.id]);
+          console.log(`[SeedContent] ✅ Corrected Dune: Parte Due poster and backdrop images to official TMDb assets.`);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SeedContent] Non-blocking Dune image correction note:', e?.message);
+    }
+
+    // 2. Refresh other anchor movies if they still have placeholder Unsplash images or wrong TMDb IDs
+    try {
+      const anchorFixes: Array<{ slug: string; tmdb_id: number; poster: string; backdrop: string }> = [
+        {
+          slug: 'parthenope',
+          tmdb_id: 1109255,
+          poster: 'https://image.tmdb.org/t/p/w780/1PrYlFquzqEEZOvBYGwnGXB8mti.jpg',
+          backdrop: 'https://image.tmdb.org/t/p/w1280/fBUaeRfD2mu6T9vNZ1IR3yhccdP.jpg'
+        },
+        {
+          slug: 'vermiglio',
+          tmdb_id: 1151244,
+          poster: 'https://image.tmdb.org/t/p/w780/6buo5I8pAEIXIa8r9oPna9viNZ3.jpg',
+          backdrop: 'https://image.tmdb.org/t/p/w1280/fYepNPcgAYHQRMNZW95oOykLRgQ.jpg'
+        },
+        {
+          slug: 'il-gladiatore-ii',
+          tmdb_id: 558449,
+          poster: 'https://image.tmdb.org/t/p/w780/tVBCG6qHQQaq2doZsOvpGNcwMuP.jpg',
+          backdrop: 'https://image.tmdb.org/t/p/w1280/tOqIwliWMovSIZ9DyvHcHI7p2im.jpg'
+        },
+        {
+          slug: 'c-e-ancora-domani',
+          tmdb_id: 1026227,
+          poster: 'https://image.tmdb.org/t/p/w780/hc9SHN0vB6iyr6MBYI6bKrpDHvJ.jpg',
+          backdrop: 'https://image.tmdb.org/t/p/w1280/fNXUCk54vGcoKr34olN14ohUSFY.jpg'
+        }
+      ];
+
+      for (const fix of anchorFixes) {
+        await executeRawSql(`
+          UPDATE movies 
+          SET tmdb_id = $1,
+              poster_url = CASE WHEN poster_url LIKE '%unsplash.com%' THEN $2 ELSE poster_url END,
+              backdrop_url = CASE WHEN backdrop_url LIKE '%unsplash.com%' THEN $3 ELSE backdrop_url END
+          WHERE slug = $4
+        `, [fix.tmdb_id, fix.poster, fix.backdrop, fix.slug]);
+      }
+    } catch (e: any) {
+      console.warn('[SeedContent] Anchor movies update note:', e?.message);
+    }
+
+    // 3. Deduplication migration:
+    // Merge and purge duplicate movie entries (e.g. "Un giorno senza donne" scraped under multiple title variants)
+    try {
+      // Find duplicate movies by tmdb_id (when > 0)
+      const dupTmdbRes = await executeRawSql(`
+        SELECT tmdb_id, array_agg(id ORDER BY length(slug) ASC, id ASC) as ids
+        FROM movies
+        WHERE tmdb_id IS NOT NULL AND tmdb_id > 0
+        GROUP BY tmdb_id
+        HAVING COUNT(*) > 1
+      `);
+
+      for (const row of dupTmdbRes.rows || []) {
+        const ids: string[] = row.ids;
+        if (!ids || ids.length < 2) continue;
+        const canonicalId = ids[0];
+        const duplicates = ids.slice(1);
+
+        for (const dupId of duplicates) {
+          await executeRawSql(`UPDATE showtimes SET movie_id = $1 WHERE movie_id = $2`, [canonicalId, dupId]);
+          await executeRawSql(`UPDATE favorites SET item_id = $1 WHERE item_id = $2 AND item_type = 'movie'`, [canonicalId, dupId]).catch(() => {});
+          await executeRawSql(`DELETE FROM movies WHERE id = $1`, [dupId]);
+          console.log(`[SeedContent] 🧹 Merged duplicate movie ${dupId} into canonical movie ${canonicalId} by tmdb_id.`);
+        }
+      }
+
+      // Explicit check for "Un giorno senza donne" variants
+      const donneRes = await executeRawSql(`
+        SELECT id, slug, title_it, tmdb_id 
+        FROM movies 
+        WHERE slug LIKE '%giorno-senza-donne%' 
+           OR title_it ILIKE '%giorno senza donne%' 
+           OR slug LIKE '%day-iceland-stood-still%'
+           OR tmdb_id = 1181125
+        ORDER BY (slug = 'un-giorno-senza-donne') DESC, length(slug) ASC
+      `);
+
+      if (donneRes.rows && donneRes.rows.length > 1) {
+        const canonicalId = donneRes.rows[0].id;
+        for (let i = 1; i < donneRes.rows.length; i++) {
+          const dupId = donneRes.rows[i].id;
+          await executeRawSql(`UPDATE showtimes SET movie_id = $1 WHERE movie_id = $2`, [canonicalId, dupId]);
+          await executeRawSql(`UPDATE favorites SET item_id = $1 WHERE item_id = $2 AND item_type = 'movie'`, [canonicalId, dupId]).catch(() => {});
+          await executeRawSql(`DELETE FROM movies WHERE id = $1`, [dupId]);
+          console.log(`[SeedContent] 🧹 Removed duplicate "Un giorno senza donne" entry ${dupId}, remapped showtimes to ${canonicalId}.`);
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SeedContent] Deduplication migration note:', e?.message);
+    }
 
     const cinemaCountRes = await executeRawSql('SELECT COUNT(*) as cnt FROM cinemas');
     const cinemaCount = parseInt(cinemaCountRes.rows[0]?.cnt || '0', 10);

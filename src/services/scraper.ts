@@ -242,12 +242,54 @@ export function determineTicketSource(
   return 'other';
 }
 
-// Map known TMDb official posters for verified accuracy on blockbuster anchors
+// Verified official TMDb CDN fallback assets for anchor titles
+const VERIFIED_FALLBACK_IMAGES: Record<number, { poster: string; backdrop: string }> = {
+  693134: { // Dune: Parte Due
+    poster: 'https://image.tmdb.org/t/p/w780/nhdQxDCI64rMgypYZpsF7UvbdJA.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/eZ239CUp1d6OryZEBPnO2n87gMG.jpg'
+  },
+  1109255: { // Parthenope
+    poster: 'https://image.tmdb.org/t/p/w780/1PrYlFquzqEEZOvBYGwnGXB8mti.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/fBUaeRfD2mu6T9vNZ1IR3yhccdP.jpg'
+  },
+  1151244: { // Vermiglio
+    poster: 'https://image.tmdb.org/t/p/w780/6buo5I8pAEIXIa8r9oPna9viNZ3.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/fYepNPcgAYHQRMNZW95oOykLRgQ.jpg'
+  },
+  558449: { // Il Gladiatore II
+    poster: 'https://image.tmdb.org/t/p/w780/tVBCG6qHQQaq2doZsOvpGNcwMuP.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/tOqIwliWMovSIZ9DyvHcHI7p2im.jpg'
+  },
+  872585: { // Oppenheimer
+    poster: 'https://image.tmdb.org/t/p/w780/fRtaxfyynWMJI6DhejyA6JOzVTB.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/7CENyUim29IEsaJhUxIGymCRvPu.jpg'
+  },
+  1026227: { // C'è ancora domani
+    poster: 'https://image.tmdb.org/t/p/w780/hc9SHN0vB6iyr6MBYI6bKrpDHvJ.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/fNXUCk54vGcoKr34olN14ohUSFY.jpg'
+  },
+  974576: { // Conclave
+    poster: 'https://image.tmdb.org/t/p/w780/ic4EM9yv6CP8lfPXcNlKTuxTT6X.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/eZzNdjNDvaSoyywy9ICg2UmFwul.jpg'
+  },
+  402431: { // Wicked
+    poster: 'https://image.tmdb.org/t/p/w780/4CiqbnZVIntQO2ujgfXkZauwfyA.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/w22GVYotTIVC1dUd58mRhwPqiS.jpg'
+  },
+  1181125: { // Un giorno senza donne
+    poster: 'https://image.tmdb.org/t/p/w780/rqqV4QZxYSuCY045OH8Ell8Ybez.jpg',
+    backdrop: 'https://image.tmdb.org/t/p/w1280/2rcFEp1DL6wcLdeKRgtxBcgNR2Y.jpg'
+  }
+};
+
+// Map known TMDb official metadata for verified accuracy on blockbuster anchors.
+// Image fields are intentionally omitted or optional so that they resolve dynamically
+// via live TMDb API (or the verified TMDb CDN fallback map).
 const KNOWN_TMDB_POSTERS: Record<
   string,
   {
-    poster: string;
-    backdrop: string;
+    poster?: string;
+    backdrop?: string;
     tmdb_id: number;
     title_it?: string;
     title_en?: string;
@@ -260,8 +302,6 @@ const KNOWN_TMDB_POSTERS: Record<
   }
 > = {
   'dune-parte-due': {
-    poster: 'https://image.tmdb.org/t/p/w780/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s520DRq.jpg',
     tmdb_id: 693134,
     title_it: 'Dune: Parte Due',
     title_en: 'Dune: Part Two',
@@ -273,9 +313,7 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 166
   },
   'parthenope': {
-    poster: 'https://image.tmdb.org/t/p/w780/1F5BPNbhxaWAA83YTnPjcswt7Nc.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/3V4kLQg0kSqPLctI5ziAhOWiT4T.jpg',
-    tmdb_id: 1146200,
+    tmdb_id: 1109255,
     title_it: 'Parthenope',
     title_en: 'Parthenope',
     title_original: 'Parthenope',
@@ -286,9 +324,7 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 136
   },
   'vermiglio': {
-    poster: 'https://image.tmdb.org/t/p/w780/qVZ8aoYtUDSi91DR0d54XhQVbgQ.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/lG7yV10N4E7k6Xn2kG8l9U7kQ5n.jpg',
-    tmdb_id: 1251398,
+    tmdb_id: 1151244,
     title_it: 'Vermiglio',
     title_en: 'Vermiglio: The Mountain Bride',
     title_original: 'Vermiglio',
@@ -299,8 +335,6 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 119
   },
   'il-gladiatore-ii': {
-    poster: 'https://image.tmdb.org/t/p/w780/2cxhvwyEwRlysAmRH4iodkvo0z5.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/euYIwmqkmz95mnXvufEmbL69ovr.jpg',
     tmdb_id: 558449,
     title_it: 'Il Gladiatore II',
     title_en: 'Gladiator II',
@@ -312,8 +346,6 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 148
   },
   'oppenheimer': {
-    poster: 'https://image.tmdb.org/t/p/w780/ptpr0kGAckfQkJeJIt8st5dglvd.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
     tmdb_id: 872585,
     title_it: 'Oppenheimer',
     title_en: 'Oppenheimer',
@@ -325,9 +357,7 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 180
   },
   'c-e-ancora-domani': {
-    poster: 'https://image.tmdb.org/t/p/w780/rDzig50dj7VpLwJ7SThbamETK1G.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/o3r5yO4pnd6P725nff4QyK1z73T.jpg',
-    tmdb_id: 1154598,
+    tmdb_id: 1026227,
     title_it: 'C\'è ancora domani',
     title_en: 'There\'s Still Tomorrow',
     title_original: 'C\'è ancora domani',
@@ -338,9 +368,7 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 118
   },
   'conclave': {
-    poster: 'https://image.tmdb.org/t/p/w780/pj1ROuB1AKJCpKV6nD7yt1vKfXy.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/m5x83w114AcLVlos43NG8j4q5i9.jpg',
-    tmdb_id: 974950,
+    tmdb_id: 974576,
     title_it: 'Conclave',
     title_en: 'Conclave',
     title_original: 'Conclave',
@@ -351,8 +379,6 @@ const KNOWN_TMDB_POSTERS: Record<
     duration: 120
   },
   'wicked': {
-    poster: 'https://image.tmdb.org/t/p/w780/tlwzOOCxcxtE7bXGvs3QlpmM5C0.jpg',
-    backdrop: 'https://image.tmdb.org/t/p/w1280/uKb22E5wvUXXPY8AyE0jQ7xQz8w.jpg',
     tmdb_id: 402431,
     title_it: 'Wicked',
     title_en: 'Wicked',
@@ -362,8 +388,49 @@ const KNOWN_TMDB_POSTERS: Record<
     director: 'Jon M. Chu',
     genres: ['Musical', 'Fantasy'],
     duration: 160
+  },
+  'un-giorno-senza-donne': {
+    tmdb_id: 1181125,
+    title_it: 'Un giorno senza donne',
+    title_en: 'The Day Iceland Stood Still',
+    title_original: 'The Day Iceland Stood Still',
+    synopsis_it: 'Il 24 ottobre 1975, il 90% delle donne islandesi decise di scioperare, paralizzando l\'intero paese e inaugurando una nuova era di parità di genere.',
+    synopsis_en: 'On October 24, 1975, 90% of Iceland\'s women went on strike, bringing the country to a standstill and igniting a movement toward true gender equality.',
+    director: 'Pamela Hogan',
+    genres: ['Documentario', 'Storico'],
+    duration: 84
   }
 };
+
+/**
+ * Clean up scraped movie titles to avoid duplicate records caused by projection tags,
+ * sound formats, or language markers (e.g. "V.O.S.", "3D", "Evento").
+ */
+export function cleanScrapedMovieTitle(rawTitle: string): { cleanTitle: string; detectedFormat: string; isVo: boolean } {
+  let t = (rawTitle || '').trim();
+  let isVo = false;
+  let detectedFormat = '2D';
+
+  if (/\b(v\.o\.s\.|v\.o\.s|vose|v\.o\.|v\.o|vo|versione originale sottotitolata|versione originale)\b/i.test(t)) {
+    isVo = true;
+  }
+  if (/\b(3d)\b/i.test(t)) {
+    detectedFormat = '3D';
+  } else if (/\b(4k|imax|isense|atmos)\b/i.test(t)) {
+    detectedFormat = '2D';
+  }
+
+  t = t
+    .replace(/\s*[\(\[](v\.?o\.?s\.?e?|v\.?o\.?|versione originale( sottotitolata)?|original version|sub\w*)[\)\]]/gi, '')
+    .replace(/\s*[\(\[](3d|2d|4k|imax|isense|atmos|dolby)[\)\]]/gi, '')
+    .replace(/\s*[\(\[](evento|live|anteprima|restauro|versione restaurata)[\)\]]/gi, '')
+    .replace(/\s*-\s*(v\.?o\.?s\.?e?|v\.?o\.?|versione originale|evento|3d|4k)\b.*$/gi, '')
+    .replace(/\s+\b(3d|4k|imax|isense|v\.?o\.?s\.?)\s*$/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return { cleanTitle: t.length > 1 ? t : rawTitle.trim(), detectedFormat, isVo };
+}
 
 export class NationwideCinemaScraper {
   private userAgent =
@@ -899,8 +966,8 @@ export class NationwideCinemaScraper {
     }
 
     // 1. Check known verified TMDb mappings for curated blockbuster accuracy
-    if (KNOWN_TMDB_POSTERS[normalizedSlug]) {
-      const known = KNOWN_TMDB_POSTERS[normalizedSlug];
+    const known = KNOWN_TMDB_POSTERS[normalizedSlug];
+    if (known && known.poster && known.backdrop) {
       const res = {
         poster_url: known.poster,
         backdrop_url: known.backdrop,
@@ -910,7 +977,7 @@ export class NationwideCinemaScraper {
         title_original: known.title_original || title,
         synopsis_it: known.synopsis_it || `Guarda ${title} nei cinema italiani.`,
         synopsis_en: known.synopsis_en || '',
-        director: known.director || 'Denis Villeneuve',
+        director: known.director || '',
         genres: known.genres || ['Cinema', 'Nuova Uscita'],
         duration: known.duration || 135,
         rating: 8.4,
@@ -923,117 +990,132 @@ export class NationwideCinemaScraper {
 
     const tmdbKey = process.env.TMDB_API_KEY;
 
-    // 2. If TMDB_API_KEY is available, perform real search + full details & credits lookup
+    // 2. If TMDB_API_KEY is available, perform direct ID lookup for known anchor titles or search for other movies
     if (tmdbKey) {
       try {
-        const queryUrl = `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(title)}&api_key=${tmdbKey}&language=it-IT`;
-        const searchRes = await fetch(queryUrl, { signal: AbortSignal.timeout(4000) });
-        if (searchRes.ok) {
-          const searchData = await searchRes.json();
-          if (searchData.results && searchData.results.length > 0) {
-            const first = searchData.results[0];
-            const tmdbId = first.id;
+        let tmdbId: number | null = known?.tmdb_id || null;
+        let firstResult: any = null;
 
-            // Make Italian call for runtime, director, genres, cast and Italian overview
-            try {
-              const detailUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?append_to_response=credits&api_key=${tmdbKey}&language=it-IT`;
-              const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4000) });
-              if (detailRes.ok) {
-                const detailData = await detailRes.json();
-
-                // Real director from credits.crew
-                const realDirector =
-                  detailData.credits?.crew?.find((c: any) => c.job === 'Director')?.name || 'Regista';
-
-                // Real genres
-                const realGenres =
-                  detailData.genres && detailData.genres.length > 0
-                    ? detailData.genres.map((g: any) => g.name)
-                    : ['Cinema', 'In Programmazione'];
-
-                // Real duration (runtime in minutes)
-                const realDuration =
-                  detailData.runtime && detailData.runtime > 0 ? detailData.runtime : 115;
-
-                // Real cast (top 5 billing actors)
-                const realCast =
-                  detailData.credits?.cast && detailData.credits.cast.length > 0
-                    ? detailData.credits.cast.slice(0, 5).map((c: any) => c.name)
-                    : ['Cast Ufficiale'];
-
-                const realYear = detailData.release_date
-                  ? new Date(detailData.release_date).getFullYear()
-                  : new Date().getFullYear();
-
-                const posterPath = detailData.poster_path || first.poster_path;
-                const backdropPath = detailData.backdrop_path || first.backdrop_path;
-
-                // Make second lightweight TMDb detail call with language=en-US to fetch real English metadata
-                let title_en = detailData.title || title;
-                let synopsis_en = '';
-                try {
-                  const enUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}&language=en-US`;
-                  const enRes = await fetch(enUrl, { signal: AbortSignal.timeout(3000) });
-                  if (enRes.ok) {
-                    const enData = await enRes.json();
-                    if (enData.title && typeof enData.title === 'string' && enData.title.trim()) {
-                      title_en = enData.title.trim();
-                    }
-                    if (enData.overview && typeof enData.overview === 'string' && enData.overview.trim()) {
-                      synopsis_en = enData.overview.trim();
-                    }
-                  }
-                } catch (enErr: any) {
-                  // Keep synopsis_en empty if English fetch fails; do not fabricate
-                }
-
-                const result = {
-                  poster_url: posterPath
-                    ? `https://image.tmdb.org/t/p/w780${posterPath}`
-                    : '',
-                  backdrop_url: backdropPath
-                    ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
-                    : '',
-                  tmdb_id: tmdbId,
-                  title_it: detailData.title || title,
-                  title_en: title_en,
-                  title_original: detailData.original_title || title,
-                  synopsis_it: detailData.overview || first.overview || '',
-                  synopsis_en: synopsis_en,
-                  director: realDirector,
-                  genres: realGenres,
-                  duration: realDuration,
-                  rating: detailData.vote_average ? Number(detailData.vote_average.toFixed(1)) : 7.5,
-                  cast: realCast,
-                  release_year: realYear
-                };
-                this.tmdbCache.set(normalizedSlug, result);
-                return result;
-              }
-            } catch (detailErr: any) {
-              console.warn(`TMDb detail fetch failed for id ${tmdbId}:`, detailErr.message);
+        if (!tmdbId) {
+          const queryUrl = `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(title)}&api_key=${tmdbKey}&language=it-IT`;
+          const searchRes = await fetch(queryUrl, { signal: AbortSignal.timeout(4000) });
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (searchData.results && searchData.results.length > 0) {
+              firstResult = searchData.results[0];
+              tmdbId = firstResult.id;
             }
+          }
+        }
 
-            // Fallback from search result if detail call fails
+        if (tmdbId) {
+          // Make Italian call for runtime, director, genres, cast and Italian overview
+          try {
+            const detailUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?append_to_response=credits&api_key=${tmdbKey}&language=it-IT`;
+            const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(4000) });
+            if (detailRes.ok) {
+              const detailData = await detailRes.json();
+
+              // Real director from credits.crew
+              const realDirector =
+                detailData.credits?.crew?.find((c: any) => c.job === 'Director')?.name || known?.director || 'Regista';
+
+              // Real genres
+              const realGenres =
+                detailData.genres && detailData.genres.length > 0
+                  ? detailData.genres.map((g: any) => g.name)
+                  : known?.genres || ['Cinema', 'In Programmazione'];
+
+              // Real duration (runtime in minutes)
+              const realDuration =
+                detailData.runtime && detailData.runtime > 0
+                  ? detailData.runtime
+                  : known?.duration || 115;
+
+              // Real cast (top 5 billing actors)
+              const realCast =
+                detailData.credits?.cast && detailData.credits.cast.length > 0
+                  ? detailData.credits.cast.slice(0, 5).map((c: any) => c.name)
+                  : ['Cast Ufficiale'];
+
+              const realYear = detailData.release_date
+                ? new Date(detailData.release_date).getFullYear()
+                : new Date().getFullYear();
+
+              const verifiedImgs = VERIFIED_FALLBACK_IMAGES[tmdbId];
+              const posterPath = detailData.poster_path || firstResult?.poster_path;
+              const backdropPath = detailData.backdrop_path || firstResult?.backdrop_path;
+
+              const finalPosterUrl = posterPath
+                ? `https://image.tmdb.org/t/p/w780${posterPath}`
+                : verifiedImgs?.poster || '';
+              const finalBackdropUrl = backdropPath
+                ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
+                : verifiedImgs?.backdrop || '';
+
+              // Make second lightweight TMDb detail call with language=en-US to fetch real English metadata
+              let title_en = detailData.title || known?.title_en || title;
+              let synopsis_en = known?.synopsis_en || '';
+              try {
+                const enUrl = `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${tmdbKey}&language=en-US`;
+                const enRes = await fetch(enUrl, { signal: AbortSignal.timeout(3000) });
+                if (enRes.ok) {
+                  const enData = await enRes.json();
+                  if (enData.title && typeof enData.title === 'string' && enData.title.trim()) {
+                    title_en = enData.title.trim();
+                  }
+                  if (enData.overview && typeof enData.overview === 'string' && enData.overview.trim()) {
+                    synopsis_en = enData.overview.trim();
+                  }
+                }
+              } catch (enErr: any) {
+                // Keep synopsis_en from known or empty if English fetch fails
+              }
+
+              const result = {
+                poster_url: finalPosterUrl,
+                backdrop_url: finalBackdropUrl,
+                tmdb_id: tmdbId,
+                title_it: detailData.title || known?.title_it || title,
+                title_en: title_en,
+                title_original: detailData.original_title || known?.title_original || title,
+                synopsis_it: detailData.overview || known?.synopsis_it || firstResult?.overview || '',
+                synopsis_en: synopsis_en,
+                director: realDirector,
+                genres: realGenres,
+                duration: realDuration,
+                rating: detailData.vote_average ? Number(detailData.vote_average.toFixed(1)) : 7.5,
+                cast: realCast,
+                release_year: realYear
+              };
+              this.tmdbCache.set(normalizedSlug, result);
+              return result;
+            }
+          } catch (detailErr: any) {
+            console.warn(`TMDb detail fetch failed for id ${tmdbId}:`, detailErr.message);
+          }
+
+          // Fallback from search result if detail call fails
+          if (firstResult) {
             const result = {
-              poster_url: first.poster_path
-                ? `https://image.tmdb.org/t/p/w780${first.poster_path}`
+              poster_url: firstResult.poster_path
+                ? `https://image.tmdb.org/t/p/w780${firstResult.poster_path}`
                 : '',
-              backdrop_url: first.backdrop_path
-                ? `https://image.tmdb.org/t/p/w1280${first.backdrop_path}`
+              backdrop_url: firstResult.backdrop_path
+                ? `https://image.tmdb.org/t/p/w1280${firstResult.backdrop_path}`
                 : '',
-              tmdb_id: first.id,
-              title_it: first.title || title,
-              title_en: first.title || title,
-              title_original: first.original_title || title,
-              synopsis_it: first.overview || '',
+              tmdb_id: firstResult.id,
+              title_it: firstResult.title || title,
+              title_en: firstResult.title || title,
+              title_original: firstResult.original_title || title,
+              synopsis_it: firstResult.overview || '',
               synopsis_en: '',
               director: '',
               genres: ['Cinema', 'Nuova Uscita'],
               duration: 115,
-              rating: first.vote_average ? Number(first.vote_average.toFixed(1)) : 7.5,
+              rating: firstResult.vote_average ? Number(firstResult.vote_average.toFixed(1)) : 7.5,
               cast: [],
-              release_year: first.release_date ? new Date(first.release_date).getFullYear() : new Date().getFullYear()
+              release_year: firstResult.release_date ? new Date(firstResult.release_date).getFullYear() : new Date().getFullYear()
             };
             this.tmdbCache.set(normalizedSlug, result);
             return result;
@@ -1044,7 +1126,31 @@ export class NationwideCinemaScraper {
       }
     }
 
-    // 3. Fallback when TMDb returns no match
+    // 3. Fallback when TMDb API is unavailable or returns no match:
+    // If this is a known anchor movie, use verified CDN assets and metadata
+    if (known && known.tmdb_id && VERIFIED_FALLBACK_IMAGES[known.tmdb_id]) {
+      const vImgs = VERIFIED_FALLBACK_IMAGES[known.tmdb_id];
+      const result = {
+        poster_url: vImgs.poster,
+        backdrop_url: vImgs.backdrop,
+        tmdb_id: known.tmdb_id,
+        title_it: known.title_it || title,
+        title_en: known.title_en || title,
+        title_original: known.title_original || title,
+        synopsis_it: known.synopsis_it || '',
+        synopsis_en: known.synopsis_en || '',
+        director: known.director || '',
+        genres: known.genres || ['Cinema', 'Nuova Uscita'],
+        duration: known.duration || 120,
+        rating: 8.2,
+        cast: [],
+        release_year: 2024
+      };
+      this.tmdbCache.set(normalizedSlug, result);
+      return result;
+    }
+
+    // 4. Fallback when TMDb returns no match
     const fallback = {
       poster_url: '',
       backdrop_url: '',
@@ -1614,20 +1720,53 @@ export class NationwideCinemaScraper {
       const uniqueTitles: string[] = [];
       for (const s of schedules) {
         const titleTrimmed = s.title.trim();
-        const lower = titleTrimmed.toLowerCase();
-        if (!movieMap.has(lower)) {
-          movieMap.set(lower, '');
-          uniqueTitles.push(titleTrimmed);
+        const { cleanTitle } = cleanScrapedMovieTitle(titleTrimmed);
+        const lowerRaw = titleTrimmed.toLowerCase();
+        const lowerClean = cleanTitle.toLowerCase();
+        if (!movieMap.has(lowerRaw) && !movieMap.has(lowerClean)) {
+          movieMap.set(lowerRaw, '');
+          movieMap.set(lowerClean, '');
+          uniqueTitles.push(cleanTitle);
         }
       }
 
       // Process and upsert movies for this cinema
       for (const title of uniqueTitles) {
-        const movieSlug = slugify(title).slice(0, 50);
-        const movieId = `mov-${movieSlug}`;
+        const { cleanTitle } = cleanScrapedMovieTitle(title);
+        const movieSlug = slugify(cleanTitle).slice(0, 50);
+        const defaultMovieId = `mov-${movieSlug}`;
 
         // Enrich with TMDb (cached in memory to avoid duplicate requests)
-        const enriched = await this.enrichMovieWithTmdb(title, movieSlug);
+        const enriched = await this.enrichMovieWithTmdb(cleanTitle, movieSlug);
+
+        // Before inserting, look up if movie already exists by tmdb_id, slug, or clean title
+        let existingId: string | null = null;
+        let existingSlug: string | null = null;
+
+        if (enriched.tmdb_id) {
+          const tmdbMatch = await executeRawSql(
+            `SELECT id, slug FROM movies WHERE tmdb_id = $1 LIMIT 1`,
+            [enriched.tmdb_id]
+          );
+          if (tmdbMatch.rows && tmdbMatch.rows.length > 0) {
+            existingId = tmdbMatch.rows[0].id;
+            existingSlug = tmdbMatch.rows[0].slug;
+          }
+        }
+
+        if (!existingId) {
+          const slugMatch = await executeRawSql(
+            `SELECT id, slug FROM movies WHERE slug = $1 OR LOWER(title_it) = LOWER($2) LIMIT 1`,
+            [movieSlug, cleanTitle]
+          );
+          if (slugMatch.rows && slugMatch.rows.length > 0) {
+            existingId = slugMatch.rows[0].id;
+            existingSlug = slugMatch.rows[0].slug;
+          }
+        }
+
+        const targetMovieId = existingId || defaultMovieId;
+        const targetSlug = existingSlug || movieSlug;
 
         const movieUpsertRes = await executeRawSql(
           `INSERT INTO movies (id, slug, title_it, title_en, title_original, tmdb_id, poster_url, backdrop_url, genres, duration_minutes, rating, synopsis_it, synopsis_en, release_year, director, "cast", age_rating, is_featured)
@@ -1646,11 +1785,11 @@ export class NationwideCinemaScraper {
                synopsis_en = CASE WHEN length(EXCLUDED.synopsis_en) > 0 THEN EXCLUDED.synopsis_en ELSE movies.synopsis_en END
            RETURNING id, (xmax = 0) AS is_inserted`,
           [
-            movieId,
-            movieSlug,
-            enriched.title_it || title,
-            enriched.title_en || title,
-            enriched.title_original || title,
+            targetMovieId,
+            targetSlug,
+            enriched.title_it || cleanTitle,
+            enriched.title_en || cleanTitle,
+            enriched.title_original || cleanTitle,
             enriched.tmdb_id,
             enriched.poster_url,
             enriched.backdrop_url,
@@ -1674,7 +1813,7 @@ export class NationwideCinemaScraper {
           !/^Guarda .* nelle sale/i.test(enriched.synopsis_it) &&
           enriched.poster_url &&
           enriched.poster_url.trim().length > 0 &&
-          (enriched.poster_url.indexOf('8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg') === -1 || movieSlug === 'dune-parte-due') &&
+          enriched.poster_url.indexOf('8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg') === -1 &&
           Array.isArray(enriched.cast) &&
           enriched.cast.length > 0 &&
           !enriched.cast.includes('Cast Ufficiale') &&
@@ -1682,11 +1821,12 @@ export class NationwideCinemaScraper {
         );
 
         if (!isMetadataComplete) {
-          console.log(`[scraper] Movie "${title}" is pending enrichment (incomplete metadata) — held back from public listings.`);
+          console.log(`[scraper] Movie "${cleanTitle}" is pending enrichment (incomplete metadata) — held back from public listings.`);
         }
 
-        const actualMovieId = movieUpsertRes.rows[0]?.id || movieId;
+        const actualMovieId = movieUpsertRes.rows[0]?.id || targetMovieId;
         movieMap.set(title.toLowerCase(), actualMovieId);
+        movieMap.set(cleanTitle.toLowerCase(), actualMovieId);
         if (movieUpsertRes.rows && movieUpsertRes.rows[0]?.is_inserted) {
           moviesTouched++;
         }
@@ -1707,7 +1847,11 @@ export class NationwideCinemaScraper {
 
       const showtimeBatchRows: ShowtimeBatchRow[] = [];
       for (const sched of schedules) {
-        const actualMovieId = movieMap.get(sched.title.trim().toLowerCase()) || `mov-${slugify(sched.title).slice(0, 50)}`;
+        const { cleanTitle: schedClean, isVo: schedIsVo, detectedFormat: schedFormat } = cleanScrapedMovieTitle(sched.title);
+        const actualMovieId =
+          movieMap.get(sched.title.trim().toLowerCase()) ||
+          movieMap.get(schedClean.toLowerCase()) ||
+          `mov-${slugify(schedClean).slice(0, 50)}`;
         for (let i = 0; i < sched.showtimes.length; i++) {
           const time = sched.showtimes[i];
           const timeClean = time.replace(/[^0-9:]/g, '');
@@ -1731,8 +1875,8 @@ export class NationwideCinemaScraper {
             cinemaId,
             showDate: sched.date,
             time: timeClean,
-            format: showtimeDetail?.format || '2D',
-            language: 'IT',
+            format: showtimeDetail?.format || schedFormat || '2D',
+            language: schedIsVo ? 'VO' : 'IT',
             ticketUrl: finalTicketUrl,
             ticketSource: finalTicketSource
           });

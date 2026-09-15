@@ -72,17 +72,19 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-serif font-bold text-white">
-                {t.favorites} & Avvisi
+                {t.favorites} & {lang === 'it' ? 'Avvisi' : 'Alerts'}
               </h2>
               <p className="text-xs text-neutral-400">
-                I tuoi cinema e film salvati per un accesso immediato
+                {lang === 'it' 
+                  ? 'I tuoi cinema e film salvati per un accesso immediato'
+                  : 'Your saved cinemas and movies for instant access'}
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            aria-label="Chiudi"
+            aria-label={t.close}
             className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-white/5 hover:bg-white text-neutral-400 hover:text-black transition-colors cursor-pointer active:scale-95 shrink-0"
           >
             <X className="w-5 h-5" />
@@ -96,12 +98,14 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] mb-3 flex items-center gap-2">
               <MapPin className="w-3.5 h-3.5" />
-              <span>Cinema Preferiti ({favoriteCinemas.length})</span>
+              <span>{lang === 'it' ? 'Cinema Preferiti' : 'Favorite Cinemas'} ({favoriteCinemas.length})</span>
             </h3>
 
             {favoriteCinemas.length === 0 ? (
               <p className="text-xs text-neutral-500 py-3 italic">
-                Nessun cinema salvato. Fai clic sull'icona segnalibro accanto a una sala per aggiungerla qui.
+                {lang === 'it' 
+                  ? "Nessun cinema salvato. Fai clic sull'icona segnalibro accanto a una sala per aggiungerla qui."
+                  : 'No saved cinemas. Click the bookmark icon next to a theater to add it here.'}
               </p>
             ) : (
               <div className="space-y-2">
@@ -135,8 +139,8 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                     <button
                       onClick={() => onRemoveFavoriteCinema(c.id)}
                       className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-rose-400 transition-colors shrink-0 active:scale-95 cursor-pointer"
-                      title="Rimuovi dai preferiti"
-                      aria-label="Rimuovi cinema dai preferiti"
+                      title={t.removeFromFavorites}
+                      aria-label={t.removeFromFavorites}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -150,12 +154,14 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
           <div className="pt-6">
             <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#D4AF37] mb-3 flex items-center gap-2">
               <Film className="w-3.5 h-3.5" />
-              <span>Film Salvati ({favoriteMovies.length})</span>
+              <span>{lang === 'it' ? 'Film Salvati' : 'Saved Movies'} ({favoriteMovies.length})</span>
             </h3>
 
             {favoriteMovies.length === 0 ? (
               <p className="text-xs text-neutral-500 py-3 italic">
-                Nessun film salvato. Fai clic sul cuore/segnalibro su una scheda film per ritrovarlo qui.
+                {lang === 'it'
+                  ? 'Nessun film salvato. Fai clic sul cuore/segnalibro su una scheda film per ritrovarlo qui.'
+                  : 'No saved movies. Click the bookmark icon on a movie card to find it here.'}
               </p>
             ) : (
               <div className="space-y-2">
@@ -190,8 +196,8 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                     <button
                       onClick={() => onRemoveFavoriteMovie(m.id)}
                       className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-500 hover:text-rose-400 transition-colors shrink-0 active:scale-95 cursor-pointer"
-                      title="Rimuovi dai preferiti"
-                      aria-label="Rimuovi film dai preferiti"
+                      title={t.removeFromFavorites}
+                      aria-label={t.removeFromFavorites}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -207,7 +213,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
               <div className="flex items-center gap-2 mb-1.5">
                 <Bell className="w-4 h-4 text-[#D4AF37]" />
                 <span className="font-serif font-bold text-sm text-white">
-                  {t.emailAlerts} {activeCity ? `per ${activeCity.name}` : 'nel tuo comune'}
+                  {t.emailAlerts} {activeCity ? (lang === 'it' ? `per ${activeCity.name}` : `for ${activeCity.name}`) : (lang === 'it' ? 'nel tuo comune' : 'in your city')}
                 </span>
               </div>
               <p className="text-xs text-neutral-400 leading-relaxed mb-4">
@@ -234,7 +240,7 @@ export const FavoritesModal: React.FC<FavoritesModalProps> = ({
                     disabled={alertLoading}
                     className="min-h-[44px] px-5 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black font-bold uppercase tracking-wider text-xs transition-colors disabled:opacity-50 cursor-pointer active:scale-95 shrink-0"
                   >
-                    {alertLoading ? 'Invio...' : t.subscribe}
+                    {alertLoading ? (lang === 'it' ? 'Invio...' : 'Subscribing...') : t.subscribe}
                   </button>
                 </form>
               )}

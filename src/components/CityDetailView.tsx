@@ -40,8 +40,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
 
   const handleShareCity = async () => {
     const shareUrl = `${window.location.origin}/citta/${city.slug}`;
-    const shareTitle = `Cinema a ${city.name} (${city.province_code}) — CineVicino`;
-    const shareText = `Programmazione sale e orari film a ${city.name} su CineVicino`;
+    const shareTitle = lang === 'it' 
+      ? `Cinema a ${city.name} (${city.province_code}) — CineVicino`
+      : `Cinemas in ${city.name} (${city.province_code}) — CineVicino`;
+    const shareText = lang === 'it'
+      ? `Programmazione sale e orari film a ${city.name} su CineVicino`
+      : `Movie showtimes and theater schedules for ${city.name} on CineVicino`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -62,8 +66,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
   const handleShareCinema = async (c: Cinema) => {
     const slug = c.slug || c.id.replace(/^cin-/, '');
     const shareUrl = `${window.location.origin}/cinema/${slug}`;
-    const shareTitle = `${c.name} (${city.name}) — CineVicino`;
-    const shareText = `Programmazione e orari film per ${c.name} su CineVicino`;
+    const shareTitle = lang === 'it'
+      ? `${c.name} (${city.name}) — CineVicino`
+      : `${c.name} (${city.name}) — CineVicino`;
+    const shareText = lang === 'it'
+      ? `Programmazione e orari film per ${c.name} su CineVicino`
+      : `Showtimes and film schedule for ${c.name} on CineVicino`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -129,7 +137,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/10 text-xs font-medium transition-colors cursor-pointer active:scale-95"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Torna alla ricerca</span>
+          <span>{lang === 'it' ? 'Torna alla ricerca' : 'Back to search'}</span>
         </button>
         <span className="text-neutral-700">/</span>
         <span className="text-xs text-neutral-400 font-medium">
@@ -137,7 +145,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
         </span>
         <span className="text-neutral-700">/</span>
         <span className="text-xs text-neutral-400 font-medium">
-          Provincia di {city.province} ({city.province_code})
+          {lang === 'it' ? `Provincia di ${city.province}` : `Province of ${city.province}`} ({city.province_code})
         </span>
       </div>
 
@@ -146,7 +154,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="px-3 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold border border-[#D4AF37]/30">
-              Comune d'Italia (ISTAT)
+              {lang === 'it' ? "Comune d'Italia (ISTAT)" : "Italian Municipality (ISTAT)"}
             </span>
             <span className="px-3 py-0.5 rounded-full bg-white/5 text-neutral-300 text-xs font-medium border border-white/10 flex items-center gap-1.5 capitalize">
               <Calendar className="w-3 h-3 text-[#D4AF37]" />
@@ -154,7 +162,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             </span>
             {city.is_provincial_capital && (
               <span className="px-3 py-0.5 rounded-full bg-white/10 text-neutral-300 text-xs font-semibold">
-                Capoluogo di Provincia
+                {lang === 'it' ? 'Capoluogo di Provincia' : 'Provincial Capital'}
               </span>
             )}
             <span className="text-xs font-mono text-neutral-500">
@@ -163,10 +171,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           </div>
 
           <h1 className="text-2xl sm:text-4xl lg:text-5xl font-serif font-bold text-white tracking-tight">
-            Cinema a <span className="italic text-[#D4AF37]">{city.name}</span>
+            {lang === 'it' ? 'Cinema a ' : 'Cinemas in '}<span className="italic text-[#D4AF37]">{city.name}</span>
           </h1>
           <p className="text-xs sm:text-base text-neutral-400 mt-2 leading-relaxed">
-            Programmazione, orari e biglietti ufficiali per le sale di {city.name} ({city.province_code}) e dintorni.
+            {lang === 'it'
+              ? `Programmazione, orari e biglietti ufficiali per le sale di ${city.name} (${city.province_code}) e dintorni.`
+              : `Showtimes, schedule and official tickets for movie theaters in and around ${city.name} (${city.province_code}).`}
           </p>
           <div className="mt-3 flex items-center gap-3">
             <button
@@ -176,12 +186,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
               {copiedLink ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Link copiato!</span>
+                  <span className="text-emerald-400 font-medium">{lang === 'it' ? 'Link copiato!' : 'Link copied!'}</span>
                 </>
               ) : (
                 <>
                   <Share2 className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>Condividi pagina comune</span>
+                  <span>{lang === 'it' ? 'Condividi pagina comune' : 'Share city page'}</span>
                 </>
               )}
             </button>
@@ -194,16 +204,20 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
               {activeCinemas.length}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
-              {data?.has_local_cinemas ? 'Sale nel comune' : 'Sale in comune'}
+              {data?.has_local_cinemas 
+                ? (lang === 'it' ? 'Sale nel comune' : 'Cinemas in town') 
+                : (lang === 'it' ? 'Sale in comune' : 'Cinemas in town')}
             </span>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div>
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
-              {data?.has_local_cinemas ? filteredShowtimes.length : (data?.nearest_cinemas?.length || 0)}
+              {data?.has_local_cinemas 
+                ? (lang === 'it' ? 'Spettacoli oggi' : 'Screenings today')
+                : (lang === 'it' ? 'Cinema nei dintorni' : 'Nearby cinemas')}
             </span>
             <span className="block text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mt-0.5">
-              {data?.has_local_cinemas ? 'Spettacoli oggi' : 'Cinema nei dintorni'}
+              {data?.has_local_cinemas ? (lang === 'it' ? 'Spettacoli oggi' : 'Screenings today') : (lang === 'it' ? 'Cinema nei dintorni' : 'Nearby cinemas')}
             </span>
           </div>
         </div>
@@ -216,7 +230,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           {/* Quick Filters */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-[#0a0a0a] border border-white/10">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-neutral-400">Filtra formato:</span>
+              <span className="text-xs font-medium text-neutral-400">{lang === 'it' ? 'Filtra formato:' : 'Filter format:'}</span>
               {['all', '2D', '3D', 'IMAX', 'Atmos'].map(fmt => (
                 <button
                   key={fmt}
@@ -227,7 +241,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                       : 'bg-white/5 text-neutral-300 hover:bg-white/10 border border-white/10'
                   }`}
                 >
-                  {fmt === 'all' ? 'Tutti i formati' : fmt}
+                  {fmt === 'all' ? (lang === 'it' ? 'Tutti i formati' : 'All formats') : fmt}
                 </button>
               ))}
             </div>
@@ -239,7 +253,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                 onChange={e => setOnlyVose(e.target.checked)}
                 className="w-4 h-4 rounded text-[#D4AF37] focus:ring-[#D4AF37] bg-white/5 border-white/20 accent-[#D4AF37]"
               />
-              <span>Solo lingua originale (VOSE / VO)</span>
+              <span>{lang === 'it' ? 'Solo lingua originale (VOSE / VO)' : 'Original language only (VOSE / OV)'}</span>
             </label>
           </div>
 
@@ -247,7 +261,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <div className="space-y-6">
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-white flex items-center gap-2">
               <Film className="w-5 h-5 text-[#D4AF37]" />
-              <span>Sale cinematografiche attive a {city.name}</span>
+              <span>{lang === 'it' ? `Sale cinematografiche attive a ${city.name}` : `Active movie theaters in ${city.name}`}</span>
             </h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -284,7 +298,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                           className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border transition-all active:scale-95 cursor-pointer ${
                             isFav ? 'bg-[#D4AF37] text-black border-[#D4AF37]' : 'bg-white/5 text-neutral-400 border-white/10 hover:text-white'
                           }`}
-                          title="Salva cinema nei preferiti"
+                          title={isFav ? t.removeFromFavorites : t.addToFavorites}
                         >
                           <Bookmark className={`w-4 h-4 ${isFav ? 'fill-black' : ''}`} />
                         </button>
@@ -333,7 +347,9 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={() => fetch(`/api/showtimes/${st.id}/click`, { method: 'POST' }).catch(() => {})}
-                                    title={st.ticket_url ? "Acquista biglietto ufficiale" : "Consulta programmazione sul sito del cinema"}
+                                    title={st.ticket_url 
+                                      ? (lang === 'it' ? "Acquista biglietto ufficiale" : "Buy official ticket") 
+                                      : (lang === 'it' ? "Consulta programmazione sul sito del cinema" : "Check schedule on cinema website")}
                                     className="min-h-[40px] px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-[#D4AF37] text-[#D4AF37] hover:text-black border border-[#D4AF37]/30 text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 shrink-0"
                                   >
                                     <span>{st.time}</span>
@@ -361,17 +377,17 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                       <button
                         onClick={() => handleShareCinema(cinema)}
                         className="inline-flex items-center gap-1.5 text-[11px] text-neutral-400 hover:text-white transition-colors cursor-pointer py-1 px-2 rounded-md hover:bg-white/5"
-                        title="Condividi cinema"
+                        title={lang === 'it' ? "Condividi cinema" : "Share cinema"}
                       >
                         {copiedCinemaId === cinema.id ? (
                           <>
                             <Check className="w-3 h-3 text-emerald-400" />
-                            <span className="text-emerald-400">Copiato!</span>
+                            <span className="text-emerald-400">{lang === 'it' ? 'Copiato!' : 'Copied!'}</span>
                           </>
                         ) : (
                           <>
                             <Share2 className="w-3 h-3 text-[#D4AF37]" />
-                            <span>Condividi</span>
+                            <span>{lang === 'it' ? 'Condividi' : 'Share'}</span>
                           </>
                         )}
                       </button>
@@ -392,10 +408,12 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             </div>
             
             <h2 className="text-xl sm:text-2xl font-serif font-bold text-white">
-              Nessun cinema attualmente a {city.name}
+              {lang === 'it' ? `Nessun cinema attualmente a ${city.name}` : `No cinemas currently in ${city.name}`}
             </h2>
             <p className="text-sm text-neutral-400 mt-2 leading-relaxed">
-              Il comune di {city.name} ({city.province_code}) non ha sale cinematografiche registrate nel catalogo ISTAT attivo. Abbiamo calcolato per te i cinema più vicini:
+              {lang === 'it'
+                ? `Il comune di ${city.name} (${city.province_code}) non ha sale cinematografiche registrate nel catalogo ISTAT attivo. Abbiamo calcolato per te i cinema più vicini:`
+                : `The municipality of ${city.name} (${city.province_code}) has no registered active movie theaters in the official catalog. Here are the closest cinemas calculated for you:`}
             </p>
           </div>
 
@@ -403,7 +421,11 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
           <div className="space-y-4">
             <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
               <Navigation className="w-5 h-5 text-[#D4AF37]" />
-              <span>Cinema più vicini a {city.name} (ordinati per distanza stradale stimata)</span>
+              <span>
+                {lang === 'it'
+                  ? `Cinema più vicini a ${city.name} (ordinati per distanza stradale stimata)`
+                  : `Cinemas closest to ${city.name} (ordered by estimated driving distance)`}
+              </span>
             </h3>
 
             {(data?.nearest_cinemas && data.nearest_cinemas.length > 0) ? (
@@ -417,7 +439,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <span className="text-xs font-black text-[#D4AF37] font-mono px-2.5 py-0.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/20">
-                            {nearest.distance_km.toFixed(1)} km da {city.name}
+                            {nearest.distance_km.toFixed(1)} km {lang === 'it' ? `da ${city.name}` : `from ${city.name}`}
                           </span>
                           <h4 className="text-base font-serif font-bold text-white mt-2.5">
                             {nearest.name}
@@ -443,7 +465,7 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
                         rel="noopener noreferrer"
                         className="px-4 py-2 rounded-full bg-[#D4AF37] hover:bg-white text-black text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors shadow-sm"
                       >
-                        <span>Vedi programmazione</span>
+                        <span>{lang === 'it' ? 'Vedi programmazione' : 'View showtimes'}</span>
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </div>
@@ -453,7 +475,9 @@ export const CityDetailView: React.FC<CityDetailViewProps> = ({
             ) : (
               <div className="p-8 rounded-3xl bg-white/[0.03] border border-white/10 text-center">
                 <p className="text-sm text-neutral-400">
-                  Nessun cinema con programmazione attiva disponibile nelle vicinanze al momento.
+                  {lang === 'it'
+                    ? 'Nessun cinema con programmazione attiva disponibile nelle vicinanze al momento.'
+                    : 'No cinemas with active showtimes currently available nearby.'}
                 </p>
               </div>
             )}

@@ -62,12 +62,15 @@ export const Hero: React.FC<HeroProps> = ({
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span className="font-medium text-xs tracking-wide">
-              Copertura su <strong className="text-white">{totalComuni.toLocaleString('it-IT')} Comuni</strong>
+              {lang === 'it' ? 'Copertura su' : 'Coverage across'}{' '}
+              <strong className="text-white">
+                {totalComuni.toLocaleString(lang === 'it' ? 'it-IT' : 'en-US')} {lang === 'it' ? 'Comuni' : 'Municipalities'}
+              </strong>
             </span>
           </div>
           <span className="hidden sm:inline text-neutral-600">|</span>
           <span className="text-[#D4AF37] flex items-center gap-1 font-mono text-[11px]">
-            <Ticket className="w-3 h-3" /> Biglietterie Ufficiali
+            <Ticket className="w-3 h-3" /> {lang === 'it' ? 'Biglietterie Ufficiali' : 'Official Box Offices'}
           </span>
         </div>
 
@@ -90,7 +93,11 @@ export const Hero: React.FC<HeroProps> = ({
           >
             <MapPin className={`w-4 h-4 ${isLocating ? 'animate-bounce' : ''}`} />
             <span>
-              {isLocating ? 'Rilevamento posizione...' : activeCityName ? `Cinema vicino a ${activeCityName}` : t.nearbyBtn}
+              {isLocating 
+                ? (lang === 'it' ? 'Rilevamento posizione...' : 'Detecting location...') 
+                : activeCityName 
+                  ? (lang === 'it' ? `Cinema vicino a ${activeCityName}` : `Cinemas near ${activeCityName}`) 
+                  : t.nearbyBtn}
             </span>
           </button>
         </div>
@@ -99,7 +106,7 @@ export const Hero: React.FC<HeroProps> = ({
         <div className="mt-8 sm:mt-10">
           <div className="text-[11px] uppercase tracking-[0.2em] font-medium text-neutral-400 mb-3 flex items-center justify-center gap-1.5">
             <Film className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>Circuiti & Catene Multiplex</span>
+            <span>{lang === 'it' ? 'Circuiti & Catene Multiplex' : 'Chains & Multiplex Circuits'}</span>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2 max-w-4xl mx-auto">
