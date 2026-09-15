@@ -23,6 +23,7 @@ export interface LetterboxdResult {
   rating: number;
   count?: number;
   url?: string;
+  viaFirecrawl?: boolean;
 }
 
 export interface RottenTomatoesResult {
@@ -35,9 +36,42 @@ export interface RatingsBatchResult {
   ratingsUpdated: number;
   letterboxdCount: number;
   rottenTomatoesCount: number;
+  firecrawlRescuesUsed: number;
   errors: number;
   durationMs: number;
   details: string;
+}
+
+export function getLetterboxdFirecrawlKey(): string | undefined {
+  return process.env.FIRECRAWL_API_KEY_LETTERBOXD || process.env.FIRECRAWL_API_KEY || undefined;
+}
+
+export function getLetterboxdKeySource(): 'dedicated' | 'fallback' | 'none' {
+  if (process.env.FIRECRAWL_API_KEY_LETTERBOXD && process.env.FIRECRAWL_API_KEY_LETTERBOXD.trim().length > 0) {
+    return 'dedicated';
+  }
+  if (process.env.FIRECRAWL_API_KEY && process.env.FIRECRAWL_API_KEY.trim().length > 0) {
+    return 'fallback';
+  }
+  return 'none';
+}
+
+async function fetchHtmlViaFirecrawl(url: string, apiKey: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, formats: ['html'] }),
+      signal: AbortSignal.timeout(20000)
+    });
+    const data = (await res.json().catch(() => ({}))) as any;
+    if (res.ok && data.success && data.data?.html) {
+      return data.data.html as string;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -53,32 +87,14 @@ function normalizeTitle(str: string): string {
 }
 
 /**
- * Fetch Letterboxd rating by TMDb ID.
- * Letterboxd provides a direct redirect endpoint: https://letterboxd.com/tmdb/${tmdbId}/
- * which redirects straight to the film's canonical Letterboxd page.
+ * Helper to parse Letterboxd schema.org JSON-LD aggregateRating.
  */
-export async function fetchLetterboxdRating(tmdbId: number): Promise<LetterboxdResult | null> {
-  if (!tmdbId || isNaN(tmdbId) || tmdbId <= 0) {
+function parseLetterboxdHtml(html: string, pageUrl?: string): LetterboxdResult | null {
+  if (!html || !html.includes('application/ld+json')) {
     return null;
   }
 
   try {
-    const url = `https://letterboxd.com/tmdb/${tmdbId}/`;
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: COMMON_HEADERS,
-      redirect: 'follow'
-    });
-
-    if (!res.ok) {
-      return null;
-    }
-
-    const html = await res.text();
-    if (!html || !html.includes('application/ld+json')) {
-      return null;
-    }
-
     const $ = cheerio.load(html);
     let result: LetterboxdResult | null = null;
 
@@ -92,9 +108,9 @@ export async function fetchLetterboxdRating(tmdbId: number): Promise<LetterboxdR
           if (!isNaN(rawVal) && rawVal >= 0.5 && rawVal <= 5.0) {
             const count = parseInt(parsed.aggregateRating.ratingCount, 10);
             result = {
-              rating: Math.round(rawVal * 10) / 10, // round to 1 decimal place (e.g. 4.4)
+              rating: Math.round(rawVal * 10) / 10,
               count: !isNaN(count) && count > 0 ? count : undefined,
-              url: res.url || undefined
+              url: pageUrl || undefined
             };
           }
         }
@@ -105,9 +121,70 @@ export async function fetchLetterboxdRating(tmdbId: number): Promise<LetterboxdR
 
     return result;
   } catch {
-    // Non-blocking best-effort: return null on any error
     return null;
   }
+}
+
+/**
+ * Fetch Letterboxd rating by TMDb ID.
+ * Letterboxd provides a direct redirect endpoint: https://letterboxd.com/tmdb/${tmdbId}/
+ * Direct HTTP fetch is always attempted first (0 credits). If blocked or missing JSON-LD,
+ * attempts one Firecrawl rescue if FIRECRAWL_API_KEY_LETTERBOXD or FIRECRAWL_API_KEY is available.
+ */
+export async function fetchLetterboxdRating(tmdbId: number): Promise<LetterboxdResult | null> {
+  if (!tmdbId || isNaN(tmdbId) || tmdbId <= 0) {
+    return null;
+  }
+
+  const url = `https://letterboxd.com/tmdb/${tmdbId}/`;
+
+  // 1. Direct fetch first (always free)
+  let directHtml: string | null = null;
+  let finalUrl: string | undefined = undefined;
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: COMMON_HEADERS,
+      redirect: 'follow',
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      finalUrl = res.url || undefined;
+      const html = await res.text();
+      if (html && html.includes('application/ld+json')) {
+        directHtml = html;
+      }
+    }
+  } catch {
+    directHtml = null;
+  }
+
+  if (directHtml) {
+    const parsed = parseLetterboxdHtml(directHtml, finalUrl);
+    if (parsed) {
+      return { ...parsed, viaFirecrawl: false };
+    }
+  }
+
+  // 2. Rescue attempt via Firecrawl if direct fetch failed, was blocked, or returned no JSON-LD
+  const firecrawlKey = getLetterboxdFirecrawlKey();
+  if (firecrawlKey) {
+    try {
+      const fcHtml = await fetchHtmlViaFirecrawl(url, firecrawlKey);
+      if (fcHtml && fcHtml.includes('application/ld+json')) {
+        const parsed = parseLetterboxdHtml(fcHtml, url);
+        if (parsed) {
+          return { ...parsed, viaFirecrawl: true };
+        }
+      }
+    } catch {
+      // Non-blocking best-effort
+    }
+  }
+
+  return null;
 }
 
 interface RtCandidate {
@@ -355,6 +432,7 @@ export async function enrichMoviesWithExternalRatings(options?: {
       ratingsUpdated: 0,
       letterboxdCount: 0,
       rottenTomatoesCount: 0,
+      firecrawlRescuesUsed: 0,
       errors: 0,
       durationMs: Date.now() - startTime,
       details: 'Nessun film da arricchire (tutte le valutazioni sono aggiornate negli ultimi 10 giorni).'
@@ -364,6 +442,7 @@ export async function enrichMoviesWithExternalRatings(options?: {
   let ratingsUpdated = 0;
   let letterboxdCount = 0;
   let rottenTomatoesCount = 0;
+  let firecrawlRescuesUsed = 0;
   let errors = 0;
 
   for (let i = 0; i < movies.length; i++) {
@@ -386,6 +465,9 @@ export async function enrichMoviesWithExternalRatings(options?: {
           lbRating = lbRes.rating;
           lbCount = lbRes.count || null;
           letterboxdCount++;
+          if (lbRes.viaFirecrawl) {
+            firecrawlRescuesUsed++;
+          }
         }
       }
 
@@ -438,14 +520,31 @@ export async function enrichMoviesWithExternalRatings(options?: {
     }
   }
 
+  // If any Firecrawl rescues were triggered, record cumulative usage
+  if (firecrawlRescuesUsed > 0) {
+    try {
+      await executeRawSql(
+        `INSERT INTO site_settings (key, value)
+         VALUES ('letterboxd_firecrawl_rescues_total', $1)
+         ON CONFLICT (key) DO UPDATE
+         SET value = (COALESCE(NULLIF(site_settings.value, '')::int, 0) + $2)::text`,
+        [String(firecrawlRescuesUsed), firecrawlRescuesUsed]
+      );
+    } catch {
+      // Non-fatal
+    }
+  }
+
   const durationMs = Date.now() - startTime;
-  const details = `Processati ${movies.length} film in ${(durationMs / 1000).toFixed(1)}s (Letterboxd: ${letterboxdCount}, Rotten Tomatoes: ${rottenTomatoesCount})`;
+  const rescueNote = firecrawlRescuesUsed > 0 ? `, Rescue Firecrawl: ${firecrawlRescuesUsed}` : '';
+  const details = `Processati ${movies.length} film in ${(durationMs / 1000).toFixed(1)}s (Letterboxd: ${letterboxdCount}, Rotten Tomatoes: ${rottenTomatoesCount}${rescueNote})`;
 
   return {
     moviesProcessed: movies.length,
     ratingsUpdated,
     letterboxdCount,
     rottenTomatoesCount,
+    firecrawlRescuesUsed,
     errors,
     durationMs,
     details
@@ -489,6 +588,18 @@ export async function getRatingsStatus(): Promise<RatingsStatus> {
       }
     }
 
+    let totalRescues = 0;
+    try {
+      const rescuesRes = await executeRawSql(`SELECT value FROM site_settings WHERE key = 'letterboxd_firecrawl_rescues_total' LIMIT 1`);
+      if (rescuesRes.rows?.[0]?.value) {
+        totalRescues = parseInt(rescuesRes.rows[0].value, 10) || 0;
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    const keySource = getLetterboxdKeySource();
+
     return {
       total_movies: total,
       letterboxd_populated: lbCount,
@@ -499,10 +610,14 @@ export async function getRatingsStatus(): Promise<RatingsStatus> {
       ratings_fetched_count: fetchedCount,
       pending_enrichment: pending,
       last_batch_run_at: row.last_batch_run_at || null,
-      status
+      status,
+      firecrawl_rescues_total: totalRescues,
+      firecrawl_key_configured: keySource !== 'none',
+      firecrawl_key_source: keySource
     };
   } catch (err: any) {
     console.warn('[RatingsFetcher] Error getting ratings status:', err?.message);
+    const keySource = getLetterboxdKeySource();
     return {
       total_movies: 0,
       letterboxd_populated: 0,
@@ -513,7 +628,10 @@ export async function getRatingsStatus(): Promise<RatingsStatus> {
       ratings_fetched_count: 0,
       pending_enrichment: 0,
       last_batch_run_at: null,
-      status: 'idle'
+      status: 'idle',
+      firecrawl_rescues_total: 0,
+      firecrawl_key_configured: keySource !== 'none',
+      firecrawl_key_source: keySource
     };
   }
 }

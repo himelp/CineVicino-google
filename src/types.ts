@@ -72,6 +72,20 @@ export interface RatingsStatus {
   pending_enrichment: number;
   last_batch_run_at: string | null;
   status: 'healthy' | 'pending' | 'idle';
+  firecrawl_rescues_total?: number;
+  firecrawl_key_configured?: boolean;
+  firecrawl_key_source?: 'dedicated' | 'fallback' | 'none';
+}
+
+export interface RatingsBatchResult {
+  moviesProcessed: number;
+  ratingsUpdated: number;
+  letterboxdCount: number;
+  rottenTomatoesCount: number;
+  firecrawlRescuesUsed: number;
+  errors: number;
+  durationMs: number;
+  details: string;
 }
 
 export interface Showtime {

@@ -397,6 +397,7 @@ CUR_ADMIN_PASSWORD="$(get_env_val "ADMIN_PASSWORD")"
 CUR_ADMIN_SLUG="$(get_env_val "ADMIN_SLUG")"
 CUR_TMDB_API_KEY="$(get_env_val "TMDB_API_KEY")"
 CUR_FIRECRAWL_API_KEY="$(get_env_val "FIRECRAWL_API_KEY")"
+CUR_FIRECRAWL_API_KEY_LETTERBOXD="$(get_env_val "FIRECRAWL_API_KEY_LETTERBOXD")"
 CUR_MAXMIND_LICENSE_KEY="$(get_env_val "MAXMIND_LICENSE_KEY")"
 CUR_EMAIL_ALERT_API_KEY="$(get_env_val "EMAIL_ALERT_API_KEY")"
 CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL="$(get_env_val "GOOGLE_SERVICE_ACCOUNT_EMAIL")"
@@ -422,6 +423,11 @@ fi
 if [ -z "${CUR_FIRECRAWL_API_KEY}" ] && [ -t 0 ]; then
   read -r -p "Enter Firecrawl API key (optional, press Enter to skip): " INPUT_FC || true
   CUR_FIRECRAWL_API_KEY="${INPUT_FC:-}"
+fi
+
+if [ -z "${CUR_FIRECRAWL_API_KEY_LETTERBOXD}" ] && [ -t 0 ]; then
+  read -r -p "Enter a separate Firecrawl API key for Letterboxd rating scraping (optional — press Enter to reuse the main Firecrawl key, or to skip if you don't use Firecrawl at all): " INPUT_FC_LB || true
+  CUR_FIRECRAWL_API_KEY_LETTERBOXD="${INPUT_FC_LB:-}"
 fi
 
 if [ -z "${CUR_MAXMIND_LICENSE_KEY}" ] && [ -t 0 ]; then
@@ -470,6 +476,7 @@ ADMIN_SLUG="${NEW_ADMIN_SLUG}"
 # External Services
 TMDB_API_KEY="${CUR_TMDB_API_KEY}"
 FIRECRAWL_API_KEY="${CUR_FIRECRAWL_API_KEY}"
+FIRECRAWL_API_KEY_LETTERBOXD="${CUR_FIRECRAWL_API_KEY_LETTERBOXD}"
 MAXMIND_LICENSE_KEY="${CUR_MAXMIND_LICENSE_KEY}"
 EMAIL_ALERT_API_KEY="${CUR_EMAIL_ALERT_API_KEY}"
 GOOGLE_SERVICE_ACCOUNT_EMAIL="${CUR_GOOGLE_SERVICE_ACCOUNT_EMAIL}"

@@ -1683,14 +1683,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                         <Star className="w-4 h-4 text-[#D4AF37]" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-sm text-white">Valutazioni Esterne (Letterboxd & Rotten Tomatoes)</span>
                           <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                             Fase 5 Post-Scrape
                           </span>
+                          {statusData?.ratings?.firecrawl_key_source === 'dedicated' && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-mono" title="Utilizza FIRECRAWL_API_KEY_LETTERBOXD dedicata per non consumare crediti dello scraper principale">
+                              Rescue: Key Dedicata
+                            </span>
+                          )}
+                          {statusData?.ratings?.firecrawl_key_source === 'fallback' && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono" title="Utilizza FIRECRAWL_API_KEY condivisa come fallback">
+                              Rescue: Key Principale
+                            </span>
+                          )}
+                          {statusData?.ratings?.firecrawl_key_source === 'none' && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-mono" title="Nessuna chiave Firecrawl configurata per il rescue">
+                              Rescue: Solo HTTP
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-neutral-400 mt-0.5">
-                          Arricchimento non bloccante dei punteggi della community e della critica tramite parsing JSON-LD schema.org con delay di cortesia anti-ban.
+                          Arricchimento non bloccante dei punteggi della community e della critica tramite parsing JSON-LD schema.org con delay di cortesia anti-ban e rescue Firecrawl per Letterboxd.
                         </p>
                       </div>
                     </div>
@@ -1733,7 +1748,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                   </div>
 
                   {/* Summary Metric Counters */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
                     <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
                       <span className="text-neutral-400 block text-[11px]">Film Totali a Catalogo:</span>
                       <span className="font-bold text-white text-base font-mono">
@@ -1769,10 +1784,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                       </div>
                     </div>
                     <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
-                      <span className="text-neutral-400 block text-[11px]">Entrambi i Voti Disponibili:</span>
+                      <span className="text-neutral-400 block text-[11px]">Entrambi i Voti:</span>
                       <span className="font-bold text-[#D4AF37] text-base font-mono">
                         {statusData?.ratings?.both_populated ?? 0}
                       </span>
+                    </div>
+                    <div className="bg-neutral-900/90 p-3 rounded-xl border border-neutral-800/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-400 block text-[11px]">Firecrawl Rescue:</span>
+                        <span className="text-cyan-400 font-bold text-[10px]">🔥 LB</span>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 mt-0.5">
+                        <span className="font-bold text-cyan-400 text-base font-mono">
+                          {statusData?.ratings?.firecrawl_rescues_total ?? 0}
+                        </span>
+                        <span className="text-[10px] text-neutral-500 truncate" title={statusData?.ratings?.firecrawl_key_source === 'dedicated' ? 'FIRECRAWL_API_KEY_LETTERBOXD' : statusData?.ratings?.firecrawl_key_source === 'fallback' ? 'FIRECRAWL_API_KEY' : 'Nessuna chiave'}>
+                          {statusData?.ratings?.firecrawl_key_source === 'dedicated' ? 'dedicata' : statusData?.ratings?.firecrawl_key_source === 'fallback' ? 'fallback' : 'solo http'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1782,6 +1811,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                       <span className="text-neutral-400">In attesa di arricchimento:</span>
                       <span className="font-mono text-amber-400 font-semibold">
                         {statusData?.ratings?.pending_enrichment ?? 0} film
+                      </span>
+                    </div>
+                    <div className="text-neutral-300 flex items-center gap-2 text-[11px] font-mono">
+                      <span className="text-neutral-400">Firecrawl rescue usati:</span>
+                      <span className="text-cyan-400 font-bold">
+                        {statusData?.ratings?.firecrawl_rescues_total ?? 0} volte
+                      </span>
+                      <span className="text-neutral-500 text-[10px]">
+                        ({statusData?.ratings?.firecrawl_key_source === 'dedicated'
+                          ? 'chiave dedicata FIRECRAWL_API_KEY_LETTERBOXD'
+                          : statusData?.ratings?.firecrawl_key_source === 'fallback'
+                          ? 'fallback su FIRECRAWL_API_KEY'
+                          : 'nessuna chiave'})
                       </span>
                     </div>
                     <div className="text-neutral-400 flex items-center gap-2 text-[11px] font-mono">
@@ -1801,15 +1843,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                         <span>{ratingsResult.details}</span>
                       </div>
-                      <span className="font-mono text-[11px] text-emerald-400/80">
-                        {ratingsResult.durationMs}ms ({ratingsResult.ratingsUpdated} aggiornati)
-                      </span>
+                      <div className="flex items-center gap-3 font-mono text-[11px]">
+                        {ratingsResult.firecrawlRescuesUsed !== undefined && (
+                          <span className="text-cyan-400">
+                            Rescue usati: {ratingsResult.firecrawlRescuesUsed}
+                          </span>
+                        )}
+                        <span className="text-emerald-400/80">
+                          {ratingsResult.durationMs}ms ({ratingsResult.ratingsUpdated} aggiornati)
+                        </span>
+                      </div>
                     </div>
                   )}
 
                   <div className="text-[11px] text-neutral-400 bg-neutral-900/50 p-2.5 rounded-xl border border-neutral-800/60 flex items-center justify-between flex-wrap gap-2">
                     <span>
-                      Regole di visualizzazione: Se un film non ha valutazione o non viene trovato con certezza, i badge non vengono mai mostrati (nessun placeholder "0.0" o "N/A").
+                      Regole di visualizzazione: Se un film non ha valutazione o non viene trovato con certezza, i badge non vengono mai mostrati. Rescue automatico su Letterboxd via Firecrawl in caso di blocco HTTP.
                     </span>
                     <span className="text-amber-400 font-mono text-[10px]">Safe Matching + Delay 2.5s</span>
                   </div>
