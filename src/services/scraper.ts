@@ -104,6 +104,8 @@ export interface ExtractedCinema {
   chain?: string;
   source_url: string;
   source_name: string;
+  lat?: number;
+  lng?: number;
   schedules?: ScrapedMovieSchedule[];
   movies: Array<{
     title: string;
@@ -430,6 +432,47 @@ export function cleanScrapedMovieTitle(rawTitle: string): { cleanTitle: string; 
     .trim();
 
   return { cleanTitle: t.length > 1 ? t : rawTitle.trim(), detectedFormat, isVo };
+}
+
+/**
+ * Clean up scraped cinema names to normalize variations across aggregators
+ * (e.g. "CINEMA Multisala Oz " vs "Multisala Oz", "CB Cinema Barberini" vs "Barberini",
+ * "The Space Cinema Quartucciu" vs "The Space Quartucciu", "Cinema Eplanet Lo Po" vs "Eplanet Lo Po").
+ */
+export function cleanScrapedCinemaName(rawName: string): { cleanName: string; canonicalSlug: string; coreName: string } {
+  let name = (rawName || '').trim().replace(/\s+/g, ' ');
+  name = name.replace(/[-–—/\\,;.:]+$/, '').trim();
+
+  // Strip ComingSoon / aggregator prefixes like "CB ", "CS "
+  name = name.replace(/^(?:cb|cs)\s+(?:cinema\s+)?/i, '');
+
+  // Strip leading "CINEMA " prefix (case-insensitive)
+  name = name.replace(/^cinema\s+/i, '');
+
+  // Normalize "The Space Cinema X" -> "The Space X"
+  name = name.replace(/^the\s+space\s+cinema\b/i, 'The Space');
+
+  // Normalize "UCI Cinemas X" -> "UCI X"
+  name = name.replace(/^uci\s+cinemas?\b/i, 'UCI');
+
+  // Normalize "Notorious Cinemas X" -> "Notorious X"
+  name = name.replace(/^notorious\s+cinemas?\b/i, 'Notorious');
+
+  name = name.replace(/\s+/g, ' ').trim();
+  if (!name) name = rawName.trim();
+
+  const canonicalSlug = slugify(name).slice(0, 50);
+
+  const coreName = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b(cinema|cinemas|multisala|multiplex|cineplex|cb|cs|teatro|sala|sale)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return { cleanName: name, canonicalSlug, coreName };
 }
 
 export class NationwideCinemaScraper {
@@ -1623,10 +1666,14 @@ export class NationwideCinemaScraper {
 
     // Process cinemas and their schedules/movies using worker pool for bounded concurrency
     let cinemaCounter = 0;
+    const batchCinemaMap = new Map<string, { id: string; name: string; lat: number; lng: number }>();
+
     await runWithConcurrency(allDiscoveredCinemas, 5, async (cinema) => {
       const cinemaIndex = ++cinemaCounter;
-      const cinemaSlug = slugify(cinema.name).slice(0, 50);
-      const cinemaId = `cin-${cinemaSlug}`;
+      const { cleanName, canonicalSlug, coreName } = cleanScrapedCinemaName(cinema.name);
+      const defaultCinemaId = `cin-${canonicalSlug}`;
+      const legacyCinemaSlug = slugify(cinema.name).slice(0, 50);
+      const legacyCinemaId = `cin-${legacyCinemaSlug}`;
 
       // Resolve city info
       let cityTarget = cityMap.get(cinema.city_slug);
@@ -1682,25 +1729,114 @@ export class NationwideCinemaScraper {
       const cinemaLat = cityTarget.lat + latOffset;
       const cinemaLng = cityTarget.lng + lngOffset;
 
+      // Deduplication check: match existing cinema by ID, normalized name, or proximity within the same city
+      let matchedCinemaId: string | null = null;
+      let matchedLat: number | null = null;
+      let matchedLng: number | null = null;
+      let matchedName: string | null = null;
+
+      const batchKeySlug = `${assignedCityId}:${canonicalSlug}`;
+      const batchKeyCore = coreName ? `${assignedCityId}:${coreName}` : null;
+
+      if (batchCinemaMap.has(batchKeySlug)) {
+        const b = batchCinemaMap.get(batchKeySlug)!;
+        matchedCinemaId = b.id;
+        matchedLat = b.lat;
+        matchedLng = b.lng;
+        matchedName = b.name;
+      } else if (batchKeyCore && batchCinemaMap.has(batchKeyCore)) {
+        const b = batchCinemaMap.get(batchKeyCore)!;
+        matchedCinemaId = b.id;
+        matchedLat = b.lat;
+        matchedLng = b.lng;
+        matchedName = b.name;
+      }
+
+      if (!matchedCinemaId) {
+        try {
+          const existingInCity = await executeRawSql(
+            `SELECT id, name, address, lat, lng FROM cinemas WHERE city_id = $1`,
+            [assignedCityId]
+          );
+          for (const ex of existingInCity.rows || []) {
+            const exNorm = cleanScrapedCinemaName(ex.name);
+            const exId = ex.id;
+            const exLat = Number(ex.lat);
+            const exLng = Number(ex.lng);
+
+            // Match 1: exact ID match or canonical slug match
+            if (exId === defaultCinemaId || exId === legacyCinemaId || exNorm.canonicalSlug === canonicalSlug) {
+              matchedCinemaId = exId;
+              matchedLat = exLat;
+              matchedLng = exLng;
+              matchedName = ex.name;
+              break;
+            }
+
+            // Match 2: normalized core name match
+            if (coreName && exNorm.coreName && coreName === exNorm.coreName) {
+              matchedCinemaId = exId;
+              matchedLat = exLat;
+              matchedLng = exLng;
+              matchedName = ex.name;
+              break;
+            }
+
+            // Match 3: proximity match within ~250m with core name substring or address match
+            if (!isNaN(exLat) && !isNaN(exLng)) {
+              const approxLat = cinema.lat || cinemaLat;
+              const approxLng = cinema.lng || cinemaLng;
+              const dLat = (exLat - approxLat) * 111000;
+              const dLng = (exLng - approxLng) * 80000;
+              const dist = Math.hypot(dLat, dLng);
+
+              if (
+                dist <= 250 &&
+                ((coreName && exNorm.coreName && (coreName.includes(exNorm.coreName) || exNorm.coreName.includes(coreName))) ||
+                  (cinema.address && ex.address && cinema.address.trim().toLowerCase() === ex.address.trim().toLowerCase()))
+              ) {
+                matchedCinemaId = exId;
+                matchedLat = exLat;
+                matchedLng = exLng;
+                matchedName = ex.name;
+                break;
+              }
+            }
+          }
+        } catch (matchErr: any) {
+          console.warn('[Scraper] Cinema duplicate lookup warning:', matchErr?.message);
+        }
+      }
+
+      const cinemaId = matchedCinemaId || defaultCinemaId;
+      const finalLat = matchedLat !== null && !isNaN(matchedLat) ? matchedLat : (cinema.lat || cinemaLat);
+      const finalLng = matchedLng !== null && !isNaN(matchedLng) ? matchedLng : (cinema.lng || cinemaLng);
+      const cinemaDisplayName = matchedName || cleanName;
+
+      batchCinemaMap.set(batchKeySlug, { id: cinemaId, name: cinemaDisplayName, lat: finalLat, lng: finalLng });
+      if (batchKeyCore) {
+        batchCinemaMap.set(batchKeyCore, { id: cinemaId, name: cinemaDisplayName, lat: finalLat, lng: finalLng });
+      }
+
       // Upsert cinema into PostgreSQL
       const cinemaUpsertRes = await executeRawSql(
         `INSERT INTO cinemas (id, city_id, name, chain, address, lat, lng, website_url, features)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO UPDATE
-         SET name = EXCLUDED.name,
-             address = EXCLUDED.address,
-             chain = EXCLUDED.chain,
-             website_url = EXCLUDED.website_url,
+         SET name = CASE WHEN LENGTH(EXCLUDED.name) > 0 AND LENGTH(EXCLUDED.name) <= LENGTH(cinemas.name) THEN EXCLUDED.name ELSE cinemas.name END,
+             address = CASE WHEN EXCLUDED.address IS NOT NULL AND LENGTH(EXCLUDED.address) > 3 THEN EXCLUDED.address ELSE cinemas.address END,
+             chain = COALESCE(NULLIF(EXCLUDED.chain, 'independent'), cinemas.chain),
+             website_url = CASE WHEN EXCLUDED.website_url IS NOT NULL AND LENGTH(EXCLUDED.website_url) > 0 THEN EXCLUDED.website_url ELSE cinemas.website_url END,
              city_id = EXCLUDED.city_id
          RETURNING (xmax = 0) AS is_inserted`,
         [
           cinemaId,
           assignedCityId,
-          cinema.name,
+          cinemaDisplayName,
           cinema.chain || 'independent',
           cinema.address,
-          cinemaLat,
-          cinemaLng,
+          finalLat,
+          finalLng,
           cinema.source_url,
           JSON.stringify(['Aria condizionata', 'Bar', 'Accessibilità disabili'])
         ]

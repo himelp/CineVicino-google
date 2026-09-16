@@ -19,56 +19,26 @@ async function main() {
   try {
     await initDb();
 
-    // 1. Read last_scrape_offset from scraper_state table
-    let storedOffset = 0;
-    try {
-      const stateRes = await executeRawSql(
-        "SELECT last_scrape_offset FROM scraper_state WHERE id = 'default' LIMIT 1"
-      );
-      if (stateRes.rows && stateRes.rows.length > 0) {
-        storedOffset = parseInt(stateRes.rows[0].last_scrape_offset, 10) || 0;
-      } else {
-        storedOffset = await cinemaScraper.getStoredCursor();
-      }
-    } catch {
-      storedOffset = await cinemaScraper.getStoredCursor();
-    }
-
+    // 1. Read last_scrape_offset from the unified single source of truth
+    const storedOffset = await cinemaScraper.getStoredCursor();
     const batchLimit = 25;
     const cursorStateBefore = await cinemaScraper.getScraperCursorState(batchLimit);
 
-    console.log(`📍 Offset attuale da scraper_state: ${storedOffset} / ${cursorStateBefore.total_eligible_cities} comuni idonei`);
+    console.log(`📍 Offset attuale: ${storedOffset} / ${cursorStateBefore.total_eligible_cities} comuni idonei`);
     if (cursorStateBefore.current_batch_cities.length > 0) {
       console.log(`🏙️ Batch attuale (${cursorStateBefore.current_batch_cities.length} città): ${cursorStateBefore.current_batch_cities.map(c => c.name).join(', ')}`);
     }
 
-    // 2. Pass offset to executeFullScrape with a limit of 25
+    // 2. Execute full scrape with advanceCursor: true (persists next offset using targetCities.length)
     const result = await cinemaScraper.executeFullScrape(
-      { useFirecrawl: false, offset: storedOffset, limit: batchLimit },
+      { useFirecrawl: false, offset: storedOffset, limit: batchLimit, advanceCursor: true },
       (update) => {
         console.log(`[${update.timestamp.slice(11, 19)}] [${update.source}] ${update.message}`);
       }
     );
 
-    // 3. Compute new offset, wrapping back to 0 when the limit is reached
-    const totalCities = cursorStateBefore.total_eligible_cities;
-    let nextOffset = storedOffset + batchLimit;
-    if (totalCities > 0 && (nextOffset >= totalCities || result.cities_touched < batchLimit)) {
-      console.log(`🔄 Raggiunta la fine dell'elenco nazionale (${totalCities} comuni totali). Reset offset a 0.`);
-      nextOffset = 0;
-    } else {
-      console.log(`➡️ Batch completato. Prossimo offset calcolato: ${nextOffset} / ${totalCities}.`);
-    }
-
-    // 4. Update scraper_state table with the new offset upon completion
-    await executeRawSql(
-      `INSERT INTO scraper_state (id, last_scrape_offset, updated_at)
-       VALUES ('default', $1, NOW())
-       ON CONFLICT (id) DO UPDATE SET last_scrape_offset = EXCLUDED.last_scrape_offset, updated_at = NOW()`,
-      [nextOffset]
-    );
-    await cinemaScraper.setStoredCursor(nextOffset);
-    console.log(`💾 Nuovo offset ${nextOffset} salvato con successo nella tabella scraper_state.`);
+    const nextOffset = result.next_offset !== undefined ? result.next_offset : await cinemaScraper.getStoredCursor();
+    console.log(`💾 Rotazione avanzata: nuovo offset ${nextOffset} / ${result.total_eligible_cities || cursorStateBefore.total_eligible_cities}.`);
 
     console.log('----------------------------------------------------');
     console.log('✅ Scraping completato con successo!');

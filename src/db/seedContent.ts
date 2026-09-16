@@ -1,5 +1,6 @@
 import { executeRawSql } from './index';
 import { Cinema, Movie } from '../types';
+import { cleanScrapedCinemaName } from '../services/scraper';
 
 const INITIAL_CINEMAS: Cinema[] = [
   // MILANO & LOMBARDIA
@@ -622,6 +623,129 @@ export async function seedContentIfEmpty(): Promise<void> {
       }
     } catch (e: any) {
       console.warn('[SeedContent] Deduplication migration note:', e?.message);
+    }
+
+    // 4. Cinema deduplication migration:
+    // Merge duplicate cinema rows for the same physical cinema sourced from different aggregators
+    // (e.g. "cin-multisala-oz" vs "cin-cinema-multisala-oz", "cin-barberini" vs "cin-cb-cinema-barberini",
+    // "cin-the-space-quartucciu" vs "cin-the-space-cinema-quartucciu", "cin-eplanet-lo-po" vs "cin-cinema-eplanet-lo-po")
+    try {
+      const allCinemasRes = await executeRawSql(`
+        SELECT id, city_id, name, address, lat, lng
+        FROM cinemas
+        ORDER BY city_id, id
+      `);
+      const allCinemas = allCinemasRes.rows || [];
+      const visitedPairs = new Set<string>();
+
+      // Group cinemas by city_id
+      const byCity = new Map<string, typeof allCinemas>();
+      for (const cin of allCinemas) {
+        const list = byCity.get(cin.city_id) || [];
+        list.push(cin);
+        byCity.set(cin.city_id, list);
+      }
+
+      for (const [cityId, cityCinemas] of byCity.entries()) {
+        if (cityCinemas.length < 2) continue;
+
+        for (let i = 0; i < cityCinemas.length; i++) {
+          const cinA = cityCinemas[i];
+          const normA = cleanScrapedCinemaName(cinA.name);
+
+          for (let j = i + 1; j < cityCinemas.length; j++) {
+            const cinB = cityCinemas[j];
+            const normB = cleanScrapedCinemaName(cinB.name);
+
+            const pairKey = [cinA.id, cinB.id].sort().join(':');
+            if (visitedPairs.has(pairKey)) continue;
+
+            let isDuplicate = false;
+
+            // Check 1: Same normalized canonical slug
+            if (normA.canonicalSlug === normB.canonicalSlug) {
+              isDuplicate = true;
+            }
+            // Check 2: Same normalized core name
+            else if (normA.coreName && normB.coreName && normA.coreName === normB.coreName) {
+              isDuplicate = true;
+            }
+            // Check 3: Distance proximity <= 250m AND (coreName similarity or address match)
+            else {
+              const dLat = (Number(cinA.lat) - Number(cinB.lat)) * 111000;
+              const dLng = (Number(cinA.lng) - Number(cinB.lng)) * 80000;
+              const dist = Math.hypot(dLat, dLng);
+              if (
+                dist <= 250 &&
+                normA.coreName &&
+                normB.coreName &&
+                (normA.coreName.includes(normB.coreName) || normB.coreName.includes(normA.coreName))
+              ) {
+                isDuplicate = true;
+              }
+            }
+
+            if (isDuplicate) {
+              visitedPairs.add(pairKey);
+
+              // Determine canonical cinema: prefer cleaner/shorter ID, or non-prefixed ID (without -cb- or -cinema-)
+              let canonical = cinA;
+              let duplicate = cinB;
+
+              const isABad = cinA.id.includes('-cb-') || cinA.id.includes('-cinema-');
+              const isBBad = cinB.id.includes('-cb-') || cinB.id.includes('-cinema-');
+
+              if (isABad && !isBBad) {
+                canonical = cinB;
+                duplicate = cinA;
+              } else if (!isABad && isBBad) {
+                canonical = cinA;
+                duplicate = cinB;
+              } else if (cinB.id.length < cinA.id.length) {
+                canonical = cinB;
+                duplicate = cinA;
+              }
+
+              console.log(`[SeedContent] 🧹 Merging duplicate cinema "${duplicate.name}" (${duplicate.id}) into canonical "${canonical.name}" (${canonical.id}) in city ${cityId}...`);
+
+              // Remap showtimes
+              await executeRawSql(`UPDATE showtimes SET cinema_id = $1 WHERE cinema_id = $2`, [canonical.id, duplicate.id]);
+
+              // Deduplicate showtimes with identical (movie_id, cinema_id, show_date, time)
+              await executeRawSql(`
+                DELETE FROM showtimes
+                WHERE cinema_id = $1 AND id IN (
+                  SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY movie_id, cinema_id, show_date, time ORDER BY id) as rn
+                    FROM showtimes
+                    WHERE cinema_id = $1
+                  ) t WHERE t.rn > 1
+                )
+              `, [canonical.id]);
+
+              // Remap user favorites
+              await executeRawSql(`UPDATE favorites SET item_id = $1 WHERE item_id = $2 AND item_type = 'cinema'`, [canonical.id, duplicate.id]).catch(() => {});
+
+              // Deduplicate duplicate favorites for the same user
+              await executeRawSql(`
+                DELETE FROM favorites
+                WHERE item_id = $1 AND item_type = 'cinema' AND id IN (
+                  SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id, item_id, item_type ORDER BY id) as rn
+                    FROM favorites
+                    WHERE item_id = $1 AND item_type = 'cinema'
+                  ) t WHERE t.rn > 1
+                )
+              `, [canonical.id]).catch(() => {});
+
+              // Delete duplicate cinema
+              await executeRawSql(`DELETE FROM cinemas WHERE id = $1`, [duplicate.id]);
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('[SeedContent] Cinema deduplication migration note:', e?.message);
     }
 
     const cinemaCountRes = await executeRawSql('SELECT COUNT(*) as cnt FROM cinemas');
