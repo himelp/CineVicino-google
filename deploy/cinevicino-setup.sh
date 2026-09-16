@@ -655,31 +655,86 @@ fi
 # ------------------------------------------------------------------------------
 # 13. AUTOMATED CRON JOB INSTALLATION (Idempotent)
 # ------------------------------------------------------------------------------
-info "Installing/refreshing CineVicino cron jobs in root's crontab..."
-
 CRON_MARKER_SCRAPE="# CineVicino: daily nationwide showtime scraper"
 CRON_MARKER_GEOIP="# CineVicino: weekly GeoLite2-City refresh"
 CRON_LINE_SCRAPE="5 12 * * * cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1"
 CRON_LINE_GEOIP="0 3 * * 0 cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/update-geoip.ts >> /var/log/cinevicino-geoip.log 2>&1"
 
-EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
+# Ensure crontab command exists, attempting package installation if missing
+if ! command -v crontab >/dev/null 2>&1; then
+  info "crontab command not found — attempting to install cron package via ${PKG_MANAGER}..."
+  case "${PKG_MANAGER}" in
+    apt-get)
+      $SUDO apt-get update -qq 2>/dev/null || true
+      $SUDO apt-get install -y -qq cron 2>/dev/null || true
+      if command -v systemctl >/dev/null 2>&1; then
+        $SUDO systemctl enable --now cron 2>/dev/null || true
+      elif command -v service >/dev/null 2>&1; then
+        $SUDO service cron start 2>/dev/null || true
+      fi
+      ;;
+    dnf|yum)
+      $SUDO "${PKG_MANAGER}" install -y cronie 2>/dev/null || true
+      if command -v systemctl >/dev/null 2>&1; then
+        $SUDO systemctl enable --now crond 2>/dev/null || true
+      elif command -v service >/dev/null 2>&1; then
+        $SUDO service crond start 2>/dev/null || true
+      fi
+      ;;
+    apk)
+      $SUDO apk add --no-cache cronie 2>/dev/null || true
+      (crond -b || rc-service cronie start) 2>/dev/null || true
+      ;;
+    pacman)
+      $SUDO pacman -Sy --noconfirm cronie 2>/dev/null || true
+      if command -v systemctl >/dev/null 2>&1; then
+        $SUDO systemctl enable --now cronie 2>/dev/null || true
+      fi
+      ;;
+    zypper)
+      $SUDO zypper --non-interactive install cronie 2>/dev/null || true
+      if command -v systemctl >/dev/null 2>&1; then
+        $SUDO systemctl enable --now cronie 2>/dev/null || true
+      fi
+      ;;
+    *)
+      warn "Unknown package manager (${PKG_MANAGER}) — could not auto-install cron."
+      ;;
+  esac
+fi
 
-# Remove any previous CineVicino-managed lines (marker + the line right after it) before re-adding,
-# so re-running this script updates the schedule instead of duplicating or leaving stale paths behind.
-NEW_CRON="$(echo "${EXISTING_CRON}" | awk '
-  /# CineVicino:/ { skip_next=1; next }
-  skip_next { skip_next=0; next }
-  { print }
-')"
+if command -v crontab >/dev/null 2>&1; then
+  info "Installing/refreshing CineVicino cron jobs in root's crontab..."
+  EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
 
-NEW_CRON="${NEW_CRON}
+  # Remove any previous CineVicino-managed lines (marker + the line right after it) before re-adding,
+  # so re-running this script updates the schedule instead of duplicating or leaving stale paths behind.
+  NEW_CRON="$(echo "${EXISTING_CRON}" | awk '
+    /# CineVicino:/ { skip_next=1; next }
+    skip_next { skip_next=0; next }
+    { print }
+  ')"
+
+  NEW_CRON="${NEW_CRON}
 ${CRON_MARKER_SCRAPE}
 ${CRON_LINE_SCRAPE}
 ${CRON_MARKER_GEOIP}
 ${CRON_LINE_GEOIP}"
 
-echo "${NEW_CRON}" | crontab -
-success "Scraper and GeoIP cron jobs installed into root's crontab (idempotent — safe to re-run this script)."
+  if echo "${NEW_CRON}" | crontab - 2>/dev/null; then
+    success "Scraper and GeoIP cron jobs installed into root's crontab (idempotent — safe to re-run this script)."
+  else
+    warn "Failed to update crontab with 'crontab -'."
+    warn "Install cron manually and add these two lines yourself via 'crontab -e':"
+    echo "  ${CRON_LINE_SCRAPE}"
+    echo "  ${CRON_LINE_GEOIP}"
+  fi
+else
+  warn "crontab is still unavailable after attempting install — skipping automatic cron setup."
+  warn "Install cron manually and add these two lines yourself via 'crontab -e':"
+  echo "  ${CRON_LINE_SCRAPE}"
+  echo "  ${CRON_LINE_GEOIP}"
+fi
 
 # ------------------------------------------------------------------------------
 # 14. FINAL STATUS & CREDENTIALS SUMMARY (Requirement 7)
@@ -703,11 +758,17 @@ echo "  Restart services:        ${DOCKER_COMPOSE} restart"
 echo "  Run national scrape:     ${DOCKER_COMPOSE} exec app npx tsx scripts/scrape.ts"
 echo "  Update GeoIP database:   ${DOCKER_COMPOSE} exec app npx tsx scripts/update-geoip.ts"
 echo ""
-echo "Automated Cron Jobs (installed into root's crontab automatically):"
+if command -v crontab >/dev/null 2>&1; then
+  echo "Automated Cron Jobs (installed into root's crontab automatically):"
+else
+  echo "Automated Cron Jobs (please configure manually in crontab via 'crontab -e'):"
+fi
 echo "  # Daily nationwide showtime scraper at 12:05"
 echo "  ${CRON_LINE_SCRAPE}"
 echo "  # Weekly GeoLite2-City database refresh (Sundays at 03:00)"
 echo "  ${CRON_LINE_GEOIP}"
-echo "  Verify anytime with: crontab -l"
+if command -v crontab >/dev/null 2>&1; then
+  echo "  Verify anytime with: crontab -l"
+fi
 echo -e "${GREEN}==================================================================${NC}"
 echo ""
