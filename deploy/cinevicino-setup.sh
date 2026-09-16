@@ -653,7 +653,36 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 13. FINAL STATUS & CREDENTIALS SUMMARY (Requirement 7)
+# 13. AUTOMATED CRON JOB INSTALLATION (Idempotent)
+# ------------------------------------------------------------------------------
+info "Installing/refreshing CineVicino cron jobs in root's crontab..."
+
+CRON_MARKER_SCRAPE="# CineVicino: daily nationwide showtime scraper"
+CRON_MARKER_GEOIP="# CineVicino: weekly GeoLite2-City refresh"
+CRON_LINE_SCRAPE="5 12 * * * cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1"
+CRON_LINE_GEOIP="0 3 * * 0 cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/update-geoip.ts >> /var/log/cinevicino-geoip.log 2>&1"
+
+EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
+
+# Remove any previous CineVicino-managed lines (marker + the line right after it) before re-adding,
+# so re-running this script updates the schedule instead of duplicating or leaving stale paths behind.
+NEW_CRON="$(echo "${EXISTING_CRON}" | awk '
+  /# CineVicino:/ { skip_next=1; next }
+  skip_next { skip_next=0; next }
+  { print }
+')"
+
+NEW_CRON="${NEW_CRON}
+${CRON_MARKER_SCRAPE}
+${CRON_LINE_SCRAPE}
+${CRON_MARKER_GEOIP}
+${CRON_LINE_GEOIP}"
+
+echo "${NEW_CRON}" | crontab -
+success "Scraper and GeoIP cron jobs installed into root's crontab (idempotent — safe to re-run this script)."
+
+# ------------------------------------------------------------------------------
+# 14. FINAL STATUS & CREDENTIALS SUMMARY (Requirement 7)
 # ------------------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}==================================================================${NC}"
@@ -674,10 +703,11 @@ echo "  Restart services:        ${DOCKER_COMPOSE} restart"
 echo "  Run national scrape:     ${DOCKER_COMPOSE} exec app npx tsx scripts/scrape.ts"
 echo "  Update GeoIP database:   ${DOCKER_COMPOSE} exec app npx tsx scripts/update-geoip.ts"
 echo ""
-echo "Recommended Cron Jobs (add via 'crontab -e'):"
+echo "Automated Cron Jobs (installed into root's crontab automatically):"
 echo "  # Daily nationwide showtime scraper at 12:05"
-echo "  5 12 * * * cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/scrape.ts >> /var/log/cinevicino-scraper.log 2>&1"
+echo "  ${CRON_LINE_SCRAPE}"
 echo "  # Weekly GeoLite2-City database refresh (Sundays at 03:00)"
-echo "  0 3 * * 0 cd $(pwd) && ${DOCKER_COMPOSE} exec -T app npx tsx scripts/update-geoip.ts >> /var/log/cinevicino-geoip.log 2>&1"
+echo "  ${CRON_LINE_GEOIP}"
+echo "  Verify anytime with: crontab -l"
 echo -e "${GREEN}==================================================================${NC}"
 echo ""

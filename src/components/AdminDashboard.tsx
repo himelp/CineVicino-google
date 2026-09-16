@@ -5,11 +5,12 @@ import {
   Settings, Film, MapPin, Ticket, CheckCircle2, 
   XCircle, AlertTriangle, Key, LogOut, Terminal, 
   Edit3, Save, Plus, ArrowRight, ArrowLeft, Eye, EyeOff, Zap, Globe,
-  FileSpreadsheet, ExternalLink, Copy, Star,
+  FileSpreadsheet, ExternalLink, Copy, Star, Clock,
   Instagram, Facebook, Twitter, Music2, Youtube, Share2
 } from 'lucide-react';
 import { Movie, Cinema, Showtime, ScrapeLog, SiteSettings, GoogleSheetsStatus } from '../types';
 import { safeReadJson, safeFetchJson, ApiResponse } from '../utils/api';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AdminDashboardProps {
   onClose?: () => void;
@@ -19,6 +20,7 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSettingsUpdated }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { lang } = useLanguage();
 
   const [token, setToken] = useState<string>(() => localStorage.getItem('cinevicino_token') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -123,6 +125,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
   // Status state
   const [statusData, setStatusData] = useState<any>(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
+
+  // Scraper staleness calculations (> 36h = warning, > 72h = critical)
+  const lastScrapeRaw = statusData?.last_scrape_time || null;
+  const lastScrapeDate = lastScrapeRaw ? new Date(lastScrapeRaw) : null;
+  const scrapeAgeHours = lastScrapeDate && !isNaN(lastScrapeDate.getTime())
+    ? Math.floor((Date.now() - lastScrapeDate.getTime()) / (1000 * 60 * 60))
+    : null;
+  const isScrapeStale = statusData ? (scrapeAgeHours === null || scrapeAgeHours >= 36) : false;
+  const isScrapeCritical = statusData ? (scrapeAgeHours === null || scrapeAgeHours >= 72) : false;
 
   // Diagnostics test states
   const [testingTmdb, setTestingTmdb] = useState(false);
@@ -891,7 +902,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
           </div>
 
           {[
-            { id: 'status', label: '1. Stato & Motori', desc: 'Diagnostica, TMDb & GeoIP', icon: Activity },
+            { 
+              id: 'status', 
+              label: '1. Stato & Motori', 
+              desc: 'Diagnostica, TMDb & GeoIP', 
+              icon: Activity,
+              badge: isScrapeCritical 
+                ? (lang === 'it' ? 'Critico (> 72h)' : 'Critical (> 72h)') 
+                : isScrapeStale 
+                ? (lang === 'it' ? 'Obsoleto (> 36h)' : 'Stale (> 36h)') 
+                : undefined,
+              badgeColor: isScrapeCritical 
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse' 
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            },
             { id: 'scrape', label: '2. Scraper & Rotazione', desc: 'Job live, cursori & log', icon: RefreshCw, badge: isScraping ? 'In corso' : undefined },
             { id: 'content', label: '3. Gestione Contenuti', desc: 'Film, Cinema & Orari', icon: Database },
             { id: 'customization', label: '4. Impostazioni & Social', desc: 'Sheets, Copertina & URL', icon: Edit3 }
@@ -915,7 +939,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                   <div className="flex items-center justify-between">
                     <span className="truncate">{item.label}</span>
                     {item.badge && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 animate-pulse">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border ${(item as any).badgeColor || 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'}`}>
                         {item.badge}
                       </span>
                     )}
@@ -1000,6 +1024,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
               >
                 <Icon className={`w-3.5 h-3.5 ${tab.id === 'scrape' && isScraping ? 'animate-spin' : ''}`} />
                 <span>{tab.label}</span>
+                {tab.id === 'status' && isScrapeStale && (
+                  <span 
+                    className={`w-2 h-2 rounded-full ${isScrapeCritical ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`} 
+                    title={lang === 'it' ? 'Dati spettacoli obsoleti (> 36h)' : 'Stale showtimes (> 36h)'}
+                  />
+                )}
               </button>
             );
           })}
@@ -1026,6 +1056,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
           </div>
 
           <div className="flex items-center gap-3">
+            {statusData && isScrapeStale && (
+              <button
+                onClick={() => handleTabChange('status')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-colors ${
+                  isScrapeCritical
+                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25'
+                    : 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+                }`}
+                title={lang === 'it' 
+                  ? `Ultimo scrape: ${lastScrapeDate ? lastScrapeDate.toLocaleString('it-IT') : 'mai'} (${scrapeAgeHours !== null ? `${scrapeAgeHours} ore fa` : 'nessun log'})`
+                  : `Last scrape: ${lastScrapeDate ? lastScrapeDate.toLocaleString('en-US') : 'never'} (${scrapeAgeHours !== null ? `${scrapeAgeHours}h ago` : 'no log'})`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>{scrapeAgeHours !== null ? (lang === 'it' ? `Scrape ${scrapeAgeHours}h fa` : `Scrape ${scrapeAgeHours}h ago`) : (lang === 'it' ? 'Scrape mai eseguito' : 'Never scraped')}</span>
+              </button>
+            )}
+
             {isScraping && (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold animate-pulse">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -1061,6 +1108,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                   <span>Riesegui Test</span>
                 </button>
               </div>
+
+              {/* Scraper Staleness Warning Banner (> 36 hours) */}
+              {statusData && isScrapeStale && (
+                <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  isScrapeCritical 
+                    ? 'bg-rose-950/40 border-rose-800/80 text-rose-200' 
+                    : 'bg-amber-950/40 border-amber-800/80 text-amber-200'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${isScrapeCritical ? 'text-rose-400' : 'text-amber-400'}`} />
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-sm text-white">
+                          {lang === 'it' ? 'Attenzione: Aggiornamento Spettacoli Obsoleto' : 'Warning: Stale Showtime Scrape'}
+                        </span>
+                        <span className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${
+                          isScrapeCritical 
+                            ? 'bg-rose-900/60 border-rose-700 text-rose-300 font-semibold' 
+                            : 'bg-amber-900/60 border-amber-700 text-amber-300 font-semibold'
+                        }`}>
+                          {scrapeAgeHours !== null 
+                            ? (lang === 'it' ? `Fermo da ${scrapeAgeHours} ore (> 36h)` : `Inactive for ${scrapeAgeHours}h (> 36h)`) 
+                            : (lang === 'it' ? 'Nessun log registrato' : 'No logs recorded')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-neutral-300 mt-1 leading-relaxed">
+                        {lang === 'it'
+                          ? `L'ultimo scraping nazionale è stato eseguito ${lastScrapeDate ? `il ${lastScrapeDate.toLocaleString('it-IT')}` : 'mai'} (ha superato la soglia di allerta di 36 ore). Gli orari dei film potrebbero risultare non aggiornati o vuoti sul sito. Verifica che il cron job sul server sia attivo oppure avvia un'esecuzione batch manuale.`
+                          : `The nationwide scraper last ran ${lastScrapeDate ? `on ${lastScrapeDate.toLocaleString('en-US')}` : 'never'} (exceeds the 36-hour alert threshold). Movie showtimes may appear outdated or empty. Verify the server cron job or trigger a manual scrape batch.`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleTabChange('scrape')}
+                    className="shrink-0 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto"
+                  >
+                    <span>{lang === 'it' ? 'Pannello Scraper' : 'Scraper Panel'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 
@@ -1501,6 +1589,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
                     </span>
                   </div>
 
+                  {/* Last Scrape Timestamp & Staleness Indicator */}
+                  <div className="p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 flex items-center justify-between flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-neutral-400">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{lang === 'it' ? 'Ultimo scraping:' : 'Last scrape:'}</span>
+                      <span className="font-mono text-white font-semibold">
+                        {lastScrapeDate ? lastScrapeDate.toLocaleString(lang === 'it' ? 'it-IT' : 'en-US') : (lang === 'it' ? 'Nessun log registrato' : 'No logs recorded')}
+                      </span>
+                    </div>
+                    {scrapeAgeHours === null ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {lang === 'it' ? 'Mai eseguito' : 'Never run'}
+                      </span>
+                    ) : isScrapeCritical ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold flex items-center gap-1 animate-pulse" title="Scraping non eseguito da oltre 72 ore">
+                        <XCircle className="w-3 h-3" /> {lang === 'it' ? `Critico (${scrapeAgeHours}h fa > 72h)` : `Critical (${scrapeAgeHours}h ago > 72h)`}
+                      </span>
+                    ) : isScrapeStale ? (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold flex items-center gap-1" title="Scraping non eseguito da oltre 36 ore">
+                        <AlertTriangle className="w-3 h-3" /> {lang === 'it' ? `Obsoleto (${scrapeAgeHours}h fa > 36h)` : `Stale (${scrapeAgeHours}h ago > 36h)`}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> {lang === 'it' ? `Aggiornato (${scrapeAgeHours}h fa)` : `Fresh (${scrapeAgeHours}h ago)`}
+                      </span>
+                    )}
+                  </div>
+
                   <div>
                     <div className="flex justify-between text-[11px] text-neutral-400 mb-1">
                       <span>Ciclo Nazionale Coperto</span>
@@ -1875,14 +1991,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, onSetti
               <div className="p-6 rounded-2xl bg-neutral-950 border border-neutral-800 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-4">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <RefreshCw className="w-4 h-4 text-amber-400" />
                       <h3 className="text-base font-bold text-white">
                         Rotazione Continua Copertura Nazionale
                       </h3>
+                      {scrapeAgeHours === null ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+                          {lang === 'it' ? 'Mai eseguito' : 'Never run'}
+                        </span>
+                      ) : isScrapeCritical ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 font-bold flex items-center gap-1 animate-pulse">
+                          <XCircle className="w-3 h-3" /> {lang === 'it' ? `Critico (${scrapeAgeHours}h fa > 72h)` : `Critical (${scrapeAgeHours}h ago > 72h)`}
+                        </span>
+                      ) : isScrapeStale ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {lang === 'it' ? `Obsoleto (${scrapeAgeHours}h fa > 36h)` : `Stale (${scrapeAgeHours}h ago > 36h)`}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> {lang === 'it' ? `Aggiornato (${scrapeAgeHours}h fa)` : `Fresh (${scrapeAgeHours}h ago)`}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-neutral-400 mt-1">
                       {statusData?.scraper_rotation?.cycle_description || 'Il cron giornaliero avanza automaticamente il batch di città ogni esecuzione, coprendo tutta Italia a rotazione.'}
+                      {lastScrapeDate && (
+                        <span className="text-neutral-500 block font-mono text-[11px] mt-0.5">
+                          {lang === 'it' ? 'Ultimo scraping registrato:' : 'Last recorded scrape:'} {lastScrapeDate.toLocaleString(lang === 'it' ? 'it-IT' : 'en-US')}
+                        </span>
+                      )}
                     </p>
                   </div>
 
