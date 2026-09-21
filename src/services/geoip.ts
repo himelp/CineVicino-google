@@ -171,12 +171,42 @@ export async function downloadGeoLite2(customKey?: string): Promise<{ success: b
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
 
-    // Extract specifically the .mmdb file from the archive
-    await execAsync(`tar -xzf "${tempTarPath}" --wildcards --strip-components=1 -C "${GEOIP_DIR}" '*/GeoLite2-City.mmdb'`);
+    // Extract using system tar into a temporary extraction directory.
+    // Note: BusyBox tar (common in minimal cloud/container images) does not support --wildcards or glob expressions.
+    // Instead, extract the archive into an extract-tmp directory and find GeoLite2-City.mmdb recursively.
+    const extractDir = path.join(GEOIP_DIR, 'extract-tmp');
+    try {
+      if (fs.existsSync(extractDir)) {
+        fs.rmSync(extractDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(extractDir, { recursive: true });
+      await execAsync(`tar -xzf "${tempTarPath}" -C "${extractDir}"`);
 
-    // Clean up temporary archive
-    if (fs.existsSync(tempTarPath)) {
-      fs.unlinkSync(tempTarPath);
+      // Walk the extracted tree to find GeoLite2-City.mmdb (its parent folder name includes the release date, e.g. GeoLite2-City_20260921)
+      const findMmdbRecursive = (dir: string): string | null => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const found = findMmdbRecursive(full);
+            if (found) return found;
+          } else if (entry.name === 'GeoLite2-City.mmdb') {
+            return full;
+          }
+        }
+        return null;
+      };
+
+      const foundMmdb = findMmdbRecursive(extractDir);
+      if (foundMmdb) {
+        fs.copyFileSync(foundMmdb, MMDB_PATH);
+      }
+    } finally {
+      if (fs.existsSync(extractDir)) {
+        fs.rmSync(extractDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(tempTarPath)) {
+        fs.unlinkSync(tempTarPath);
+      }
     }
 
     // Re-initialize Reader

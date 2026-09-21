@@ -129,7 +129,11 @@ export async function runWithConcurrency<T, R>(
   const workers = Array.from({ length: workerCount }, async () => {
     while (currentIndex < items.length) {
       const idx = currentIndex++;
-      results[idx] = await fn(items[idx], idx);
+      try {
+        results[idx] = await fn(items[idx], idx);
+      } catch (err: any) {
+        console.warn(`[runWithConcurrency] Unhandled error at index ${idx}:`, err?.message || err);
+      }
     }
   });
   await Promise.all(workers);
@@ -1669,7 +1673,8 @@ export class NationwideCinemaScraper {
     const batchCinemaMap = new Map<string, { id: string; name: string; lat: number; lng: number }>();
 
     await runWithConcurrency(allDiscoveredCinemas, 5, async (cinema) => {
-      const cinemaIndex = ++cinemaCounter;
+      try {
+        const cinemaIndex = ++cinemaCounter;
       const { cleanName, canonicalSlug, coreName } = cleanScrapedCinemaName(cinema.name);
       const defaultCinemaId = `cin-${canonicalSlug}`;
       const legacyCinemaSlug = slugify(cinema.name).slice(0, 50);
@@ -1904,43 +1909,61 @@ export class NationwideCinemaScraper {
         const targetMovieId = existingId || defaultMovieId;
         const targetSlug = existingSlug || movieSlug;
 
-        const movieUpsertRes = await executeRawSql(
-          `INSERT INTO movies (id, slug, title_it, title_en, title_original, tmdb_id, poster_url, backdrop_url, genres, duration_minutes, rating, synopsis_it, synopsis_en, release_year, director, "cast", age_rating, is_featured)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-           ON CONFLICT (id) DO UPDATE
-           SET tmdb_id = COALESCE(EXCLUDED.tmdb_id, movies.tmdb_id),
-               poster_url = COALESCE(EXCLUDED.poster_url, movies.poster_url),
-               backdrop_url = COALESCE(EXCLUDED.backdrop_url, movies.backdrop_url),
-               title_en = CASE WHEN length(EXCLUDED.title_en) > 0 THEN EXCLUDED.title_en ELSE movies.title_en END,
-               title_original = COALESCE(EXCLUDED.title_original, movies.title_original),
-               director = CASE WHEN EXCLUDED.director != 'Regista' THEN EXCLUDED.director ELSE movies.director END,
-               duration_minutes = CASE WHEN EXCLUDED.duration_minutes > 0 THEN EXCLUDED.duration_minutes ELSE movies.duration_minutes END,
-               rating = CASE WHEN EXCLUDED.rating > 0 THEN EXCLUDED.rating ELSE movies.rating END,
-               genres = EXCLUDED.genres,
-               synopsis_it = CASE WHEN length(EXCLUDED.synopsis_it) > 10 THEN EXCLUDED.synopsis_it ELSE movies.synopsis_it END,
-               synopsis_en = CASE WHEN length(EXCLUDED.synopsis_en) > 0 THEN EXCLUDED.synopsis_en ELSE movies.synopsis_en END
-           RETURNING id, (xmax = 0) AS is_inserted`,
-          [
-            targetMovieId,
-            targetSlug,
-            enriched.title_it || cleanTitle,
-            enriched.title_en || cleanTitle,
-            enriched.title_original || cleanTitle,
-            enriched.tmdb_id,
-            enriched.poster_url,
-            enriched.backdrop_url,
-            JSON.stringify(enriched.genres || ['Cinema', 'Nuova Uscita']),
-            enriched.duration || 115,
-            enriched.rating || 7.5,
-            enriched.synopsis_it || '',
-            enriched.synopsis_en || '',
-            enriched.release_year || new Date().getFullYear(),
-            enriched.director || '',
-            JSON.stringify(enriched.cast || []),
-            'T',
-            true
-          ]
-        );
+        let movieUpsertRes: any;
+        try {
+          movieUpsertRes = await executeRawSql(
+            `INSERT INTO movies (id, slug, title_it, title_en, title_original, tmdb_id, poster_url, backdrop_url, genres, duration_minutes, rating, synopsis_it, synopsis_en, release_year, director, "cast", age_rating, is_featured)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             ON CONFLICT (id) DO UPDATE
+             SET tmdb_id = COALESCE(EXCLUDED.tmdb_id, movies.tmdb_id),
+                 poster_url = COALESCE(EXCLUDED.poster_url, movies.poster_url),
+                 backdrop_url = COALESCE(EXCLUDED.backdrop_url, movies.backdrop_url),
+                 title_en = CASE WHEN length(EXCLUDED.title_en) > 0 THEN EXCLUDED.title_en ELSE movies.title_en END,
+                 title_original = COALESCE(EXCLUDED.title_original, movies.title_original),
+                 director = CASE WHEN EXCLUDED.director != 'Regista' THEN EXCLUDED.director ELSE movies.director END,
+                 duration_minutes = CASE WHEN EXCLUDED.duration_minutes > 0 THEN EXCLUDED.duration_minutes ELSE movies.duration_minutes END,
+                 rating = CASE WHEN EXCLUDED.rating > 0 THEN EXCLUDED.rating ELSE movies.rating END,
+                 genres = EXCLUDED.genres,
+                 synopsis_it = CASE WHEN length(EXCLUDED.synopsis_it) > 10 THEN EXCLUDED.synopsis_it ELSE movies.synopsis_it END,
+                 synopsis_en = CASE WHEN length(EXCLUDED.synopsis_en) > 0 THEN EXCLUDED.synopsis_en ELSE movies.synopsis_en END
+             RETURNING id, (xmax = 0) AS is_inserted`,
+            [
+              targetMovieId,
+              targetSlug,
+              enriched.title_it || cleanTitle,
+              enriched.title_en || cleanTitle,
+              enriched.title_original || cleanTitle,
+              enriched.tmdb_id,
+              enriched.poster_url,
+              enriched.backdrop_url,
+              JSON.stringify(enriched.genres || ['Cinema', 'Nuova Uscita']),
+              enriched.duration || 115,
+              enriched.rating || 7.5,
+              enriched.synopsis_it || '',
+              enriched.synopsis_en || '',
+              enriched.release_year || new Date().getFullYear(),
+              enriched.director || '',
+              JSON.stringify(enriched.cast || []),
+              'T',
+              true
+            ]
+          );
+        } catch (upsertErr: any) {
+          if (
+            (upsertErr?.code === '23505' && (upsertErr?.constraint === 'movies_slug_key' || upsertErr?.message?.includes('movies_slug_key'))) ||
+            upsertErr?.message?.includes('Key (slug)=')
+          ) {
+            // Another concurrent worker (or a prior mismatched id) already owns this slug — reuse that row instead of failing.
+            const bySlug = await executeRawSql(`SELECT id FROM movies WHERE slug = $1 LIMIT 1`, [targetSlug]);
+            if (bySlug.rows && bySlug.rows.length > 0) {
+              movieUpsertRes = { rows: [{ id: bySlug.rows[0].id, is_inserted: false }] };
+            } else {
+              throw upsertErr;
+            }
+          } else {
+            throw upsertErr;
+          }
+        }
 
         const isMetadataComplete = Boolean(
           enriched.synopsis_it &&
@@ -2056,7 +2079,11 @@ export class NationwideCinemaScraper {
         await executeRawSql(sql, params);
         showtimesTouched += chunk.length;
       }
-    });
+    } catch (cinemaErr: any) {
+      console.warn(`[Scraper] Skipping cinema "${cinema.name}" (${cinema.city_name}) due to error:`, cinemaErr?.message);
+      notify('error', cinema.source_name || 'System', 0, `Errore su "${cinema.name}": ${cinemaErr?.message || cinemaErr}. Cinema saltato, proseguo con gli altri.`);
+    }
+  });
 
     const logId = `log-${Date.now()}`;
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
