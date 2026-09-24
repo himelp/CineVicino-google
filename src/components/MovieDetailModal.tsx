@@ -71,34 +71,58 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   const title = getMovieTitle(movie, lang);
   const { text: synopsis, isFallback } = getMovieSynopsis(movie, lang);
 
-  // Part 1: Never show past dates — filter only active showtimes today or future
+  // Filter active showtimes returned by the API (which respects the grace window)
   const activeShowtimes = useMemo(() => {
-    return showtimes.filter(s => s.active && s.show_date >= todayStr);
-  }, [showtimes, todayStr]);
+    return showtimes.filter(s => s.active);
+  }, [showtimes]);
 
-  // Distinct dates actually scraped for this movie (today or future)
+  // Distinct dates actually scraped for this movie
   const scrapedDates = useMemo(() => {
     const datesSet = new Set<string>();
     activeShowtimes.forEach(s => {
-      if (s.show_date && s.show_date >= todayStr) {
+      if (s.show_date) {
         datesSet.add(s.show_date);
       }
     });
     return Array.from(datesSet).sort();
-  }, [activeShowtimes, todayStr]);
+  }, [activeShowtimes]);
 
-  // Date selector options — strictly don't show date options beyond what has been scraped, but always include today
-  const dateOptions = useMemo(() => {
-    const list = scrapedDates.includes(todayStr) ? [...scrapedDates] : [todayStr, ...scrapedDates];
-    return list.map(dStr => formatDatePill(dStr, lang));
-  }, [scrapedDates, todayStr, lang]);
+  // Check if we have showtimes for today or future
+  const hasCurrentOrFuture = useMemo(() => {
+    return scrapedDates.some(d => d >= todayStr);
+  }, [scrapedDates, todayStr]);
 
-  // Ensure selectedDate is valid and never in the past
-  useEffect(() => {
-    if (selectedDate < todayStr) {
-      setSelectedDate(todayStr);
+  // Relevant dates to display in pills
+  const relevantDates = useMemo(() => {
+    if (hasCurrentOrFuture) {
+      const futureOrToday = scrapedDates.filter(d => d >= todayStr);
+      const list = futureOrToday.includes(todayStr) ? [...futureOrToday] : [todayStr, ...futureOrToday];
+      return list.sort();
+    } else if (scrapedDates.length > 0) {
+      // Grace-window dates (e.g. yesterday before today's cron runs or rotating city batch)
+      return [...scrapedDates].sort();
     }
-  }, [selectedDate, todayStr]);
+    return [todayStr];
+  }, [scrapedDates, hasCurrentOrFuture, todayStr]);
+
+  // Date selector options
+  const dateOptions = useMemo(() => {
+    return relevantDates.map(dStr => formatDatePill(dStr, lang));
+  }, [relevantDates, lang]);
+
+  // Ensure selectedDate defaults to an existing date: todayStr if available, or the latest available date
+  useEffect(() => {
+    if (relevantDates.length > 0) {
+      if (relevantDates.includes(selectedDate)) {
+        return;
+      }
+      if (relevantDates.includes(todayStr)) {
+        setSelectedDate(todayStr);
+      } else {
+        setSelectedDate(relevantDates[relevantDates.length - 1]);
+      }
+    }
+  }, [relevantDates, selectedDate, todayStr]);
 
   // Filter showtimes for selected date and city
   const filteredShowtimes = activeShowtimes.filter(s => {
@@ -430,6 +454,18 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
                     );
                   })}
                 </div>
+
+                {/* Past Grace-Window Alert */}
+                {selectedDate < todayStr && (
+                  <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                    <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>
+                      {lang === 'it' 
+                        ? `Programmazione riferita all'ultimo aggiornamento disponibile (${selectedDate}).`
+                        : `Showtimes from latest available update (${selectedDate}).`}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

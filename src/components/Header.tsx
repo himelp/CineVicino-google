@@ -185,19 +185,19 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={onOpenAllMovies}
                 className="hover:text-white transition-colors py-1 hover:border-b hover:border-white text-xs uppercase tracking-widest cursor-pointer"
               >
-                Film
+                {t.navMovies || (lang === 'it' ? 'Film' : 'Movies')}
               </button>
               <button 
                 onClick={onOpenHome}
                 className="hover:text-white transition-colors py-1 hover:border-b hover:border-white text-xs uppercase tracking-widest cursor-pointer"
               >
-                Cinema
+                {t.navCinemas || (lang === 'it' ? 'Cinema' : 'Cinemas')}
               </button>
               <button 
                 onClick={onOpenAllCities}
                 className="hover:text-white transition-colors py-1 hover:border-b hover:border-white text-xs uppercase tracking-widest cursor-pointer"
               >
-                Città
+                {t.navCities || (lang === 'it' ? 'Città' : 'Cities')}
               </button>
               {user?.is_admin && (
                 <button 
@@ -348,6 +348,17 @@ export const Header: React.FC<HeaderProps> = ({
                                 {m.release_year && <span>{m.release_year}</span>}
                                 {m.duration_minutes && <span>· {m.duration_minutes}m</span>}
                                 {m.director && <span className="truncate">· {m.director}</span>}
+                                {typeof m.active_showtimes_count !== 'undefined' && (
+                                  parseInt(m.active_showtimes_count as any, 10) > 0 ? (
+                                    <span className="text-emerald-400 font-medium truncate">
+                                      · {m.active_showtimes_count} {lang === 'it' ? (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'orario' : 'orari') : (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'showtime' : 'showtimes')}
+                                    </span>
+                                  ) : (
+                                    <span className="text-neutral-500 truncate">
+                                      · {lang === 'it' ? 'Nessun orario' : 'No showtimes'}
+                                    </span>
+                                  )
+                                )}
                               </div>
                             </div>
                           </div>
@@ -588,7 +599,16 @@ export const Header: React.FC<HeaderProps> = ({
                             {m.title_it}
                           </p>
                           <p className="text-[11px] text-neutral-400 truncate mt-0.5">
-                            {[m.release_year, m.duration_minutes ? `${m.duration_minutes}m` : null, m.director].filter(Boolean).join(' · ')}
+                            {[
+                              m.release_year,
+                              m.duration_minutes ? `${m.duration_minutes}m` : null,
+                              m.director,
+                              typeof m.active_showtimes_count !== 'undefined'
+                                ? (parseInt(m.active_showtimes_count as any, 10) > 0
+                                    ? `${m.active_showtimes_count} ${lang === 'it' ? (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'orario' : 'orari') : (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'showtime' : 'showtimes')}`
+                                    : (lang === 'it' ? 'Nessun orario' : 'No showtimes'))
+                                : null
+                            ].filter(Boolean).join(' · ')}
                           </p>
                         </div>
                       </div>
@@ -599,7 +619,7 @@ export const Header: React.FC<HeaderProps> = ({
               ) : (
                 !isSearching && searchQuery.trim().length >= 2 && (
                   <div className="mt-2 p-3 text-center text-xs text-neutral-400 bg-[#0a0a0a] border border-white/10 rounded-xl">
-                    Nessun film trovato per &quot;<span className="text-white">{searchQuery}</span>&quot;
+                    {lang === 'it' ? 'Nessun film trovato per' : 'No movies found for'} &quot;<span className="text-white">{searchQuery}</span>&quot;
                   </div>
                 )
               )
@@ -628,7 +648,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <Film className="w-4 h-4 text-[#D4AF37]" />
-                <span>Film in Programmazione</span>
+                <span>{lang === 'it' ? 'Film in Programmazione' : 'Now Playing Movies'}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-neutral-500" />
             </button>
@@ -642,7 +662,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <MapPin className="w-4 h-4 text-[#D4AF37]" />
-                <span>Tutti i Cinema e Multiplex</span>
+                <span>{lang === 'it' ? 'Tutti i Cinema e Multiplex' : 'All Cinemas & Multiplexes'}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-neutral-500" />
             </button>
@@ -656,7 +676,7 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <div className="flex items-center gap-2.5">
                 <Globe className="w-4 h-4 text-[#D4AF37]" />
-                <span>Directory dei 7.894 Comuni</span>
+                <span>{lang === 'it' ? 'Directory dei 7.894 Comuni' : '7,894 Municipalities Directory'}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-neutral-500" />
             </button>

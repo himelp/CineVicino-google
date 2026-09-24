@@ -61,6 +61,9 @@ const app = express();
 const PORT = 3000;
 const ADMIN_SLUG = process.env.ADMIN_SLUG || 'gestione-riservata-cv';
 
+// Showtime freshness grace window in days (covers multi-day rotation cycles + daily pre-cron morning window)
+export const SHOWTIMES_GRACE_DAYS = 3;
+
 // Trust front-end reverse proxy / Cloudflare Tunnel / Nginx for real client IP
 app.set('trust proxy', true);
 
@@ -271,7 +274,7 @@ app.get('/api/cities/:slug', async (req: Request, res: Response) => {
 
     const city = cityRes.rows[0];
 
-    // Local cinemas with active, current/future showtimes
+    // Local cinemas with active showtimes within the freshness grace window
     const cinemasRes = await executeRawSql(
       `SELECT c.*, ci.name as city_name, ci.slug as city_slug
        FROM cinemas c
@@ -279,14 +282,14 @@ app.get('/api/cities/:slug', async (req: Request, res: Response) => {
        WHERE c.city_id = $1
        AND EXISTS (
          SELECT 1 FROM showtimes s
-         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
        )
        ORDER BY c.name ASC`,
       [city.id]
     );
     const cityCinemas = cinemasRes.rows;
 
-    // Find nearest cinemas across Italy that actually have active current/future showtimes
+    // Find nearest cinemas across Italy that actually have active showtimes within the freshness grace window
     const nearestRes = await executeRawSql(
       `SELECT
          c.*, ci.name as city_name, ci.slug as city_slug,
@@ -301,7 +304,7 @@ app.get('/api/cities/:slug', async (req: Request, res: Response) => {
        JOIN cities ci ON c.city_id = ci.id
        WHERE EXISTS (
          SELECT 1 FROM showtimes s
-         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
        )
        ORDER BY distance_km ASC
        LIMIT 6`,
@@ -348,7 +351,7 @@ app.get('/api/nearby', async (req: Request, res: Response) => {
        JOIN cities ci ON c.city_id = ci.id
        WHERE EXISTS (
          SELECT 1 FROM showtimes s
-         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+         WHERE s.cinema_id = c.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
        )
        ORDER BY distance_km ASC
        LIMIT 10`,
@@ -534,7 +537,7 @@ app.get('/api/cinemas/:id', async (req: Request, res: Response) => {
          s.*, m.title_it as movie_title, m.poster_url as movie_poster
        FROM showtimes s
        JOIN movies m ON s.movie_id = m.id
-       WHERE s.cinema_id = $1 AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+       WHERE s.cinema_id = $1 AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
        ORDER BY s.show_date ASC, s.time ASC`,
       [cinema.id]
     );
@@ -569,7 +572,7 @@ app.get('/api/movies/search', async (req: Request, res: Response) => {
         (
           SELECT COUNT(*) 
           FROM showtimes s 
-          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
         ) as active_showtimes_count
       FROM movies m
       WHERE 
@@ -595,7 +598,7 @@ app.get('/api/movies/search', async (req: Request, res: Response) => {
         AND length(trim(m.poster_url)) > 0
         AND m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
       ORDER BY 
-        (SELECT COUNT(*) FROM showtimes s WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text) DESC,
+        (SELECT COUNT(*) FROM showtimes s WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text) DESC,
         m.is_featured DESC, 
         m.rating DESC, 
         m.title_it ASC
@@ -638,15 +641,15 @@ app.get('/api/movies', async (req: Request, res: Response) => {
       AND m.poster_url NOT LIKE '%8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg%'
     )`);
 
-    // Part 1: Public movie catalog only returns movies with active showtimes today or in the future
+    // Public movie catalog prioritizes movies with active showtimes within the freshness grace window
     if (!allParam) {
       conditions.push(`(
         EXISTS (
           SELECT 1 FROM showtimes s
-          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+          WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
         )
         OR NOT EXISTS (
-          SELECT 1 FROM showtimes s2 WHERE s2.active = TRUE AND s2.show_date >= CURRENT_DATE::text
+          SELECT 1 FROM showtimes s2 WHERE s2.active = TRUE AND s2.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
         )
       )`);
     }
@@ -665,6 +668,10 @@ app.get('/api/movies', async (req: Request, res: Response) => {
 
     if (featuredOnly) {
       conditions.push(`m.is_featured = TRUE`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM showtimes s
+        WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
+      )`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -672,7 +679,11 @@ app.get('/api/movies', async (req: Request, res: Response) => {
     const sql = `
       SELECT m.* FROM movies m
       ${whereClause}
-      ORDER BY m.is_featured DESC, m.rating DESC, m.title_it ASC
+      ORDER BY 
+        (EXISTS (SELECT 1 FROM showtimes s WHERE s.movie_id = m.id AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text)) DESC,
+        m.is_featured DESC, 
+        m.rating DESC, 
+        m.title_it ASC
     `;
 
     const result = await executeRawSql(sql, params);
@@ -709,7 +720,7 @@ app.get('/api/movies/:slug', async (req: Request, res: Response) => {
        FROM showtimes s
        JOIN cinemas c ON s.cinema_id = c.id
        JOIN cities ci ON c.city_id = ci.id
-       WHERE s.movie_id = $1 AND s.active = TRUE AND s.show_date >= CURRENT_DATE::text
+       WHERE s.movie_id = $1 AND s.active = TRUE AND s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text
        ORDER BY s.show_date ASC, s.time ASC`,
       [movie.id]
     );
@@ -761,7 +772,7 @@ app.get('/api/showtimes', async (req: Request, res: Response) => {
       params.push(date);
       pIdx++;
     } else {
-      conditions.push(`s.show_date >= CURRENT_DATE::text`);
+      conditions.push(`s.show_date >= (CURRENT_DATE - INTERVAL '${SHOWTIMES_GRACE_DAYS} days')::text`);
     }
 
     if (format && format !== 'all') {
@@ -1801,39 +1812,92 @@ Sitemap: ${publicUrl}/sitemap.xml
 `);
 });
 
-// Dynamic Sitemap.xml Handler
+// Dynamic Sitemap.xml Handler — Covers all Italian comuni, movies, and core editorial routes with real lastmod timestamps
 app.get('/sitemap.xml', async (req: Request, res: Response) => {
   try {
     const publicUrl = getPublicSiteUrl();
-    const [citiesRes, moviesRes] = await Promise.all([
-      executeRawSql('SELECT slug FROM cities WHERE is_provincial_capital = TRUE LIMIT 120'),
-      executeRawSql('SELECT slug FROM movies LIMIT 200')
+    const todayIso = new Date().toISOString().split('T')[0];
+
+    const [citiesRes, moviesRes, lastScrapeRes] = await Promise.all([
+      executeRawSql(`
+        SELECT 
+          c.slug,
+          c.is_provincial_capital,
+          (SELECT COUNT(*) FROM cinemas WHERE city_id = c.id) as cinema_count,
+          COALESCE(
+            to_char(MAX(s.scraped_at), 'YYYY-MM-DD'),
+            to_char(c.geocoded_at, 'YYYY-MM-DD')
+          ) as lastmod
+        FROM cities c
+        LEFT JOIN cinemas cin ON cin.city_id = c.id
+        LEFT JOIN showtimes s ON s.cinema_id = cin.id
+        GROUP BY c.id, c.slug, c.is_provincial_capital, c.geocoded_at
+        ORDER BY c.is_provincial_capital DESC, cinema_count DESC, c.name ASC
+      `),
+      executeRawSql(`
+        SELECT 
+          m.slug,
+          COALESCE(
+            to_char(MAX(s.scraped_at), 'YYYY-MM-DD'),
+            to_char(m.ratings_fetched_at, 'YYYY-MM-DD'),
+            $1
+          ) as lastmod
+        FROM movies m
+        LEFT JOIN showtimes s ON s.movie_id = m.id
+        GROUP BY m.id, m.slug, m.ratings_fetched_at
+        ORDER BY m.slug ASC
+      `, [todayIso]),
+      executeRawSql(`SELECT to_char(run_at, 'YYYY-MM-DD') as last_run FROM scrape_logs ORDER BY run_at DESC LIMIT 1`)
     ]);
 
-    const urls = [
-      `${publicUrl}/`,
-      `${publicUrl}/film`,
-      `${publicUrl}/comuni`
+    const fallbackLastmod = lastScrapeRes.rows[0]?.last_run || todayIso;
+
+    type SitemapEntry = { loc: string; lastmod: string; changefreq: string; priority: string };
+    const entries: SitemapEntry[] = [
+      { loc: `${publicUrl}/`, lastmod: fallbackLastmod, changefreq: 'daily', priority: '1.0' },
+      { loc: `${publicUrl}/film`, lastmod: fallbackLastmod, changefreq: 'daily', priority: '0.9' },
+      { loc: `${publicUrl}/comuni`, lastmod: fallbackLastmod, changefreq: 'daily', priority: '0.9' }
     ];
 
     for (const c of citiesRes.rows) {
-      urls.push(`${publicUrl}/citta/${c.slug}`);
-      urls.push(`${publicUrl}/cinema/${c.slug}`);
+      const cityLastmod = c.lastmod || fallbackLastmod;
+      const hasCinemas = parseInt(c.cinema_count || '0', 10) > 0;
+      const priority = c.is_provincial_capital || hasCinemas ? '0.8' : '0.6';
+
+      entries.push({
+        loc: `${publicUrl}/citta/${c.slug}`,
+        lastmod: cityLastmod,
+        changefreq: 'daily',
+        priority
+      });
+      entries.push({
+        loc: `${publicUrl}/cinema/${c.slug}`,
+        lastmod: cityLastmod,
+        changefreq: 'daily',
+        priority
+      });
     }
 
     for (const m of moviesRes.rows) {
-      urls.push(`${publicUrl}/film/${m.slug}`);
+      entries.push({
+        loc: `${publicUrl}/film/${m.slug}`,
+        lastmod: m.lastmod || fallbackLastmod,
+        changefreq: 'daily',
+        priority: '0.8'
+      });
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => `  <url>
-    <loc>${u}</loc>
-    <changefreq>daily</changefreq>
-    <priority>${u === publicUrl + '/' ? '1.0' : '0.8'}</priority>
+${entries.map(e => `  <url>
+    <loc>${e.loc}</loc>
+    <lastmod>${e.lastmod}</lastmod>
+    <changefreq>${e.changefreq}</changefreq>
+    <priority>${e.priority}</priority>
   </url>`).join('\n')}
 </urlset>`;
 
+    res.set('Cache-Control', 'public, max-age=3600');
     res.type('application/xml');
     res.send(xml);
   } catch (err: any) {

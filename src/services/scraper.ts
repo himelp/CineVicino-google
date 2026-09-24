@@ -1653,19 +1653,39 @@ export class NationwideCinemaScraper {
     );
 
     const todayStr = new Date().toISOString().split('T')[0];
+    const SHOWTIMES_GRACE_DAYS = 3;
+    const cutoffDate = new Date(Date.now() - SHOWTIMES_GRACE_DAYS * 86400000).toISOString().split('T')[0];
 
-    // Deactivate past showtimes so outdated rows are automatically cleaned up
+    // Deactivate showtimes older than the grace window (3 days) so rotating batches remain active
     try {
       const cleanRes = await executeRawSql(
         `UPDATE showtimes SET active = FALSE WHERE show_date < $1 AND active = TRUE`,
-        [todayStr]
+        [cutoffDate]
       );
       if (cleanRes.rowCount && cleanRes.rowCount > 0) {
-        console.log(`[Scraper] 🧹 Disattivati ${cleanRes.rowCount} orari di programmazione con data passata (< ${todayStr})`);
-        notify('cleanup', 'Database', cleanRes.rowCount, `Disattivati ${cleanRes.rowCount} orari con data trascorsa (< ${todayStr}).`);
+        console.log(`[Scraper] 🧹 Disattivati ${cleanRes.rowCount} orari di programmazione oltre la finestra di grazia (< ${cutoffDate})`);
+        notify('cleanup', 'Database', cleanRes.rowCount, `Disattivati ${cleanRes.rowCount} orari con data trascorsa (< ${cutoffDate}).`);
       }
     } catch (cleanErr: any) {
       console.warn('[Scraper] Past showtimes cleanup error:', cleanErr?.message);
+    }
+
+    // Unfeature movies that have zero active showtimes within the grace window (Issue #2)
+    try {
+      const unfeatureRes = await executeRawSql(`
+        UPDATE movies
+        SET is_featured = FALSE
+        WHERE is_featured = TRUE
+        AND NOT EXISTS (
+          SELECT 1 FROM showtimes s
+          WHERE s.movie_id = movies.id AND s.active = TRUE AND s.show_date >= $1
+        )
+      `, [cutoffDate]);
+      if (unfeatureRes.rowCount && unfeatureRes.rowCount > 0) {
+        console.log(`[Scraper] 🎬 Aggiornato is_featured=FALSE per ${unfeatureRes.rowCount} film senza spettacoli attivi`);
+      }
+    } catch (featErr: any) {
+      console.warn('[Scraper] Unfeature expired movies error:', featErr?.message);
     }
 
     // Process cinemas and their schedules/movies using worker pool for bounded concurrency

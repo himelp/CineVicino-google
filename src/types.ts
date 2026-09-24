@@ -55,6 +55,7 @@ export interface Movie {
   cast: string[];
   age_rating?: string; // e.g. 'T', 'VM14', 'VM18'
   is_featured?: boolean;
+  active_showtimes_count?: number;
   letterboxd_rating?: number | null;
   letterboxd_rating_count?: number | null;
   rotten_tomatoes_score?: number | null;

@@ -3,6 +3,9 @@ export type Language = 'it' | 'en';
 export interface TranslationKeys {
   tagline: string;
   nearbyBtn: string;
+  navMovies: string;
+  navCinemas: string;
+  navCities: string;
   searchPlaceholder: string;
   searchComune: string;
   allCities: string;
@@ -133,6 +136,9 @@ export const translations: Record<Language, TranslationKeys> = {
   it: {
     tagline: 'Directory Cinema d\'Italia',
     nearbyBtn: 'Cinema vicino a me',
+    navMovies: 'Film',
+    navCinemas: 'Cinema',
+    navCities: 'Città',
     searchPlaceholder: 'Cerca per comune (es. Roma, Milano, Melzo, Cortina...)',
     searchComune: 'Cerca un comune italiano...',
     allCities: 'Tutti i Comuni',
@@ -261,6 +267,9 @@ export const translations: Record<Language, TranslationKeys> = {
   en: {
     tagline: 'Italian Cinema Directory',
     nearbyBtn: 'Cinemas near me',
+    navMovies: 'Movies',
+    navCinemas: 'Cinemas',
+    navCities: 'Cities',
     searchPlaceholder: 'Search any Italian city (e.g. Rome, Milan, Melzo, Cortina...)',
     searchComune: 'Search an Italian city...',
     allCities: 'All Municipalities',
