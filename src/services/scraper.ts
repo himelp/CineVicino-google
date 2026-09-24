@@ -9,7 +9,7 @@
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
 import { executeRawSql } from '../db/index';
-import { MovieFormat, TicketSource } from '../types';
+import { CinemaChain, MovieFormat, TicketSource } from '../types';
 import { syncAllDataToGoogleSheet } from './googleSheets';
 import { enrichMoviesWithExternalRatings } from './ratingsFetcher';
 
@@ -45,6 +45,8 @@ export interface ScrapeOptions {
   offset?: number;
   advanceCursor?: boolean;
   daysAhead?: number;
+  skipWebtic?: boolean;
+  skipSpazioCinema?: boolean;
 }
 
 export interface ScraperCursorState {
@@ -202,7 +204,8 @@ export function determineTicketSource(
       urlLower.includes('thespacecinema') ||
       urlLower.includes('arcadiacinema') ||
       urlLower.includes('notoriouscinemas') ||
-      urlLower.includes('spaziocinema')
+      urlLower.includes('spaziocinema') ||
+      urlLower.includes('webtic')
     ) {
       return 'chain site';
     }
@@ -213,7 +216,10 @@ export function determineTicketSource(
     chain === 'The Space Cinema' ||
     chain === 'Arcadia' ||
     chain === 'Notorious' ||
-    chain === 'Anteo'
+    chain === 'Anteo' ||
+    chain === 'Giometti' ||
+    chain === 'Cineplexx' ||
+    chain === 'Il Regno del Cinema'
   ) {
     return 'chain site';
   }
@@ -417,7 +423,7 @@ export function cleanScrapedMovieTitle(rawTitle: string): { cleanTitle: string; 
   let isVo = false;
   let detectedFormat = '2D';
 
-  if (/\b(v\.o\.s\.|v\.o\.s|vose|v\.o\.|v\.o|vo|versione originale sottotitolata|versione originale)\b/i.test(t)) {
+  if (/\b(v\.?o\.?s\.?e?|v\.?o\.?|vo|versione originale sottotitolata|versione originale|original version)\b/i.test(t)) {
     isVo = true;
   }
   if (/\b(3d)\b/i.test(t)) {
@@ -427,6 +433,10 @@ export function cleanScrapedMovieTitle(rawTitle: string): { cleanTitle: string; 
   }
 
   t = t
+    // Strip leading VO prefixes e.g. "V. O. SOTT. ITA ODISSEA" -> "ODISSEA"
+    .replace(/^v\.?\s*o\.?\s*(?:sott\.?\s*ita\.?)?\s*[-–—:]*\s*/gi, '')
+    // Strip leading parentheses e.g. "(Kor) Bts...", "(Lingua Orig) Avengers...", "(Anteprima) Atmos - Dune..."
+    .replace(/^\((?:kor|en|eng|ita|jap|lingua orig\w*|anteprima|evento|special\w*)\)\s*/gi, '')
     .replace(/\s*[\(\[](v\.?o\.?s\.?e?|v\.?o\.?|versione originale( sottotitolata)?|original version|sub\w*)[\)\]]/gi, '')
     .replace(/\s*[\(\[](3d|2d|4k|imax|isense|atmos|dolby)[\)\]]/gi, '')
     .replace(/\s*[\(\[](evento|live|anteprima|restauro|versione restaurata)[\)\]]/gi, '')
@@ -1427,6 +1437,419 @@ export class NationwideCinemaScraper {
   }
 
   /**
+   * Phase 4: Webtic Network Adapter
+   * Unlocks UCI Cinemas, Notorious, Giometti, Cineplexx, Il Regno del Cinema, and independent venues nationwide.
+   * Direct integration with Webtic's JSON API (getLocalsTitles + getFullScheduling).
+   */
+  async scrapeWebticNetwork(
+    notify: (step: string, source: string, count: number, msg: string) => void,
+    options: ScrapeOptions = {}
+  ): Promise<ExtractedCinema[]> {
+    const t0 = Date.now();
+    notify('webtic', 'Webtic Network', 0, 'Caricamento directory nazionale sale Webtic...');
+
+    let allLocals: any[] = [];
+    try {
+      const dirRes = await fetch('https://secure.webtic.it/api/wtjsonservices.ashx?wtid=getLocalsTitles', {
+        method: 'POST',
+        headers: { 'User-Agent': this.userAgent },
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!dirRes.ok) {
+        throw new Error(`HTTP ${dirRes.status} durante il recupero della directory Webtic`);
+      }
+      const dirData = await dirRes.json();
+      const localsObj = dirData?.DS?.LocalsTitles?.Locals || {};
+      allLocals = Object.values(localsObj);
+    } catch (err: any) {
+      console.error('[Scraper] Webtic directory fetch failed:', err?.message || err);
+      notify('webtic', 'Webtic Network', 0, `Impossibile caricare directory Webtic: ${err?.message}`);
+      return [];
+    }
+
+    // Filter out internal test accounts, vendor offices, and invalid/wildcard entries
+    let candidates = allLocals.filter((l: any) => {
+      if (!l.Description || l.Town === '*' || l.Description.trim().length === 0) return false;
+      if (/\btest\b/i.test(l.Description)) return false;
+      if (/via rubens/i.test(l.Address || '')) return false;
+      if (l.Description.trim().toUpperCase() === 'EVOWEB') return false;
+      return true;
+    });
+
+    // If a specific city was requested, focus on matching venues for fast execution
+    if (options.city) {
+      const cityFilter = options.city.toLowerCase().trim();
+      const filtered = candidates.filter((l: any) => {
+        const town = (l.Town || '').toLowerCase();
+        const district = (l.District || '').toLowerCase();
+        return town.includes(cityFilter) || district.includes(cityFilter);
+      });
+      if (filtered.length > 0) {
+        candidates = filtered;
+      }
+    }
+
+    notify(
+      'webtic',
+      'Webtic Network',
+      candidates.length,
+      `Scansione programmazioni su ${candidates.length} strutture Webtic (concorrenza: 12)...`
+    );
+
+    const discoveredCinemas: ExtractedCinema[] = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    let processedCount = 0;
+
+    await runWithConcurrency(candidates, 12, async (loc: any) => {
+      try {
+        const res = await fetch(
+          `https://secure.webtic.it/api/wtjsonservices.ashx?wtid=getFullScheduling&trackid=1&localid=${loc.LocalId}`,
+          {
+            method: 'POST',
+            headers: { 'User-Agent': this.userAgent },
+            signal: AbortSignal.timeout(2500)
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const events: any[] = data?.DS?.Scheduling?.Events || [];
+        if (!events || events.length === 0) return;
+
+        const venueName = (loc.Description || '').trim().replace(/\s+/g, ' ');
+        const town = (loc.Town || loc.District || 'Italia').trim();
+        const citySlug = slugify(town);
+        const address = [loc.Address, loc.ZipCode, loc.Town, loc.DistrictAbbreviation]
+          .filter(Boolean)
+          .map((s: string) => s.trim())
+          .join(', ');
+
+        let chain: CinemaChain | undefined = undefined;
+        if (/\buci\b/i.test(venueName)) chain = 'UCI';
+        else if (/\bnotorious\b/i.test(venueName)) chain = 'Notorious';
+        else if (/\banteo\b/i.test(venueName)) chain = 'Anteo';
+
+        const ticketDeepLink = `https://secure.webtic.it/angwt/webtic.aspx?lng=it&lid=${loc.LocalId}&tpl=default&kid=1#/local/it/1/${loc.LocalId}`;
+
+        const schedulesMap = new Map<string, ScrapedMovieSchedule>();
+
+        for (const ev of events) {
+          const rawTitle = (ev.Title || '').trim();
+          if (!rawTitle) continue;
+
+          // Format derivation from Is3D and Properties array
+          const props: string[] = ev.Properties || [];
+          let format = '2D';
+          if (ev.Is3D || props.includes('3D')) {
+            format = '3D';
+          } else if (props.includes('ISENSE')) {
+            format = 'ISENSE';
+          } else if (props.includes('ATMOS')) {
+            format = 'ATMOS';
+          } else if (props.includes('35MM')) {
+            format = '35MM';
+          }
+
+          for (const d of ev.Days || []) {
+            const dateStr = (d.Day || '').split('T')[0];
+            if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+
+            const perfs = d.Performances || [];
+            const times: string[] = [];
+            const details: ScrapedShowtimeDetail[] = [];
+
+            for (const p of perfs) {
+              const time = (p.Time || '').trim();
+              if (time && /^\d{1,2}:\d{2}$/.test(time)) {
+                times.push(time);
+                details.push({
+                  time,
+                  format,
+                  ticket_url: ticketDeepLink
+                });
+              }
+            }
+
+            if (times.length > 0) {
+              const key = `${rawTitle}__${dateStr}`;
+              if (!schedulesMap.has(key)) {
+                schedulesMap.set(key, {
+                  title: rawTitle,
+                  date: dateStr,
+                  showtimes: times,
+                  showtime_details: details,
+                  ticket_url: ticketDeepLink
+                });
+              } else {
+                const existing = schedulesMap.get(key)!;
+                for (let i = 0; i < times.length; i++) {
+                  if (!existing.showtimes.includes(times[i])) {
+                    existing.showtimes.push(times[i]);
+                    existing.showtime_details?.push(details[i]);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        const schedules = Array.from(schedulesMap.values());
+        if (schedules.length === 0) return;
+
+        // Movies fallback for today (or earliest available day)
+        let movies = schedules
+          .filter(s => s.date === todayStr)
+          .map(s => ({
+            title: s.title,
+            showtimes: s.showtimes,
+            showtime_details: s.showtime_details,
+            ticket_url: s.ticket_url
+          }));
+
+        if (movies.length === 0 && schedules.length > 0) {
+          const earliestDate = schedules[0].date;
+          movies = schedules
+            .filter(s => s.date === earliestDate)
+            .map(s => ({
+              title: s.title,
+              showtimes: s.showtimes,
+              showtime_details: s.showtime_details,
+              ticket_url: s.ticket_url
+            }));
+        }
+
+        discoveredCinemas.push({
+          name: venueName,
+          city_name: town,
+          city_slug: citySlug,
+          city_id: `city-${citySlug}`,
+          address: address || `${venueName}, ${town}`,
+          chain,
+          source_url: ticketDeepLink,
+          source_name: 'Webtic',
+          schedules,
+          movies
+        });
+      } catch (err: any) {
+        // Safe timeout/network error swallow per venue
+      } finally {
+        processedCount++;
+        if (processedCount % 200 === 0 || processedCount === candidates.length) {
+          notify(
+            'webtic',
+            'Webtic Network',
+            discoveredCinemas.length,
+            `Progresso Webtic: ${processedCount}/${candidates.length} strutture analizzate (${discoveredCinemas.length} cinema attivi con programmazioni)...`
+          );
+        }
+      }
+    });
+
+    const elapsedSec = ((Date.now() - t0) / 1000).toFixed(1);
+    notify(
+      'webtic',
+      'Webtic Network',
+      discoveredCinemas.length,
+      `Webtic completato in ${elapsedSec}s: ${discoveredCinemas.length} cinema attivi con programmazioni estratti.`
+    );
+
+    return discoveredCinemas;
+  }
+
+  /**
+   * Phase 5: Anteo / SpazioCinema Circuit Adapter
+   * Scrapes 18tickets-powered venues of the SpazioCinema network (Anteo Palazzo del Cinema, CityLife, Ariosto, Monza, Treviglio, Cremona).
+   */
+  async scrapeSpazioCinema(
+    notify: (step: string, source: string, count: number, msg: string) => void,
+    options: ScrapeOptions = {}
+  ): Promise<ExtractedCinema[]> {
+    notify('spaziocinema', 'SpazioCinema', 0, 'Scansione circuito Anteo SpazioCinema...');
+    const t0 = Date.now();
+
+    const KNOWN_ANTEO_VENUES = [
+      { name: 'Anteo Palazzo Del Cinema', city: 'Milano', slug: 'milano', url: 'https://anteo.spaziocinema.18tickets.it/', address: 'Piazza XXV Aprile 8, 20124 Milano' },
+      { name: 'CityLife Anteo', city: 'Milano', slug: 'milano', url: 'https://citylife.spaziocinema.18tickets.it/', address: 'Piazza Tre Torri 1, 20145 Milano' },
+      { name: 'Ariosto spazioCinema', city: 'Milano', slug: 'milano', url: 'Via Lodovico Ariosto 16, 20145 Milano', address: 'Via Lodovico Ariosto 16, 20145 Milano' },
+      { name: 'Capitol Anteo spazioCinema', city: 'Monza', slug: 'monza', url: 'https://capitol.spaziocinema.18tickets.it/', address: 'Via Pennati 4, 20900 Monza' },
+      { name: 'Treviglio Anteo spazioCinema', city: 'Treviglio', slug: 'treviglio', url: 'https://treviglio.spaziocinema.18tickets.it/', address: 'Viale Monte Grappa 31, 24047 Treviglio' },
+      { name: 'Anteo spazioCinema Cremona Po', city: 'Cremona', slug: 'cremona', url: 'https://cremona.spaziocinema.18tickets.it/', address: 'Via Castelleone 108, 26100 Cremona' },
+      { name: 'Arianteo CityLife', city: 'Milano', slug: 'milano', url: 'https://arenacitylife.spaziocinema.18tickets.it/', address: 'Piazza Tre Torri, 20145 Milano' },
+      { name: 'Arianteo Fabbrica Del Vapore', city: 'Milano', slug: 'milano', url: 'https://fabbricadelvapore.spaziocinema.18tickets.it/', address: 'Via Procaccini 4, 20154 Milano' },
+      { name: 'Anteo Nella Città', city: 'Milano', slug: 'milano', url: 'https://anteonellacitta.spaziocinema.18tickets.it/', address: 'Milano' }
+    ];
+
+    // Ensure Ariosto has correct URL
+    KNOWN_ANTEO_VENUES[2].url = 'https://ariosto.spaziocinema.18tickets.it/';
+
+    let venuesToScrape = [...KNOWN_ANTEO_VENUES];
+
+    // Attempt dynamic discovery from select_cinema page
+    try {
+      const selectRes = await fetch('https://spaziocinema.18tickets.it/select_cinema?mandatory=true', {
+        headers: { 'User-Agent': this.userAgent },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (selectRes.ok) {
+        const html = await selectRes.text();
+        const $ = cheerio.load(html);
+        $('a[href*="18tickets.it"]').each((_, a) => {
+          const href = $(a).attr('href');
+          const text = $(a).text().trim().replace(/\s+/g, ' ');
+          if (href && href.startsWith('http') && !venuesToScrape.some(v => v.url === href || (v.slug && href.includes(v.slug)))) {
+            let city = 'Milano';
+            if (/monza/i.test(text)) city = 'Monza';
+            else if (/cremona/i.test(text)) city = 'Cremona';
+            else if (/treviglio/i.test(text)) city = 'Treviglio';
+            venuesToScrape.push({
+              name: text || 'spazioCinema',
+              city,
+              slug: slugify(city),
+              url: href,
+              address: `${text}, ${city}`
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // Fall back smoothly to verified known list
+    }
+
+    if (options.city) {
+      const cityFilter = options.city.toLowerCase().trim();
+      const filtered = venuesToScrape.filter(v => v.city.toLowerCase().includes(cityFilter) || v.slug.includes(cityFilter));
+      if (filtered.length > 0) {
+        venuesToScrape = filtered;
+      }
+    }
+
+    const results: ExtractedCinema[] = [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    for (const v of venuesToScrape) {
+      try {
+        const res = await fetch(v.url, {
+          headers: { 'User-Agent': this.userAgent },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (!res.ok) continue;
+        const html = await res.text();
+        const $ = cheerio.load(html);
+
+        const cinema: ExtractedCinema = {
+          name: v.name,
+          city_name: v.city,
+          city_slug: v.slug,
+          city_id: `city-${v.slug}`,
+          address: v.address,
+          chain: 'Anteo',
+          source_url: v.url,
+          source_name: 'SpazioCinema',
+          schedules: [],
+          movies: []
+        };
+
+        const scheduleMap = new Map<string, ScrapedMovieSchedule>();
+
+        $('.movie--preview').each((_, m) => {
+          const rawTitle = $(m).find('.movie__title').first().text().trim();
+          if (!rawTitle) return;
+          const title = rawTitle.replace(/\s+/g, ' ');
+
+          $(m).find('.schedule-section-show').each((_, s) => {
+            const placeText = $(s).find('.time-select__place').text().trim();
+            const dateMatch = placeText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+            if (!dateMatch) return;
+            const dd = dateMatch[1];
+            const mm = dateMatch[2];
+            const yyyy = dateMatch[3];
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+
+            const mapsTitle = $(s).find('a[href*="maps.google"]').attr('title');
+            if (mapsTitle && mapsTitle.length > 5) {
+              cinema.address = mapsTitle;
+            }
+
+            const showtimeDetails: ScrapedShowtimeDetail[] = [];
+            $(s).find('ul a').each((_, a) => {
+              const tHref = $(a).attr('href') || v.url;
+              const btnText = $(a).find('li').text().trim();
+              const timeMatch = btnText.match(/\b\d{2}:\d{2}\b/);
+              if (timeMatch) {
+                const time = timeMatch[0];
+                const hall = btnText.replace(time, '').trim();
+                showtimeDetails.push({
+                  time,
+                  format: hall || '2D',
+                  ticket_url: tHref
+                });
+              }
+            });
+
+            if (showtimeDetails.length > 0) {
+              const key = `${title}__${dateStr}`;
+              if (!scheduleMap.has(key)) {
+                scheduleMap.set(key, {
+                  title,
+                  date: dateStr,
+                  showtimes: showtimeDetails.map(d => d.time),
+                  showtime_details: showtimeDetails,
+                  ticket_url: showtimeDetails[0].ticket_url
+                });
+              } else {
+                const existing = scheduleMap.get(key)!;
+                for (const d of showtimeDetails) {
+                  if (!existing.showtimes.includes(d.time)) {
+                    existing.showtimes.push(d.time);
+                    existing.showtime_details?.push(d);
+                  }
+                }
+              }
+            }
+          });
+        });
+
+        cinema.schedules = Array.from(scheduleMap.values());
+        cinema.movies = cinema.schedules
+          .filter(s => s.date === todayStr)
+          .map(s => ({
+            title: s.title,
+            showtimes: s.showtimes,
+            showtime_details: s.showtime_details,
+            ticket_url: s.ticket_url
+          }));
+
+        if (cinema.movies.length === 0 && cinema.schedules.length > 0) {
+          const earliest = cinema.schedules[0].date;
+          cinema.movies = cinema.schedules
+            .filter(s => s.date === earliest)
+            .map(s => ({
+              title: s.title,
+              showtimes: s.showtimes,
+              showtime_details: s.showtime_details,
+              ticket_url: s.ticket_url
+            }));
+        }
+
+        if (cinema.schedules.length > 0) {
+          results.push(cinema);
+        }
+      } catch (err: any) {
+        console.warn(`[Scraper] SpazioCinema failed for ${v.name}:`, err?.message);
+      }
+    }
+
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    notify(
+      'spaziocinema',
+      'SpazioCinema',
+      results.length,
+      `SpazioCinema completato in ${elapsed}s: ${results.length} sale attive con programmazioni multi-giorno estratte.`
+    );
+
+    return results;
+  }
+
+  /**
    * Execute Full Scraper Process Across Cities
    */
   async executeFullScrape(
@@ -1453,7 +1876,7 @@ export class NationwideCinemaScraper {
       }
     };
 
-    const scrapeOptions = { useFirecrawl: options.useFirecrawl === true };
+    const scrapeOptions: ScrapeOptions = { ...options, useFirecrawl: options.useFirecrawl === true };
     if (scrapeOptions.useFirecrawl) {
       notify('init', 'Firecrawl', 0, 'Integrazione Firecrawl API attivata per bypass JS e bot protection...');
     } else {
@@ -1585,7 +2008,7 @@ export class NationwideCinemaScraper {
       } catch (err: any) {}
     }
     daysAhead = Math.min(Math.max(daysAhead || 7, 1), 30);
-    const resolvedScrapeOptions = { ...scrapeOptions, daysAhead };
+    const resolvedScrapeOptions: ScrapeOptions = { ...scrapeOptions, daysAhead };
 
     const allDiscoveredCinemas: ExtractedCinema[] = [];
 
@@ -1643,6 +2066,82 @@ export class NationwideCinemaScraper {
       }
     } catch (err: any) {
       console.error('[Scraper] ComingSoon error:', err.message);
+    }
+
+    // Phase 4: Webtic Network (UCI, Notorious, Giometti, Cineplexx, Il Regno del Cinema, etc.)
+    if (!resolvedScrapeOptions.skipWebtic) {
+      try {
+        const webticCinemas = await this.scrapeWebticNetwork(notify, resolvedScrapeOptions);
+        for (const wc of webticCinemas) {
+          const { coreName: wcCore } = cleanScrapedCinemaName(wc.name);
+          const existing = allDiscoveredCinemas.find(c => {
+            const { coreName: cCore } = cleanScrapedCinemaName(c.name);
+            return (cCore && wcCore && cCore === wcCore) || c.name.toLowerCase() === wc.name.toLowerCase();
+          });
+          if (existing) {
+            if (wc.schedules && wc.schedules.length > 0) {
+              if (!existing.schedules) existing.schedules = [];
+              for (const s of wc.schedules) {
+                if (!existing.schedules.some(es => es.date === s.date && es.title.toLowerCase() === s.title.toLowerCase())) {
+                  existing.schedules.push(s);
+                }
+              }
+            }
+            for (const m of wc.movies) {
+              if (!existing.movies.some(em => em.title.toLowerCase() === m.title.toLowerCase())) {
+                existing.movies.push(m);
+              }
+            }
+            if (!existing.chain && wc.chain) existing.chain = wc.chain;
+            if (!isRealTicketingUrl(existing.source_url) && isRealTicketingUrl(wc.source_url)) {
+              existing.source_url = wc.source_url;
+              existing.source_name = wc.source_name;
+            }
+          } else {
+            allDiscoveredCinemas.push(wc);
+          }
+        }
+      } catch (err: any) {
+        console.error('[Scraper] Webtic Network error:', err?.message || err);
+      }
+    }
+
+    // Phase 5: Anteo / SpazioCinema Circuit
+    if (!resolvedScrapeOptions.skipSpazioCinema) {
+      try {
+        const anteoCinemas = await this.scrapeSpazioCinema(notify, resolvedScrapeOptions);
+        for (const ac of anteoCinemas) {
+          const { coreName: acCore } = cleanScrapedCinemaName(ac.name);
+          const existing = allDiscoveredCinemas.find(c => {
+            const { coreName: cCore } = cleanScrapedCinemaName(c.name);
+            return (cCore && acCore && cCore === acCore) || c.name.toLowerCase() === ac.name.toLowerCase();
+          });
+          if (existing) {
+            if (ac.schedules && ac.schedules.length > 0) {
+              if (!existing.schedules) existing.schedules = [];
+              for (const s of ac.schedules) {
+                if (!existing.schedules.some(es => es.date === s.date && es.title.toLowerCase() === s.title.toLowerCase())) {
+                  existing.schedules.push(s);
+                }
+              }
+            }
+            for (const m of ac.movies) {
+              if (!existing.movies.some(em => em.title.toLowerCase() === m.title.toLowerCase())) {
+                existing.movies.push(m);
+              }
+            }
+            if (!existing.chain && ac.chain) existing.chain = ac.chain;
+            if (!isRealTicketingUrl(existing.source_url) && isRealTicketingUrl(ac.source_url)) {
+              existing.source_url = ac.source_url;
+              existing.source_name = ac.source_name;
+            }
+          } else {
+            allDiscoveredCinemas.push(ac);
+          }
+        }
+      } catch (err: any) {
+        console.error('[Scraper] SpazioCinema error:', err?.message || err);
+      }
     }
 
     notify(

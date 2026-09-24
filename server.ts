@@ -1325,6 +1325,8 @@ interface ScrapeBackgroundJob {
     offset?: number;
     advanceCursor?: boolean;
     daysAhead?: number;
+    skipWebtic?: boolean;
+    skipSpazioCinema?: boolean;
   };
   progress: {
     step: string;
@@ -1353,6 +1355,8 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
     const useFirecrawl = req.body?.useFirecrawl === true;
     const rawDays = req.query.days_ahead || req.query.days || req.body?.days_ahead || req.body?.days;
     const daysAhead = rawDays !== undefined && rawDays !== '' ? parseInt(rawDays as string, 10) : undefined;
+    const skipWebtic = req.query.skip_webtic === 'true' || req.body?.skipWebtic === true || req.body?.skip_webtic === true;
+    const skipSpazioCinema = req.query.skip_spaziocinema === 'true' || req.body?.skipSpazioCinema === true || req.body?.skip_spaziocinema === true;
 
     // Check if an active scrape is already running
     if (activeScrapeJob && activeScrapeJob.status === 'running') {
@@ -1394,7 +1398,9 @@ app.post('/api/admin/scrape/run', requireAdmin, scraperLimiter, async (req: Auth
         limit: targetLimit,
         offset: targetOffset,
         advanceCursor,
-        daysAhead
+        daysAhead,
+        skipWebtic,
+        skipSpazioCinema
       },
       progress: {
         step: 'init',
