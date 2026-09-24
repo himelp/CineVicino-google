@@ -3,7 +3,7 @@ import { Film, MapPin, Search, Globe, Bookmark, Shield, User, X, ChevronRight, S
 import { City, Movie } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { safeFetchJson } from '../utils/api';
-import { formatTodayFull } from '../utils/date';
+import { formatTodayFull, formatTodayShort } from '../utils/date';
 
 export interface SocialLinkItem {
   id: string;
@@ -154,11 +154,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-white/10 transition-colors">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 gap-2 sm:gap-4">
+      <div className="max-w-7xl 2xl:max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 sm:h-20 gap-2.5 sm:gap-4 lg:gap-6">
           
           {/* Logo & Navigation */}
-          <div className="flex items-center gap-3 sm:gap-6 lg:gap-8 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-5 lg:gap-6 flex-shrink-0">
             <div 
               onClick={() => {
                 onOpenHome();
@@ -212,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Desktop Search bar with instant autocomplete */}
-          <div ref={searchRef} className="relative flex-1 max-w-md hidden sm:block">
+          <div ref={searchRef} className="relative flex-1 min-w-[260px] sm:min-w-[300px] lg:min-w-[340px] max-w-lg hidden sm:block">
             {/* Search Tab Switcher (Città vs Film) */}
             <div className="flex items-center gap-1.5 mb-1.5 px-0.5">
               <button
@@ -272,9 +272,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Autocomplete Dropdown */}
+            {/* Autocomplete Dropdown — guaranteed minimum readable width */}
             {showDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-white/5 backdrop-blur-xl max-h-96 overflow-y-auto">
+              <div className="absolute top-full left-0 w-[420px] sm:w-[480px] max-w-[calc(100vw-2rem)] mt-2 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-white/5 backdrop-blur-xl max-h-[30rem] overflow-y-auto">
                 {searchTab === 'cities' ? (
                   suggestions.length > 0 ? (
                     <>
@@ -326,35 +326,35 @@ export const Header: React.FC<HeaderProps> = ({
                         <button
                           key={m.id}
                           onClick={() => handleSelectMovie(m)}
-                          className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex items-center justify-between text-sm group cursor-pointer"
+                          className="w-full text-left px-4 py-2.5 hover:bg-white/5 transition-colors flex items-center justify-between text-sm group cursor-pointer gap-3"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             {m.poster_url ? (
                               <img
                                 src={m.poster_url}
                                 alt={m.title_it}
-                                className="w-9 h-13 object-cover rounded-md flex-shrink-0 border border-white/10 bg-neutral-900"
+                                className="w-10 h-14 object-cover rounded-md flex-shrink-0 border border-white/10 bg-neutral-900"
                               />
                             ) : (
-                              <div className="w-9 h-13 rounded-md bg-neutral-800 border border-white/10 flex items-center justify-center flex-shrink-0">
+                              <div className="w-10 h-14 rounded-md bg-neutral-800 border border-white/10 flex items-center justify-center flex-shrink-0">
                                 <Film className="w-4 h-4 text-neutral-500" />
                               </div>
                             )}
-                            <div className="min-w-0">
-                              <p className="font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-white truncate group-hover:text-[#D4AF37] transition-colors text-sm">
                                 {m.title_it}
                               </p>
-                              <div className="flex items-center gap-1.5 text-xs text-neutral-400 mt-0.5">
+                              <div className="flex items-center gap-1.5 text-xs text-neutral-400 mt-0.5 flex-wrap">
                                 {m.release_year && <span>{m.release_year}</span>}
                                 {m.duration_minutes && <span>· {m.duration_minutes}m</span>}
-                                {m.director && <span className="truncate">· {m.director}</span>}
+                                {m.director && <span className="truncate max-w-[140px]">· {m.director}</span>}
                                 {typeof m.active_showtimes_count !== 'undefined' && (
                                   parseInt(m.active_showtimes_count as any, 10) > 0 ? (
-                                    <span className="text-emerald-400 font-medium truncate">
+                                    <span className="text-emerald-400 font-medium whitespace-nowrap">
                                       · {m.active_showtimes_count} {lang === 'it' ? (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'orario' : 'orari') : (parseInt(m.active_showtimes_count as any, 10) === 1 ? 'showtime' : 'showtimes')}
                                     </span>
                                   ) : (
-                                    <span className="text-neutral-500 truncate">
+                                    <span className="text-neutral-500 whitespace-nowrap">
                                       · {lang === 'it' ? 'Nessun orario' : 'No showtimes'}
                                     </span>
                                   )
@@ -362,7 +362,7 @@ export const Header: React.FC<HeaderProps> = ({
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                             {m.rating ? (
                               <span className="flex items-center gap-1 text-xs font-mono font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded-md border border-[#D4AF37]/20">
                                 <Star className="w-3 h-3 fill-[#D4AF37]" />
@@ -387,12 +387,16 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
             
-            {/* Today's live date indicator (Desktop) */}
-            <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-neutral-300 text-xs font-medium whitespace-nowrap">
+            {/* Today's live date indicator (Desktop: full on 2xl, compact on xl, hidden below xl) */}
+            <div className="hidden 2xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-neutral-300 text-xs font-medium whitespace-nowrap">
               <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
               <span className="capitalize">{formatTodayFull(lang)}</span>
+            </div>
+            <div className="hidden xl:flex 2xl:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-neutral-300 text-xs font-medium whitespace-nowrap">
+              <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
+              <span className="capitalize">{formatTodayShort(lang)}</span>
             </div>
 
             {/* Mobile Search Button */}
@@ -409,10 +413,10 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onLocateMe}
               disabled={isLocating}
               title={t.nearbyBtn}
-              className="bg-[#D4AF37] text-black text-xs font-bold min-h-[40px] sm:min-h-[44px] px-3 sm:px-4 py-2 rounded-full uppercase tracking-tighter hover:bg-white transition-colors shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-60 whitespace-nowrap active:scale-95"
+              className="bg-[#D4AF37] text-black text-xs font-bold min-h-[40px] sm:min-h-[44px] px-3 sm:px-3.5 py-2 rounded-full uppercase tracking-tighter hover:bg-white transition-colors shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-60 whitespace-nowrap active:scale-95"
             >
               <MapPin className={`w-3.5 h-3.5 shrink-0 ${isLocating ? 'animate-bounce' : ''}`} />
-              <span className="max-w-[70px] sm:max-w-[140px] truncate">
+              <span className="max-w-[70px] sm:max-w-[90px] xl:max-w-[110px] truncate">
                 {isLocating ? '...' : activeCity ? activeCity.name : 'Vicino'}
               </span>
             </button>
@@ -431,9 +435,9 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Social Media Links (Desktop - shown only if configured) */}
+            {/* Social Media Links (Desktop - shown only on wide 2xl screens if configured) */}
             {socialLinks && socialLinks.length > 0 && (
-              <div className="hidden lg:flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.03] border border-white/10">
+              <div className="hidden 2xl:flex items-center gap-1 px-2 py-1 rounded-full bg-white/[0.03] border border-white/10">
                 {socialLinks.map((s) => {
                   const Icon = s.icon;
                   return (

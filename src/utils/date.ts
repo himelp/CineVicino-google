@@ -39,6 +39,29 @@ export function formatTodayFull(lang: Language): string {
   return raw;
 }
 
+/**
+ * Returns short formatted today string in the active language.
+ * e.g. "Gio 24 Set" / "Thu, Sep 24"
+ */
+export function formatTodayShort(lang: Language): string {
+  const now = new Date();
+  const locale = lang === 'it' ? 'it-IT' : 'en-US';
+  const raw = new Intl.DateTimeFormat(locale, {
+    timeZone: 'Europe/Rome',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  }).format(now);
+
+  if (lang === 'it') {
+    return raw.split(' ').map((w) => {
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(' ');
+  }
+
+  return raw;
+}
+
 export interface FormattedDatePill {
   dateStr: string;
   mainLabel: string;

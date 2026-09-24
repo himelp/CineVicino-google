@@ -1813,8 +1813,18 @@ Sitemap: ${publicUrl}/sitemap.xml
 });
 
 // Dynamic Sitemap.xml Handler — Covers all Italian comuni, movies, and core editorial routes with real lastmod timestamps
+let cachedSitemapXml: string | null = null;
+let cachedSitemapTime = 0;
+const SITEMAP_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour in-memory cache
+
 app.get('/sitemap.xml', async (req: Request, res: Response) => {
   try {
+    if (cachedSitemapXml && (Date.now() - cachedSitemapTime < SITEMAP_CACHE_TTL_MS)) {
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.type('application/xml');
+      return res.send(cachedSitemapXml);
+    }
+
     const publicUrl = getPublicSiteUrl();
     const todayIso = new Date().toISOString().split('T')[0];
 
@@ -1896,6 +1906,9 @@ ${entries.map(e => `  <url>
     <priority>${e.priority}</priority>
   </url>`).join('\n')}
 </urlset>`;
+
+    cachedSitemapXml = xml;
+    cachedSitemapTime = Date.now();
 
     res.set('Cache-Control', 'public, max-age=3600');
     res.type('application/xml');

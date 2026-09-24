@@ -395,13 +395,23 @@ export default function App() {
     if (path.startsWith('/film/')) {
       const slug = path.replace('/film/', '').split('/')[0];
       if (slug) {
+        // If the movie is already loaded and matches the slug, prevent redundant re-fetching
+        if (selectedMovie?.slug === slug) {
+          return;
+        }
         const found = movies.find(m => m.slug === slug);
         if (found) {
           setSelectedMovie(found);
         } else {
           safeFetchJson<any>(`/api/movies/${slug}`)
             .then(parsed => {
-              if (parsed.ok && parsed.data?.movie) setSelectedMovie(parsed.data.movie);
+              if (parsed.ok && parsed.data?.movie) {
+                const m = parsed.data.movie;
+                if (parsed.data.showtimes) {
+                  (m as any)._preloadedShowtimes = parsed.data.showtimes;
+                }
+                setSelectedMovie(m);
+              }
             })
             .catch(err => console.error('Failed to load movie from URL', err));
         }

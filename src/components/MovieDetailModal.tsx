@@ -47,24 +47,36 @@ export const MovieDetailModal: React.FC<MovieDetailModalProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
-    if (!movie) return;
+    if (!movie?.slug) return;
 
+    // Use preloaded showtimes immediately if available (e.g. from direct URL navigation in App.tsx)
+    if ((movie as any)._preloadedShowtimes) {
+      setShowtimes((movie as any)._preloadedShowtimes);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
     async function loadMovieShowtimes() {
       try {
         setLoading(true);
-        const parsed = await safeFetchJson<any>(`/api/movies/${movie?.slug}`);
-        if (parsed.ok && parsed.data?.showtimes) {
+        const parsed = await safeFetchJson<any>(`/api/movies/${movie!.slug}`);
+        if (isMounted && parsed.ok && parsed.data?.showtimes) {
           setShowtimes(parsed.data.showtimes);
         }
       } catch (e) {
         console.error('Error fetching showtimes', e);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
     loadMovieShowtimes();
-  }, [movie]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [movie?.slug]);
 
   if (!movie) return null;
 
